@@ -44,25 +44,31 @@ The only dependencies are `typescript` and `@types/node` (dev-only). The compile
 
 ### 2. Configure
 
-Edit `trace-capture.json` (ships with sensible defaults):
+Edit the `x-config` section in `HOOK.json` (ships with sensible defaults):
 
 ```json
 {
-  "backend": {
-    "type": "gcs",
-    "bucket": "my-org-claude-traces",   // ← change to your bucket
-    "prefix": "traces/{USER}/{YYYY}/{MM}/{DD}/"
-  },
-  "privacy": {
-    "mode": "redacted",                 // "full" to skip redaction
-    "hash_user_identity": false,        // true to pseudonymise usernames
-    "org_salt": "",                     // required when hash_user_identity is true
-    "extra_patterns": []                // additional redaction regexes
+  "event": "Stop",
+  "command": "node",
+  "args": ["dist/capture.js"],
+  "timeout_seconds": 120,
+  "x-config": {
+    "backend": {
+      "type": "gcs",
+      "bucket": "my-org-claude-traces",   // ← change to your bucket
+      "prefix": "traces/{USER}/{YYYY}/{MM}/{DD}/"
+    },
+    "privacy": {
+      "mode": "redacted",                 // "full" to skip redaction
+      "hash_user_identity": false,        // true to pseudonymise usernames
+      "org_salt": "",                     // required when hash_user_identity is true
+      "extra_patterns": []                // additional redaction regexes
+    }
   }
 }
 ```
 
-At minimum you'll need to set `backend.bucket` to your GCS bucket name. See [Configuration reference](#configuration-reference) below for all options.
+At minimum you'll need to set `backend.bucket` to your GCS bucket name. The `x-config` key follows the OpenAPI vendor-extension convention for custom fields. See [Configuration reference](#configuration-reference) below for all options.
 
 ### 3. Ensure `gsutil` is available
 
@@ -83,7 +89,7 @@ The compiled `dist/` directory is checked into the repo, so you only need to reb
 
 ## Configuration reference
 
-The config file is `trace-capture.json` in the hook's root directory (next to `HOOK.json`).
+Configuration lives in the `x-config` key inside `HOOK.json`, keeping everything in one file.
 
 ### `backend`
 
@@ -283,7 +289,7 @@ Common errors and their remediation:
 |-------|-----|
 | `gsutil not found` | Install [Google Cloud SDK](https://cloud.google.com/sdk/docs/install) |
 | `auth failure` | Run `gcloud auth login` |
-| `bucket not found` | Check the bucket name in `trace-capture.json` |
+| `bucket not found` | Check the bucket name in `HOOK.json` `x-config` |
 | `permission denied` | Grant `roles/storage.objectCreator` on the bucket |
 
 If the config file is missing, the hook exits silently (code 0) with no side effects.

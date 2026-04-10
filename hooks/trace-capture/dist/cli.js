@@ -91,7 +91,7 @@ async function cmdDelete(args) {
     }
     const config = (0, config_1.loadConfig)();
     if (!config) {
-        console.error("trace-capture is not configured (no trace-capture.json found).");
+        console.error("trace-capture is not configured (no x-config in HOOK.json).");
         process.exit(1);
     }
     const backend = (0, interface_1.createBackend)(config.backend);

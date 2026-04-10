@@ -2,5 +2,18 @@
   "event": "Stop",
   "command": "node",
   "args": ["dist/capture.js"],
-  "timeout_seconds": 120
+  "timeout_seconds": 120,
+  "x-config": {
+    "backend": {
+      "type": "gcs",
+      "bucket": "my-org-claude-traces",
+      "prefix": "traces/{USER}/{YYYY}/{MM}/{DD}/"
+    },
+    "privacy": {
+      "mode": "redacted",
+      "hash_user_identity": false,
+      "org_salt": "",
+      "extra_patterns": []
+    }
+  }
 }

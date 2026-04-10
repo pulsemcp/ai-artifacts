@@ -30,38 +30,40 @@ const path = __importStar(require("path"));
 // Loader
 // ---------------------------------------------------------------------------
 /**
- * Resolve the config file path.
+ * Resolve the HOOK.json file path.
  *
- * The config lives alongside the hook itself: trace-capture.json in the hook
- * root directory.  At runtime, dist/capture.js is one level down from the
- * hook root, so we resolve relative to __dirname's parent.
+ * The config lives inside HOOK.json under the "x-config" key, following the
+ * OpenAPI vendor-extension convention for custom fields.
  *
- * When installed via a hook manager, the hook directory is copied into the
- * agent's workspace (e.g., .claude/hooks/trace-capture/).  The config file
- * travels with it.
+ * At runtime, dist/capture.js is one level down from the hook root, so we
+ * resolve relative to __dirname's parent.
  */
-function resolveConfigPath() {
+function resolveHookJsonPath() {
     // dist/capture.js -> hook root is one level up
     const hookRoot = path.resolve(__dirname, "..");
-    return path.join(hookRoot, "trace-capture.json");
+    return path.join(hookRoot, "HOOK.json");
 }
 /**
- * Load and validate the trace-capture config.
- * Returns null if the config file does not exist (hook is not configured).
+ * Load and validate the trace-capture config from HOOK.json's "x-config" key.
+ * Returns null if HOOK.json does not exist or has no "x-config" section.
  * Throws on malformed config so the error surfaces loudly.
  */
 function loadConfig() {
-    const configPath = resolveConfigPath();
-    if (!fs.existsSync(configPath)) {
+    const hookJsonPath = resolveHookJsonPath();
+    if (!fs.existsSync(hookJsonPath)) {
         return null;
     }
-    const raw = fs.readFileSync(configPath, "utf-8");
-    let parsed;
+    const raw = fs.readFileSync(hookJsonPath, "utf-8");
+    let hookJson;
     try {
-        parsed = JSON.parse(raw);
+        hookJson = JSON.parse(raw);
     }
     catch {
-        throw new Error(`trace-capture config is not valid JSON: ${configPath}`);
+        throw new Error(`HOOK.json is not valid JSON: ${hookJsonPath}`);
+    }
+    const parsed = hookJson["x-config"];
+    if (!parsed || typeof parsed !== "object") {
+        return null;
     }
     // --- backend ---
     const backend = parsed.backend;
