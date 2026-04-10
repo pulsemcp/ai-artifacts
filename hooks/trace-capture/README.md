@@ -51,7 +51,7 @@ Edit `trace-capture.json` (ships with sensible defaults):
   "backend": {
     "type": "gcs",
     "bucket": "my-org-claude-traces",   // ← change to your bucket
-    "prefix": "traces/{YYYY}/{MM}/{DD}/"
+    "prefix": "traces/{USER}/{YYYY}/{MM}/{DD}/"
   },
   "privacy": {
     "mode": "redacted",                 // "full" to skip redaction
@@ -105,17 +105,20 @@ Bucket name (just the name, not a `gs://` URI).
 
 **Type:** `string` — **Default:** `""`
 
-Key prefix for all uploaded archives. Supports date template tokens that are interpolated at upload time:
+Key prefix for all uploaded archives. Supports template tokens that are interpolated at upload time:
 
 | Token | Expands to | Example |
 |-------|-----------|---------|
+| `{USER}` | Username or hash (see `hash_user_identity`) | `alice` or `a1b2c3d4e5f6` |
 | `{YYYY}` | 4-digit year (UTC) | `2026` |
 | `{MM}` | 2-digit month (UTC) | `04` |
 | `{DD}` | 2-digit day (UTC) | `10` |
 
 Examples:
-- `"traces/{YYYY}/{MM}/{DD}/"` → `traces/2026/04/10/`
-- `"traces/{YYYY}-{MM}-{DD}/"` → `traces/2026-04-10/`
+- `"traces/{USER}/{YYYY}/{MM}/{DD}/"` → `traces/alice/2026/04/10/` (default)
+- `"traces/{YYYY}-{MM}-{DD}/{USER}/"` → `traces/2026-04-10/alice/`
+
+Putting `{USER}` early in the prefix (before dates) makes it easy to scope GCS IAM permissions per user — each developer can be granted access to their own `traces/{username}/` prefix.
 
 Include a trailing slash if you want a directory-like structure.
 
@@ -138,16 +141,16 @@ When `true`, the system username is SHA-256 hashed before being used in storage 
 
 When `false` (the default), the raw username is used in storage paths and the manifest, and transcript content is not scrubbed for username occurrences.
 
-The default config ships with `hash_user_identity: false` and a prefix of `traces/{YYYY}/{MM}/{DD}/`, producing storage paths like:
+The default config ships with `hash_user_identity: false` and a prefix of `traces/{USER}/{YYYY}/{MM}/{DD}/`, producing storage paths like:
 
 ```
-traces/2026/04/10/alice/5f1a4e51-5354-4a2d-99bf-4a7fb40594a5.tar.gz
+traces/alice/2026/04/10/5f1a4e51-5354-4a2d-99bf-4a7fb40594a5.tar.gz
 ```
 
-With `hash_user_identity: true`, the same path would be:
+With `hash_user_identity: true`, the `{USER}` token expands to the hash instead:
 
 ```
-traces/2026/04/10/a1b2c3d4e5f6/5f1a4e51-5354-4a2d-99bf-4a7fb40594a5.tar.gz
+traces/a1b2c3d4e5f6/2026/04/10/5f1a4e51-5354-4a2d-99bf-4a7fb40594a5.tar.gz
 ```
 
 #### `privacy.org_salt`
@@ -207,14 +210,16 @@ When `hash_user_identity` is enabled, the system username is also replaced with 
 Archives are stored at:
 
 ```
-{interpolated_prefix}{user}/{session_id}.tar.gz
+{interpolated_prefix}{session_id}.tar.gz
 ```
 
-`{user}` is the raw system username by default, or a 12-character hex hash when `hash_user_identity` is `true`. The prefix is interpolated with date tokens before use (see [`backend.prefix`](#backendprefix)).
+The prefix is interpolated with template tokens before use (see [`backend.prefix`](#backendprefix)). With the default prefix `traces/{USER}/{YYYY}/{MM}/{DD}/`:
 
-With the default prefix `traces/{YYYY}/{MM}/{DD}/`:
-- `traces/2026/04/10/alice/5f1a4e51-5354-4a2d-99bf-4a7fb40594a5.tar.gz`
-- With `hash_user_identity`: `traces/2026/04/10/a1b2c3d4e5f6/5f1a4e51-5354-4a2d-99bf-4a7fb40594a5.tar.gz`
+```
+traces/alice/2026/04/10/5f1a4e51-5354-4a2d-99bf-4a7fb40594a5.tar.gz
+```
+
+This structure puts the user segment first, making it straightforward to scope GCS IAM permissions per developer (e.g., grant each user access to `traces/{their-username}/*`).
 
 ## Agent support
 

@@ -100,13 +100,14 @@ async function main(): Promise<void> {
 
   const archive = await buildTarGz(archiveEntries);
 
-  // 6. Compute storage key (interpolate date tokens in prefix).
+  // 6. Compute storage key (interpolate template tokens in prefix).
   const now = new Date();
   const prefix = config.backend.prefix
     .replace(/\{YYYY\}/g, String(now.getUTCFullYear()))
     .replace(/\{MM\}/g, String(now.getUTCMonth() + 1).padStart(2, "0"))
-    .replace(/\{DD\}/g, String(now.getUTCDate()).padStart(2, "0"));
-  const key = `${prefix}${userLabel}/${bundle.sessionId}.tar.gz`;
+    .replace(/\{DD\}/g, String(now.getUTCDate()).padStart(2, "0"))
+    .replace(/\{USER\}/g, userLabel);
+  const key = `${prefix}${bundle.sessionId}.tar.gz`;
 
   // 7. Upload.
   const backend = createBackend(config.backend);
