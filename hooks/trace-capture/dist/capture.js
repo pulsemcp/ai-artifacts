@@ -114,7 +114,8 @@ async function main() {
         catch {
             // Manifest failure must not fail the hook.
         }
-        process.stderr.write(`trace-capture: uploaded session ${bundle.sessionId}\n` +
+        // Claude Code shows stdout (not stderr) to the user for exit-0 hooks.
+        process.stdout.write(`trace-capture: uploaded session ${bundle.sessionId}\n` +
             `  Run: node hooks/trace-capture/dist/cli.js list\n`);
         process.exit(0);
     }
