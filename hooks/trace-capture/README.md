@@ -44,27 +44,26 @@ The only dependencies are `typescript` and `@types/node` (dev-only). The compile
 
 ### 2. Configure
 
-Copy the example config and edit it:
-
-```bash
-cp trace-capture.example.json trace-capture.json
-```
-
-Then edit `trace-capture.json`:
+Edit `trace-capture.json` (ships with sensible defaults):
 
 ```json
 {
   "enabled": true,
   "backend": {
     "type": "gcs",
-    "bucket": "my-org-claude-traces",
+    "bucket": "my-org-claude-traces",   // ← change to your bucket
     "prefix": "traces/"
   },
   "privacy": {
-    "mode": "redacted"
+    "mode": "redacted",                 // "full" to skip redaction
+    "hash_user_identity": false,        // true to pseudonymise usernames
+    "org_salt": "",                     // required when hash_user_identity is true
+    "extra_patterns": []                // additional redaction regexes
   }
 }
 ```
+
+At minimum you'll need to set `backend.bucket` to your GCS bucket name. See [Configuration reference](#configuration-reference) below for all options.
 
 ### 3. Ensure `gsutil` is available
 
