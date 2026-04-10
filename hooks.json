@@ -1,0 +1,7 @@
+{
+  "trace-capture": {
+    "title": "Session Trace Capture",
+    "description": "Captures complete agent session archives (transcripts, subagents, tool results) to cloud storage on task completion",
+    "path": "hooks/trace-capture"
+  }
+}

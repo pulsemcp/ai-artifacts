@@ -1,0 +1,6 @@
+{
+  "event": "Stop",
+  "command": "node",
+  "args": ["dist/capture.js"],
+  "timeout_seconds": 120
+}

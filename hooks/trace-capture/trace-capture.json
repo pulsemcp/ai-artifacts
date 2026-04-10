@@ -1,0 +1,13 @@
+{
+  "backend": {
+    "type": "gcs",
+    "bucket": "my-org-claude-traces",
+    "prefix": "traces/{USER}/{YYYY}/{MM}/{DD}/"
+  },
+  "privacy": {
+    "mode": "redacted",
+    "hash_user_identity": false,
+    "org_salt": "",
+    "extra_patterns": []
+  }
+}
