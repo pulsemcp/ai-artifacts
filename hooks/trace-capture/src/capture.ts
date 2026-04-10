@@ -1,0 +1,119 @@
+/**
+ * Main entry point for the trace-capture hook.
+ *
+ * Reads the hook payload from stdin, collects session files via the agent
+ * adapter, optionally redacts sensitive content, builds a tar.gz archive,
+ * and uploads it to cloud storage.
+ */
+
+import { HookInput, createAdapter } from "./adapters/interface";
+import { createBackend } from "./backends/interface";
+import { loadConfig } from "./config";
+import { redactContent } from "./redactor";
+import { hashUser, scrubUsername } from "./identity";
+import { buildTarGz, ArchiveEntry } from "./archive";
+import { showError } from "./error-page";
+
+// ---------------------------------------------------------------------------
+// Stdin reader
+// ---------------------------------------------------------------------------
+
+function readStdin(): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const chunks: Buffer[] = [];
+    process.stdin.on("data", (chunk) => chunks.push(chunk));
+    process.stdin.on("end", () =>
+      resolve(Buffer.concat(chunks).toString("utf-8"))
+    );
+    process.stdin.on("error", reject);
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Main
+// ---------------------------------------------------------------------------
+
+async function main(): Promise<void> {
+  // 1. Read hook payload from stdin.
+  const raw = await readStdin();
+  if (!raw.trim()) {
+    process.exit(0);
+  }
+
+  let hookInput: HookInput;
+  try {
+    hookInput = JSON.parse(raw);
+  } catch {
+    // Malformed stdin — not our problem, exit silently.
+    process.exit(0);
+  }
+
+  if (!hookInput.session_id || !hookInput.transcript_path) {
+    process.exit(0);
+  }
+
+  // 2. Load config.
+  const config = loadConfig(hookInput.cwd);
+  if (!config || !config.enabled) {
+    process.exit(0);
+  }
+
+  // 3. Create agent adapter and collect session files.
+  const adapter = createAdapter(config.agent);
+  const bundle = await adapter.collectSession(hookInput);
+
+  // 4. Redact if configured.
+  const isRedacted = config.privacy.mode === "redacted";
+  const hashedUser = hashUser(
+    isRedacted ? config.privacy.org_salt : "default"
+  );
+
+  const archiveEntries: ArchiveEntry[] = bundle.files.map((file) => {
+    let content = file.content;
+
+    if (isRedacted && file.redactable) {
+      let text = content.toString("utf-8");
+      text = redactContent(text, config.privacy.extra_patterns);
+      text = scrubUsername(text, hashedUser);
+      content = Buffer.from(text, "utf-8");
+    }
+
+    return { path: file.archivePath, content };
+  });
+
+  // 5. Build tar.gz archive.
+  const archive = await buildTarGz(archiveEntries);
+
+  // 6. Compute storage key.
+  const now = new Date();
+  const yyyy = now.getUTCFullYear();
+  const mm = String(now.getUTCMonth() + 1).padStart(2, "0");
+  const dd = String(now.getUTCDate()).padStart(2, "0");
+  const prefix = config.backend.prefix;
+  const key = `${prefix}${yyyy}/${mm}/${dd}/${hashedUser}/${bundle.sessionId}.tar.gz`;
+
+  // 7. Upload.
+  const backend = createBackend(config.backend);
+  const result = await backend.upload(key, archive);
+
+  if (result.success) {
+    process.exit(0);
+  }
+
+  // 8. Loud failure.
+  const errorMsg = result.error || "upload_failed";
+  const details = result.details || "No details available.";
+
+  showError(errorMsg, details, bundle.sessionId);
+  process.stderr.write(
+    `trace-capture: upload failed (${errorMsg}): ${details}\n`
+  );
+  process.exit(2);
+}
+
+main().catch((err) => {
+  const message = err instanceof Error ? err.message : String(err);
+  showError("unexpected_error", message, "unknown");
+  process.stderr.write(`trace-capture: unexpected error: ${message}\n`);
+  process.exit(2);
+});

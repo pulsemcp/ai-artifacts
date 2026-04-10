@@ -1,0 +1,14 @@
+{
+  "enabled": true,
+  "agent": "claude",
+  "backend": {
+    "type": "gcs",
+    "bucket": "my-org-claude-traces",
+    "prefix": "traces/"
+  },
+  "privacy": {
+    "mode": "redacted",
+    "org_salt": "CHANGE-ME-to-a-random-string",
+    "extra_patterns": []
+  }
+}
