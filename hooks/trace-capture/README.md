@@ -138,6 +138,18 @@ When `true`, the system username is SHA-256 hashed before being used in storage 
 
 When `false` (the default), the raw username is used in storage paths and the manifest, and transcript content is not scrubbed for username occurrences.
 
+The default config ships with `hash_user_identity: false` and a prefix of `traces/{YYYY}/{MM}/{DD}/`, producing storage paths like:
+
+```
+traces/2026/04/10/alice/5f1a4e51-5354-4a2d-99bf-4a7fb40594a5.tar.gz
+```
+
+With `hash_user_identity: true`, the same path would be:
+
+```
+traces/2026/04/10/a1b2c3d4e5f6/5f1a4e51-5354-4a2d-99bf-4a7fb40594a5.tar.gz
+```
+
 #### `privacy.org_salt`
 
 **Type:** `string` — **Required when `hash_user_identity` is `true`**
