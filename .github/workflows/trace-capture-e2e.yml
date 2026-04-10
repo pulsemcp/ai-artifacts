@@ -6,12 +6,10 @@ on:
     paths:
       - "hooks/trace-capture/**"
       - ".github/workflows/trace-capture-e2e.yml"
-      - ".github/claude-code-version/**"
   pull_request:
     paths:
       - "hooks/trace-capture/**"
       - ".github/workflows/trace-capture-e2e.yml"
-      - ".github/claude-code-version/**"
 
 jobs:
   unit-tests:
@@ -56,11 +54,8 @@ jobs:
       - run: npm install
       - run: npm run build
 
-      - name: Install Claude Code (version from .github/claude-code-version/)
-        run: |
-          cd "${{ github.workspace }}/.github/claude-code-version"
-          npm install
-          echo "${{ github.workspace }}/.github/claude-code-version/node_modules/.bin" >> "$GITHUB_PATH"
+      - name: Install Claude Code (pinned v2.1.98)
+        run: npm install -g @anthropic-ai/claude-code@2.1.98
 
       - name: Run e2e test (Claude Code + mock API + real GCS)
         run: node test/e2e/hook-fires.mjs

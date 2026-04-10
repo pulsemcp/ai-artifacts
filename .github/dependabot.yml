@@ -1,8 +1,0 @@
-version: 2
-updates:
-  - package-ecosystem: npm
-    directory: /.github/claude-code-version
-    schedule:
-      interval: weekly
-    commit-message:
-      prefix: "deps"
