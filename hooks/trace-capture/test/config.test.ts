@@ -62,18 +62,30 @@ describe("loadConfig", () => {
     expect(config!.privacy.mode).toBe("full");
   });
 
-  it("loads a valid redacted-mode config", () => {
+  it("loads a valid redacted-mode config without identity hashing", () => {
     writeConfig({
       enabled: false,
       backend: { type: "gcs", bucket: "bucket" },
-      privacy: { mode: "redacted", org_salt: "my-salt-123" },
+      privacy: { mode: "redacted" },
     });
     const config = loadConfig();
     expect(config).not.toBeNull();
     expect(config!.enabled).toBe(false);
     expect(config!.privacy.mode).toBe("redacted");
-    expect(config!.privacy.org_salt).toBe("my-salt-123");
+    expect(config!.privacy.hash_user_identity).toBe(false);
     expect(config!.backend.prefix).toBe(""); // default
+  });
+
+  it("loads a valid redacted-mode config with identity hashing", () => {
+    writeConfig({
+      enabled: true,
+      backend: { type: "gcs", bucket: "bucket" },
+      privacy: { mode: "redacted", hash_user_identity: true, org_salt: "my-salt" },
+    });
+    const config = loadConfig();
+    expect(config).not.toBeNull();
+    expect(config!.privacy.hash_user_identity).toBe(true);
+    expect(config!.privacy.org_salt).toBe("my-salt");
   });
 
   it("throws on invalid JSON", () => {
@@ -122,13 +134,24 @@ describe("loadConfig", () => {
     expect(() => loadConfig()).toThrow("'privacy.mode' must be");
   });
 
-  it("throws when redacted mode is missing org_salt", () => {
+  it("throws when hash_user_identity is true but org_salt is missing", () => {
+    writeConfig({
+      enabled: true,
+      backend: { type: "gcs", bucket: "b" },
+      privacy: { mode: "redacted", hash_user_identity: true },
+    });
+    expect(() => loadConfig()).toThrow("'privacy.org_salt' is required");
+  });
+
+  it("does not require org_salt when hash_user_identity is false", () => {
     writeConfig({
       enabled: true,
       backend: { type: "gcs", bucket: "b" },
       privacy: { mode: "redacted" },
     });
-    expect(() => loadConfig()).toThrow("'privacy.org_salt' is required");
+    const config = loadConfig();
+    expect(config).not.toBeNull();
+    expect(config!.privacy.hash_user_identity).toBe(false);
   });
 
   it("parses extra_patterns", () => {
@@ -137,7 +160,6 @@ describe("loadConfig", () => {
       backend: { type: "gcs", bucket: "b" },
       privacy: {
         mode: "redacted",
-        org_salt: "salt",
         extra_patterns: [
           { name: "custom", pattern: "CUSTOM-[0-9]+" },
         ],

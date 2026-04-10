@@ -23,19 +23,23 @@ var __importStar = (this && this.__importStar) || function (mod) {
     return result;
 };
 Object.defineProperty(exports, "__esModule", { value: true });
+exports.getUsername = getUsername;
 exports.hashUser = hashUser;
 exports.scrubUsername = scrubUsername;
 const crypto = __importStar(require("crypto"));
 const os = __importStar(require("os"));
+/** Return the current system username. */
+function getUsername() {
+    return os.userInfo().username;
+}
 /**
  * Compute a pseudonymised user identifier.
  * sha256(orgSalt + username) truncated to 12 hex characters.
  */
 function hashUser(orgSalt) {
-    const username = os.userInfo().username;
     return crypto
         .createHash("sha256")
-        .update(orgSalt + username)
+        .update(orgSalt + getUsername())
         .digest("hex")
         .slice(0, 12);
 }

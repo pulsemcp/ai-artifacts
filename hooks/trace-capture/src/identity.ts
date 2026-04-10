@@ -1,15 +1,19 @@
 import * as crypto from "crypto";
 import * as os from "os";
 
+/** Return the current system username. */
+export function getUsername(): string {
+  return os.userInfo().username;
+}
+
 /**
  * Compute a pseudonymised user identifier.
  * sha256(orgSalt + username) truncated to 12 hex characters.
  */
 export function hashUser(orgSalt: string): string {
-  const username = os.userInfo().username;
   return crypto
     .createHash("sha256")
-    .update(orgSalt + username)
+    .update(orgSalt + getUsername())
     .digest("hex")
     .slice(0, 12);
 }

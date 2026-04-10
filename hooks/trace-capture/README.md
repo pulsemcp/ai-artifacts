@@ -61,8 +61,7 @@ Then edit `trace-capture.json`:
     "prefix": "traces/"
   },
   "privacy": {
-    "mode": "redacted",
-    "org_salt": "your-org-specific-random-string"
+    "mode": "redacted"
   }
 }
 ```
@@ -124,12 +123,20 @@ Key prefix for all uploaded archives. Include a trailing slash if you want a dir
 
 **Type:** `"full" | "redacted"` — **Required**
 
-- **`"redacted"`** (recommended): Scrubs secrets from all transcript and tool-result content before upload. Hashes the system username in file paths. This is the safe default for org-wide deployment.
+- **`"redacted"`** (recommended): Scrubs secrets from all transcript and tool-result content before upload. This is the safe default for org-wide deployment.
 - **`"full"`**: Uploads transcripts as-is with no modifications. Use only in trusted environments where transcript content is not sensitive.
+
+#### `privacy.hash_user_identity`
+
+**Type:** `boolean` — **Default:** `false`
+
+When `true`, the system username is SHA-256 hashed before being used in storage paths and the manifest. The literal username is also scrubbed from all transcript content and replaced with `[USER:<hash>]`.
+
+When `false` (the default), the raw username is used in storage paths and the manifest, and transcript content is not scrubbed for username occurrences.
 
 #### `privacy.org_salt`
 
-**Type:** `string` — **Required when mode is `"redacted"`**
+**Type:** `string` — **Required when `hash_user_identity` is `true`**
 
 A random string used to hash the system username. Same salt across an organization means the same developer gets the same hash (useful for usage analytics). Different salt across orgs means hashes are unlinkable.
 
@@ -177,19 +184,21 @@ When `privacy.mode` is `"redacted"`, these patterns are applied (in order):
 
 Patterns are ordered so that longer, more specific prefixes match before shorter ones (e.g., `sk-ant-` before `sk-`). The `env_secret` pattern includes a negative lookahead for `${` to avoid redacting template variable references.
 
-In addition, the system username is replaced with a hashed placeholder (`[USER:a1b2c3d4e5f6]`) throughout all redactable content, including file paths like `/home/username/...`.
+When `hash_user_identity` is enabled, the system username is also replaced with a hashed placeholder (`[USER:a1b2c3d4e5f6]`) throughout all redactable content, including file paths like `/home/username/...`.
 
 ## Storage layout
 
 Archives are stored at:
 
 ```
-{prefix}{YYYY}/{MM}/{DD}/{user_hash}/{session_id}.tar.gz
+{prefix}{YYYY}/{MM}/{DD}/{user}/{session_id}.tar.gz
 ```
 
-For example: `traces/2026/04/10/a1b2c3d4e5f6/5f1a4e51-5354-4a2d-99bf-4a7fb40594a5.tar.gz`
+`{user}` is the raw system username by default, or a 12-character hex hash when `hash_user_identity` is `true`.
 
-The user hash is always used in the storage path (even in `full` mode) to organize files by developer without exposing usernames in the bucket.
+For example:
+- Default: `traces/2026/04/10/alice/5f1a4e51-5354-4a2d-99bf-4a7fb40594a5.tar.gz`
+- With `hash_user_identity`: `traces/2026/04/10/a1b2c3d4e5f6/5f1a4e51-5354-4a2d-99bf-4a7fb40594a5.tar.gz`
 
 ## Agent support
 

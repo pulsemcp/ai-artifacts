@@ -91,9 +91,10 @@ function loadConfig() {
     if (privacy.mode !== "full" && privacy.mode !== "redacted") {
         throw new Error("trace-capture config: 'privacy.mode' must be 'full' or 'redacted'");
     }
-    if (privacy.mode === "redacted" &&
+    const hashUserIdentity = privacy.hash_user_identity === true;
+    if (hashUserIdentity &&
         (typeof privacy.org_salt !== "string" || !privacy.org_salt)) {
-        throw new Error("trace-capture config: 'privacy.org_salt' is required when mode is 'redacted'");
+        throw new Error("trace-capture config: 'privacy.org_salt' is required when hash_user_identity is true");
     }
     const extraPatterns = [];
     if (Array.isArray(privacy.extra_patterns)) {
@@ -115,6 +116,7 @@ function loadConfig() {
         },
         privacy: {
             mode: privacy.mode,
+            hash_user_identity: hashUserIdentity,
             org_salt: privacy.org_salt || "",
             extra_patterns: extraPatterns,
         },

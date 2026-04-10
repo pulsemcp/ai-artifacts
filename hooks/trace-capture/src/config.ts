@@ -14,6 +14,7 @@ export interface RedactionPattern {
 
 export interface PrivacyConfig {
   mode: "full" | "redacted";
+  hash_user_identity: boolean;
   org_salt: string;
   extra_patterns?: RedactionPattern[];
 }
@@ -104,12 +105,14 @@ export function loadConfig(): TraceCaptureConfig | null {
       "trace-capture config: 'privacy.mode' must be 'full' or 'redacted'"
     );
   }
+  const hashUserIdentity = privacy.hash_user_identity === true;
+
   if (
-    privacy.mode === "redacted" &&
+    hashUserIdentity &&
     (typeof privacy.org_salt !== "string" || !privacy.org_salt)
   ) {
     throw new Error(
-      "trace-capture config: 'privacy.org_salt' is required when mode is 'redacted'"
+      "trace-capture config: 'privacy.org_salt' is required when hash_user_identity is true"
     );
   }
 
@@ -136,6 +139,7 @@ export function loadConfig(): TraceCaptureConfig | null {
     },
     privacy: {
       mode: privacy.mode as "full" | "redacted",
+      hash_user_identity: hashUserIdentity,
       org_salt: (privacy.org_salt as string) || "",
       extra_patterns: extraPatterns,
     },

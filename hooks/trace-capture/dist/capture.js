@@ -54,13 +54,18 @@ async function main() {
     const bundle = await adapter.collectSession(hookInput);
     // 4. Redact if configured.
     const isRedacted = config.privacy.mode === "redacted";
-    const hashedUser = (0, identity_1.hashUser)(isRedacted ? config.privacy.org_salt : "default");
+    const hashIdentity = config.privacy.hash_user_identity;
+    const userLabel = hashIdentity
+        ? (0, identity_1.hashUser)(config.privacy.org_salt)
+        : (0, identity_1.getUsername)();
     const archiveEntries = bundle.files.map((file) => {
         let content = file.content;
         if (isRedacted && file.redactable) {
             let text = content.toString("utf-8");
             text = (0, redactor_1.redactContent)(text, config.privacy.extra_patterns);
-            text = (0, identity_1.scrubUsername)(text, hashedUser);
+            if (hashIdentity) {
+                text = (0, identity_1.scrubUsername)(text, userLabel);
+            }
             content = Buffer.from(text, "utf-8");
         }
         return { path: file.archivePath, content };
@@ -72,7 +77,7 @@ async function main() {
         session_id: bundle.sessionId,
         agent: adapter.name,
         privacy_mode: config.privacy.mode,
-        user_hash: hashedUser,
+        user: userLabel,
         files: archiveEntries.map((e) => e.path),
     };
     archiveEntries.unshift({
@@ -86,7 +91,7 @@ async function main() {
     const mm = String(now.getUTCMonth() + 1).padStart(2, "0");
     const dd = String(now.getUTCDate()).padStart(2, "0");
     const prefix = config.backend.prefix;
-    const key = `${prefix}${yyyy}/${mm}/${dd}/${hashedUser}/${bundle.sessionId}.tar.gz`;
+    const key = `${prefix}${yyyy}/${mm}/${dd}/${userLabel}/${bundle.sessionId}.tar.gz`;
     // 7. Upload.
     const backend = (0, interface_2.createBackend)(config.backend);
     const result = await backend.upload(key, archive);

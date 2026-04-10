@@ -10,7 +10,7 @@ import { HookInput, detectAgent } from "./adapters/interface";
 import { createBackend } from "./backends/interface";
 import { loadConfig } from "./config";
 import { redactContent } from "./redactor";
-import { hashUser, scrubUsername } from "./identity";
+import { getUsername, hashUser, scrubUsername } from "./identity";
 import { buildTarGz, ArchiveEntry } from "./archive";
 import { showError } from "./error-page";
 
@@ -63,9 +63,10 @@ async function main(): Promise<void> {
 
   // 4. Redact if configured.
   const isRedacted = config.privacy.mode === "redacted";
-  const hashedUser = hashUser(
-    isRedacted ? config.privacy.org_salt : "default"
-  );
+  const hashIdentity = config.privacy.hash_user_identity;
+  const userLabel = hashIdentity
+    ? hashUser(config.privacy.org_salt)
+    : getUsername();
 
   const archiveEntries: ArchiveEntry[] = bundle.files.map((file) => {
     let content = file.content;
@@ -73,7 +74,9 @@ async function main(): Promise<void> {
     if (isRedacted && file.redactable) {
       let text = content.toString("utf-8");
       text = redactContent(text, config.privacy.extra_patterns);
-      text = scrubUsername(text, hashedUser);
+      if (hashIdentity) {
+        text = scrubUsername(text, userLabel);
+      }
       content = Buffer.from(text, "utf-8");
     }
 
@@ -87,7 +90,7 @@ async function main(): Promise<void> {
     session_id: bundle.sessionId,
     agent: adapter.name,
     privacy_mode: config.privacy.mode,
-    user_hash: hashedUser,
+    user: userLabel,
     files: archiveEntries.map((e) => e.path),
   };
   archiveEntries.unshift({
@@ -103,7 +106,7 @@ async function main(): Promise<void> {
   const mm = String(now.getUTCMonth() + 1).padStart(2, "0");
   const dd = String(now.getUTCDate()).padStart(2, "0");
   const prefix = config.backend.prefix;
-  const key = `${prefix}${yyyy}/${mm}/${dd}/${hashedUser}/${bundle.sessionId}.tar.gz`;
+  const key = `${prefix}${yyyy}/${mm}/${dd}/${userLabel}/${bundle.sessionId}.tar.gz`;
 
   // 7. Upload.
   const backend = createBackend(config.backend);
