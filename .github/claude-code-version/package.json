@@ -1,0 +1,7 @@
+{
+  "private": true,
+  "description": "Pin Claude Code version for e2e tests. Dependabot watches this file.",
+  "dependencies": {
+    "@anthropic-ai/claude-code": "2.1.98"
+  }
+}
