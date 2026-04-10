@@ -47,7 +47,7 @@ const REMEDIATION = {
     </ol>`,
     bucket_not_found: `
     <ol>
-      <li>Verify the bucket name in <code>.claude/trace-capture.json</code></li>
+      <li>Verify the bucket name in <code>HOOK.json</code></li>
       <li>Ensure the bucket exists: <code>gsutil ls gs://YOUR_BUCKET</code></li>
       <li>Check your GCP project: <code>gcloud config get-value project</code></li>
     </ol>`,
@@ -63,7 +63,7 @@ const REMEDIATION = {
 // ---------------------------------------------------------------------------
 function generateErrorHTML(error, details, sessionId) {
     const remediation = REMEDIATION[error] ||
-        `<p>Check the error details below and verify your <code>.claude/trace-capture.json</code> configuration.</p>`;
+        `<p>Check the error details below and verify your <code>HOOK.json</code> configuration.</p>`;
     const escapedDetails = details
         .replace(/&/g, "&amp;")
         .replace(/</g, "&lt;")

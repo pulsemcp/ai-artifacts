@@ -134,7 +134,7 @@ async function cmdDelete(args: string[]): Promise<void> {
 
   const config = loadConfig();
   if (!config) {
-    console.error("trace-capture is not configured (no trace-capture.json found).");
+    console.error("trace-capture is not configured (no x-config in HOOK.json).");
     process.exit(1);
   }
 
