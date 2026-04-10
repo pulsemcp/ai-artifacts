@@ -85,13 +85,13 @@ async function main() {
         content: Buffer.from(JSON.stringify(manifest, null, 2), "utf-8"),
     });
     const archive = await (0, archive_1.buildTarGz)(archiveEntries);
-    // 6. Compute storage key.
+    // 6. Compute storage key (interpolate date tokens in prefix).
     const now = new Date();
-    const yyyy = now.getUTCFullYear();
-    const mm = String(now.getUTCMonth() + 1).padStart(2, "0");
-    const dd = String(now.getUTCDate()).padStart(2, "0");
-    const prefix = config.backend.prefix;
-    const key = `${prefix}${yyyy}/${mm}/${dd}/${userLabel}/${bundle.sessionId}.tar.gz`;
+    const prefix = config.backend.prefix
+        .replace(/\{YYYY\}/g, String(now.getUTCFullYear()))
+        .replace(/\{MM\}/g, String(now.getUTCMonth() + 1).padStart(2, "0"))
+        .replace(/\{DD\}/g, String(now.getUTCDate()).padStart(2, "0"));
+    const key = `${prefix}${userLabel}/${bundle.sessionId}.tar.gz`;
     // 7. Upload.
     const backend = (0, interface_2.createBackend)(config.backend);
     const result = await backend.upload(key, archive);

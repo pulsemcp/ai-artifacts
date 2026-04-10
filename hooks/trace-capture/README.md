@@ -52,7 +52,7 @@ Edit `trace-capture.json` (ships with sensible defaults):
   "backend": {
     "type": "gcs",
     "bucket": "my-org-claude-traces",   // ← change to your bucket
-    "prefix": "traces/"
+    "prefix": "traces/{YYYY}/{MM}/{DD}/"
   },
   "privacy": {
     "mode": "redacted",                 // "full" to skip redaction
@@ -112,7 +112,19 @@ Bucket name (just the name, not a `gs://` URI).
 
 **Type:** `string` — **Default:** `""`
 
-Key prefix for all uploaded archives. Include a trailing slash if you want a directory-like structure (e.g., `"traces/"`).
+Key prefix for all uploaded archives. Supports date template tokens that are interpolated at upload time:
+
+| Token | Expands to | Example |
+|-------|-----------|---------|
+| `{YYYY}` | 4-digit year (UTC) | `2026` |
+| `{MM}` | 2-digit month (UTC) | `04` |
+| `{DD}` | 2-digit day (UTC) | `10` |
+
+Examples:
+- `"traces/{YYYY}/{MM}/{DD}/"` → `traces/2026/04/10/`
+- `"traces/{YYYY}-{MM}-{DD}/"` → `traces/2026-04-10/`
+
+Include a trailing slash if you want a directory-like structure.
 
 ### `privacy`
 
@@ -190,13 +202,13 @@ When `hash_user_identity` is enabled, the system username is also replaced with 
 Archives are stored at:
 
 ```
-{prefix}{YYYY}/{MM}/{DD}/{user}/{session_id}.tar.gz
+{interpolated_prefix}{user}/{session_id}.tar.gz
 ```
 
-`{user}` is the raw system username by default, or a 12-character hex hash when `hash_user_identity` is `true`.
+`{user}` is the raw system username by default, or a 12-character hex hash when `hash_user_identity` is `true`. The prefix is interpolated with date tokens before use (see [`backend.prefix`](#backendprefix)).
 
-For example:
-- Default: `traces/2026/04/10/alice/5f1a4e51-5354-4a2d-99bf-4a7fb40594a5.tar.gz`
+With the default prefix `traces/{YYYY}/{MM}/{DD}/`:
+- `traces/2026/04/10/alice/5f1a4e51-5354-4a2d-99bf-4a7fb40594a5.tar.gz`
 - With `hash_user_identity`: `traces/2026/04/10/a1b2c3d4e5f6/5f1a4e51-5354-4a2d-99bf-4a7fb40594a5.tar.gz`
 
 ## Agent support

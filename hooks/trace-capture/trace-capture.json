@@ -3,7 +3,7 @@
   "backend": {
     "type": "gcs",
     "bucket": "my-org-claude-traces",
-    "prefix": "traces/"
+    "prefix": "traces/{YYYY}/{MM}/{DD}/"
   },
   "privacy": {
     "mode": "redacted",
