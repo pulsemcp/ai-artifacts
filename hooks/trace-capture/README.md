@@ -31,59 +31,112 @@ Stop event → read stdin → auto-detect agent → collect files → redact →
 5. Everything is bundled into a tar.gz with a manifest
 6. The archive is uploaded to cloud storage
 
-## Setup
+## Installation
 
-### 1. Install dependencies (build only)
+### Claude Code
+
+Copy the hook into your project and register it in Claude Code's `settings.json`:
 
 ```bash
-cd hooks/trace-capture
-npm install
+# From your project root — copy the hook directory
+cp -r path/to/ai-artifacts/hooks/trace-capture .claude/hooks/trace-capture
+
+# Set your GCS bucket (the only required change)
+cd .claude/hooks/trace-capture
+sed -i 's/my-org-claude-traces/YOUR_BUCKET_NAME/' HOOK.json
 ```
 
-The only dependencies are `typescript` and `@types/node` (dev-only). The compiled hook has **zero runtime dependencies** — it uses only Node.js built-ins.
-
-### 2. Configure
-
-Edit `trace-capture.json` (ships with sensible defaults):
+Then add the hook to your Claude Code settings (`~/.claude/settings.json` for global, or `.claude/settings.json` for per-project):
 
 ```json
 {
-  "backend": {
-    "type": "gcs",
-    "bucket": "my-org-claude-traces",   // ← change to your bucket
-    "prefix": "traces/{USER}/{YYYY}/{MM}/{DD}/"
-  },
-  "privacy": {
-    "mode": "redacted",                 // "full" to skip redaction
-    "hash_user_identity": false,        // true to pseudonymise usernames
-    "org_salt": "",                     // required when hash_user_identity is true
-    "extra_patterns": []                // additional redaction regexes
+  "hooks": {
+    "Stop": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node .claude/hooks/trace-capture/dist/capture.js"
+          }
+        ]
+      }
+    ]
   }
 }
 ```
 
-At minimum you'll need to set `backend.bucket` to your GCS bucket name. See [Configuration reference](#configuration-reference) below for all options.
-
-### 3. Ensure `gsutil` is available
-
-The GCS backend shells out to `gsutil`. Install the [Google Cloud SDK](https://cloud.google.com/sdk/docs/install) and authenticate:
+Or as a one-liner to append the hook config:
 
 ```bash
-gcloud auth login
-gcloud config set project YOUR_PROJECT
+# Ensure settings.json exists and add the Stop hook
+cat <<'EOF' > /tmp/trace-hook-settings.json
+{
+  "hooks": {
+    "Stop": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node .claude/hooks/trace-capture/dist/capture.js"
+          }
+        ]
+      }
+    ]
+  }
+}
+EOF
+echo "Wrote /tmp/trace-hook-settings.json — merge into your ~/.claude/settings.json"
 ```
 
-### 4. Build (if modifying source)
+**Prerequisites:**
+- Node.js 18+
+- `gsutil` authenticated (`gcloud auth login && gcloud config set project YOUR_PROJECT`)
+
+The compiled `dist/` directory is checked into the repo — no build step needed. Zero runtime dependencies.
+
+### Configuration
+
+All configuration lives in `HOOK.json` under the `x-config` key (following the OpenAPI vendor-extension convention):
+
+```json
+{
+  "event": "Stop",
+  "command": "node",
+  "args": ["dist/capture.js"],
+  "timeout_seconds": 120,
+  "x-config": {
+    "backend": {
+      "type": "gcs",
+      "bucket": "my-org-claude-traces",
+      "prefix": "traces/{USER}/{YYYY}/{MM}/{DD}/"
+    },
+    "privacy": {
+      "mode": "redacted",
+      "hash_user_identity": false,
+      "org_salt": "",
+      "extra_patterns": []
+    }
+  }
+}
+```
+
+At minimum, set `backend.bucket` to your GCS bucket name. See [Configuration reference](#configuration-reference) below for all options.
+
+### Building from source
+
+Only needed if you modify the TypeScript source:
 
 ```bash
+cd .claude/hooks/trace-capture
+npm install    # dev dependencies only (typescript, @types/node)
 npm run build
 ```
 
-The compiled `dist/` directory is checked into the repo, so you only need to rebuild if you change the TypeScript source.
-
 ## Configuration reference
 
-The config file is `trace-capture.json` in the hook's root directory (next to `HOOK.json`).
+Configuration lives in the `x-config` key inside `HOOK.json`, keeping everything in one file.
 
 ### `backend`
 
@@ -283,7 +336,7 @@ Common errors and their remediation:
 |-------|-----|
 | `gsutil not found` | Install [Google Cloud SDK](https://cloud.google.com/sdk/docs/install) |
 | `auth failure` | Run `gcloud auth login` |
-| `bucket not found` | Check the bucket name in `trace-capture.json` |
+| `bucket not found` | Check the bucket name in `HOOK.json` `x-config` |
 | `permission denied` | Grant `roles/storage.objectCreator` on the bucket |
 
 If the config file is missing, the hook exits silently (code 0) with no side effects.

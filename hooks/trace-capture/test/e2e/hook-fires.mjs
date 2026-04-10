@@ -43,7 +43,7 @@ const __dirname = dirname(__filename);
 const HOOK_ROOT = resolve(__dirname, "..", "..");
 const CAPTURE_JS = join(HOOK_ROOT, "dist", "capture.js");
 const CLI_JS = join(HOOK_ROOT, "dist", "cli.js");
-const CONFIG_PATH = join(HOOK_ROOT, "trace-capture.json");
+const HOOK_JSON_PATH = join(HOOK_ROOT, "HOOK.json");
 const CLAUDE_BIN = process.env.CLAUDE_BIN || "claude";
 const E2E_BUCKET = "pulsemcp-trace-capture-e2e";
 
@@ -261,20 +261,24 @@ async function main() {
   // Env for child processes: merge GCS creds + test overrides.
   const childEnv = { ...process.env, ...gcsEnv };
 
-  // Save original config.
-  const origConfig = readFileSync(CONFIG_PATH, "utf-8");
+  // Save original HOOK.json.
+  const origHookJson = readFileSync(HOOK_JSON_PATH, "utf-8");
 
-  // Write test config pointing to real GCS bucket.
+  // Write test HOOK.json with x-config pointing to real GCS bucket.
   const testPrefix = `e2e-hook-fires/${Date.now()}/`;
+  const origHookParsed = JSON.parse(origHookJson);
   writeFileSync(
-    CONFIG_PATH,
+    HOOK_JSON_PATH,
     JSON.stringify(
       {
-        backend: { type: "gcs", bucket: E2E_BUCKET, prefix: testPrefix },
-        privacy: {
-          mode: "full",
-          hash_user_identity: false,
-          org_salt: "",
+        ...origHookParsed,
+        "x-config": {
+          backend: { type: "gcs", bucket: E2E_BUCKET, prefix: testPrefix },
+          privacy: {
+            mode: "full",
+            hash_user_identity: false,
+            org_salt: "",
+          },
         },
       },
       null,
@@ -480,8 +484,8 @@ async function main() {
 
     console.log("\nPASS: hook-fires e2e test");
   } finally {
-    // Restore config.
-    writeFileSync(CONFIG_PATH, origConfig, "utf-8");
+    // Restore HOOK.json.
+    writeFileSync(HOOK_JSON_PATH, origHookJson, "utf-8");
 
     // Clean up GCS prefix (best-effort).
     try {

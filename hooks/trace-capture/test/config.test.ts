@@ -1,54 +1,72 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import * as fs from "fs";
 import * as path from "path";
-import * as os from "os";
 import { loadConfig } from "../src/config";
 
 /**
  * Config resolution is relative to __dirname (compiled dist/).
- * To test loadConfig() without mocking, we write a config file to the
+ * To test loadConfig() without mocking, we write a HOOK.json file to the
  * location it expects: one directory up from __dirname at import time.
  *
  * Since we're running via vitest (ts source, not compiled), __dirname in
  * config.ts points to src/. So the config path resolves to the hook root,
- * which is where trace-capture.json should live.
+ * which is where HOOK.json should live.
  *
- * We use a temp copy approach: save/restore any existing config file.
+ * We use a temp copy approach: save/restore any existing HOOK.json file.
  */
 
 const hookRoot = path.resolve(__dirname, "..");
-const configPath = path.join(hookRoot, "trace-capture.json");
+const hookJsonPath = path.join(hookRoot, "HOOK.json");
 
-let savedConfig: Buffer | null = null;
+let savedHookJson: Buffer | null = null;
 
 beforeEach(() => {
-  if (fs.existsSync(configPath)) {
-    savedConfig = fs.readFileSync(configPath);
+  if (fs.existsSync(hookJsonPath)) {
+    savedHookJson = fs.readFileSync(hookJsonPath);
   } else {
-    savedConfig = null;
+    savedHookJson = null;
   }
 });
 
 afterEach(() => {
-  if (savedConfig !== null) {
-    fs.writeFileSync(configPath, savedConfig);
-  } else if (fs.existsSync(configPath)) {
-    fs.unlinkSync(configPath);
+  if (savedHookJson !== null) {
+    fs.writeFileSync(hookJsonPath, savedHookJson);
+  } else if (fs.existsSync(hookJsonPath)) {
+    fs.unlinkSync(hookJsonPath);
   }
 });
 
-function writeConfig(obj: unknown): void {
-  fs.writeFileSync(configPath, JSON.stringify(obj, null, 2), "utf-8");
+function writeHookJson(xConfig: unknown): void {
+  const hookJson = {
+    event: "Stop",
+    command: "node",
+    args: ["dist/capture.js"],
+    "x-config": xConfig,
+  };
+  fs.writeFileSync(hookJsonPath, JSON.stringify(hookJson, null, 2), "utf-8");
+}
+
+function writeRawHookJson(content: string): void {
+  fs.writeFileSync(hookJsonPath, content, "utf-8");
 }
 
 describe("loadConfig", () => {
-  it("returns null when config file does not exist", () => {
-    if (fs.existsSync(configPath)) fs.unlinkSync(configPath);
+  it("returns null when HOOK.json does not exist", () => {
+    if (fs.existsSync(hookJsonPath)) fs.unlinkSync(hookJsonPath);
+    expect(loadConfig()).toBeNull();
+  });
+
+  it("returns null when HOOK.json has no x-config key", () => {
+    fs.writeFileSync(
+      hookJsonPath,
+      JSON.stringify({ event: "Stop", command: "node" }),
+      "utf-8"
+    );
     expect(loadConfig()).toBeNull();
   });
 
   it("loads a valid full-mode config", () => {
-    writeConfig({
+    writeHookJson({
       backend: { type: "gcs", bucket: "my-bucket", prefix: "traces/" },
       privacy: { mode: "full", org_salt: "" },
     });
@@ -61,7 +79,7 @@ describe("loadConfig", () => {
   });
 
   it("loads a valid redacted-mode config without identity hashing", () => {
-    writeConfig({
+    writeHookJson({
       backend: { type: "gcs", bucket: "bucket" },
       privacy: { mode: "redacted" },
     });
@@ -73,7 +91,7 @@ describe("loadConfig", () => {
   });
 
   it("loads a valid redacted-mode config with identity hashing", () => {
-    writeConfig({
+    writeHookJson({
       backend: { type: "gcs", bucket: "bucket" },
       privacy: { mode: "redacted", hash_user_identity: true, org_salt: "my-salt" },
     });
@@ -84,17 +102,17 @@ describe("loadConfig", () => {
   });
 
   it("throws on invalid JSON", () => {
-    fs.writeFileSync(configPath, "not json{{{", "utf-8");
+    writeRawHookJson("not json{{{");
     expect(() => loadConfig()).toThrow("not valid JSON");
   });
 
   it("throws when backend is missing", () => {
-    writeConfig({ privacy: { mode: "full" } });
+    writeHookJson({ privacy: { mode: "full" } });
     expect(() => loadConfig()).toThrow("'backend' is required");
   });
 
   it("throws when backend.type is missing", () => {
-    writeConfig({
+    writeHookJson({
       backend: { bucket: "b" },
       privacy: { mode: "full" },
     });
@@ -102,7 +120,7 @@ describe("loadConfig", () => {
   });
 
   it("throws when backend.bucket is a gs:// URI", () => {
-    writeConfig({
+    writeHookJson({
       backend: { type: "gcs", bucket: "gs://my-bucket" },
       privacy: { mode: "full" },
     });
@@ -110,7 +128,7 @@ describe("loadConfig", () => {
   });
 
   it("throws when privacy.mode is invalid", () => {
-    writeConfig({
+    writeHookJson({
       backend: { type: "gcs", bucket: "b" },
       privacy: { mode: "summary" },
     });
@@ -118,7 +136,7 @@ describe("loadConfig", () => {
   });
 
   it("throws when hash_user_identity is true but org_salt is missing", () => {
-    writeConfig({
+    writeHookJson({
       backend: { type: "gcs", bucket: "b" },
       privacy: { mode: "redacted", hash_user_identity: true },
     });
@@ -126,7 +144,7 @@ describe("loadConfig", () => {
   });
 
   it("does not require org_salt when hash_user_identity is false", () => {
-    writeConfig({
+    writeHookJson({
       backend: { type: "gcs", bucket: "b" },
       privacy: { mode: "redacted" },
     });
@@ -136,7 +154,7 @@ describe("loadConfig", () => {
   });
 
   it("parses extra_patterns", () => {
-    writeConfig({
+    writeHookJson({
       backend: { type: "gcs", bucket: "b" },
       privacy: {
         mode: "redacted",
