@@ -7,19 +7,28 @@
  * and collecting all files that belong to a session.
  */
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.createAdapter = createAdapter;
+exports.detectAgent = detectAgent;
 // ---------------------------------------------------------------------------
-// Factory
+// Auto-detection + factory
 // ---------------------------------------------------------------------------
-function createAdapter(agent) {
-    switch (agent) {
-        case "claude": {
-            // Lazy require to avoid circular deps and keep the factory lightweight.
-            // eslint-disable-next-line @typescript-eslint/no-var-requires
-            const { ClaudeAdapter } = require("./claude");
-            return new ClaudeAdapter();
-        }
-        default:
-            throw new Error(`Unknown agent adapter: "${agent}". Supported: claude`);
+const claude_1 = require("./claude");
+/**
+ * Detect the agent type from the hook input and environment.
+ *
+ * Current heuristics:
+ * - transcript_path contains "/.claude/" → Claude Code
+ * - CLAUDE_PROJECT_DIR env var is set   → Claude Code
+ *
+ * Falls back to Claude Code as the default (it's the only agent with a
+ * hook system today).  When Cursor or other agents gain hook support,
+ * add detection heuristics here.
+ */
+function detectAgent(hookInput) {
+    // Claude Code: transcripts live under ~/.claude/projects/
+    if (hookInput.transcript_path.includes("/.claude/") ||
+        process.env.CLAUDE_PROJECT_DIR) {
+        return new claude_1.ClaudeAdapter();
     }
+    // Default: assume Claude Code for now.
+    return new claude_1.ClaudeAdapter();
 }

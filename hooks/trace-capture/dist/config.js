@@ -30,20 +30,28 @@ const path = __importStar(require("path"));
 // Loader
 // ---------------------------------------------------------------------------
 /**
- * Resolve the config file path. Checks $CLAUDE_PROJECT_DIR first, then falls
- * back to the cwd provided by the hook input.
+ * Resolve the config file path.
+ *
+ * The config lives alongside the hook itself: trace-capture.json in the hook
+ * root directory.  At runtime, dist/capture.js is one level down from the
+ * hook root, so we resolve relative to __dirname's parent.
+ *
+ * When installed via a hook manager, the hook directory is copied into the
+ * agent's workspace (e.g., .claude/hooks/trace-capture/).  The config file
+ * travels with it.
  */
-function resolveConfigPath(cwd) {
-    const projectDir = process.env.CLAUDE_PROJECT_DIR || cwd;
-    return path.join(projectDir, ".claude", "trace-capture.json");
+function resolveConfigPath() {
+    // dist/capture.js -> hook root is one level up
+    const hookRoot = path.resolve(__dirname, "..");
+    return path.join(hookRoot, "trace-capture.json");
 }
 /**
  * Load and validate the trace-capture config.
- * Returns null if the config file does not exist (hook is simply not configured).
+ * Returns null if the config file does not exist (hook is not configured).
  * Throws on malformed config so the error surfaces loudly.
  */
-function loadConfig(cwd) {
-    const configPath = resolveConfigPath(cwd);
+function loadConfig() {
+    const configPath = resolveConfigPath();
     if (!fs.existsSync(configPath)) {
         return null;
     }
@@ -59,8 +67,6 @@ function loadConfig(cwd) {
     if (typeof parsed.enabled !== "boolean") {
         throw new Error("trace-capture config: 'enabled' must be a boolean");
     }
-    // --- agent (optional, defaults to "claude") ---
-    const agent = typeof parsed.agent === "string" ? parsed.agent : "claude";
     // --- backend ---
     const backend = parsed.backend;
     if (!backend || typeof backend !== "object") {
@@ -102,7 +108,6 @@ function loadConfig(cwd) {
     }
     return {
         enabled: parsed.enabled,
-        agent,
         backend: {
             type: backend.type,
             bucket: backend.bucket,

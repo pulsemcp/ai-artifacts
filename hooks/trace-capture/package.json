@@ -2,14 +2,16 @@
   "name": "trace-capture",
   "version": "1.0.0",
   "private": true,
-  "description": "AIR hook for capturing agent session transcripts to cloud storage",
+  "description": "Hook for capturing agent session transcripts to cloud storage",
   "scripts": {
     "build": "tsc",
     "clean": "rm -rf dist",
-    "rebuild": "npm run clean && npm run build"
+    "rebuild": "npm run clean && npm run build",
+    "test": "vitest run"
   },
   "devDependencies": {
+    "@types/node": "~20.0.0",
     "typescript": "~5.5.0",
-    "@types/node": "~20.0.0"
+    "vitest": "^4.1.4"
   }
 }

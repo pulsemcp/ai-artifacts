@@ -45,6 +45,8 @@ function listFiles(
 }
 
 export class ClaudeAdapter implements AgentAdapter {
+  readonly name = "claude";
+
   async collectSession(hookInput: HookInput): Promise<SessionBundle> {
     const transcriptPath = hookInput.transcript_path;
     const sessionId = hookInput.session_id;

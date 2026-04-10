@@ -60,6 +60,7 @@ function listFiles(dir, test) {
     }
 }
 class ClaudeAdapter {
+    name = "claude";
     async collectSession(hookInput) {
         const transcriptPath = hookInput.transcript_path;
         const sessionId = hookInput.session_id;

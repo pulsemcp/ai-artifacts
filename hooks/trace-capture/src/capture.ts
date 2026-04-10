@@ -1,12 +1,12 @@
 /**
  * Main entry point for the trace-capture hook.
  *
- * Reads the hook payload from stdin, collects session files via the agent
- * adapter, optionally redacts sensitive content, builds a tar.gz archive,
- * and uploads it to cloud storage.
+ * Reads the hook payload from stdin, auto-detects the agent, collects session
+ * files, optionally redacts sensitive content, builds a tar.gz archive, and
+ * uploads it to cloud storage.
  */
 
-import { HookInput, createAdapter } from "./adapters/interface";
+import { HookInput, detectAgent } from "./adapters/interface";
 import { createBackend } from "./backends/interface";
 import { loadConfig } from "./config";
 import { redactContent } from "./redactor";
@@ -44,7 +44,6 @@ async function main(): Promise<void> {
   try {
     hookInput = JSON.parse(raw);
   } catch {
-    // Malformed stdin — not our problem, exit silently.
     process.exit(0);
   }
 
@@ -52,14 +51,14 @@ async function main(): Promise<void> {
     process.exit(0);
   }
 
-  // 2. Load config.
-  const config = loadConfig(hookInput.cwd);
+  // 2. Load config (lives alongside the hook, not in the project).
+  const config = loadConfig();
   if (!config || !config.enabled) {
     process.exit(0);
   }
 
-  // 3. Create agent adapter and collect session files.
-  const adapter = createAdapter(config.agent);
+  // 3. Auto-detect agent and collect session files.
+  const adapter = detectAgent(hookInput);
   const bundle = await adapter.collectSession(hookInput);
 
   // 4. Redact if configured.
@@ -86,7 +85,7 @@ async function main(): Promise<void> {
     version: 1,
     created: new Date().toISOString(),
     session_id: bundle.sessionId,
-    agent: config.agent,
+    agent: adapter.name,
     privacy_mode: config.privacy.mode,
     user_hash: hashedUser,
     files: archiveEntries.map((e) => e.path),

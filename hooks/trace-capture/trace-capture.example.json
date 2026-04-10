@@ -1,6 +1,5 @@
 {
   "enabled": true,
-  "agent": "claude",
   "backend": {
     "type": "gcs",
     "bucket": "my-org-claude-traces",

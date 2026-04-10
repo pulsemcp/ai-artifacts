@@ -20,7 +20,6 @@ export interface PrivacyConfig {
 
 export interface TraceCaptureConfig {
   enabled: boolean;
-  agent: string;
   backend: BackendConfig;
   privacy: PrivacyConfig;
 }
@@ -30,21 +29,29 @@ export interface TraceCaptureConfig {
 // ---------------------------------------------------------------------------
 
 /**
- * Resolve the config file path. Checks $CLAUDE_PROJECT_DIR first, then falls
- * back to the cwd provided by the hook input.
+ * Resolve the config file path.
+ *
+ * The config lives alongside the hook itself: trace-capture.json in the hook
+ * root directory.  At runtime, dist/capture.js is one level down from the
+ * hook root, so we resolve relative to __dirname's parent.
+ *
+ * When installed via a hook manager, the hook directory is copied into the
+ * agent's workspace (e.g., .claude/hooks/trace-capture/).  The config file
+ * travels with it.
  */
-function resolveConfigPath(cwd: string): string {
-  const projectDir = process.env.CLAUDE_PROJECT_DIR || cwd;
-  return path.join(projectDir, ".claude", "trace-capture.json");
+function resolveConfigPath(): string {
+  // dist/capture.js -> hook root is one level up
+  const hookRoot = path.resolve(__dirname, "..");
+  return path.join(hookRoot, "trace-capture.json");
 }
 
 /**
  * Load and validate the trace-capture config.
- * Returns null if the config file does not exist (hook is simply not configured).
+ * Returns null if the config file does not exist (hook is not configured).
  * Throws on malformed config so the error surfaces loudly.
  */
-export function loadConfig(cwd: string): TraceCaptureConfig | null {
-  const configPath = resolveConfigPath(cwd);
+export function loadConfig(): TraceCaptureConfig | null {
+  const configPath = resolveConfigPath();
 
   if (!fs.existsSync(configPath)) {
     return null;
@@ -65,10 +72,6 @@ export function loadConfig(cwd: string): TraceCaptureConfig | null {
     throw new Error("trace-capture config: 'enabled' must be a boolean");
   }
 
-  // --- agent (optional, defaults to "claude") ---
-  const agent =
-    typeof parsed.agent === "string" ? parsed.agent : "claude";
-
   // --- backend ---
   const backend = parsed.backend as Record<string, unknown> | undefined;
   if (!backend || typeof backend !== "object") {
@@ -81,7 +84,7 @@ export function loadConfig(cwd: string): TraceCaptureConfig | null {
     throw new Error("trace-capture config: 'backend.bucket' is required");
   }
   if (
-    typeof (backend as Record<string, unknown>).bucket === "string" &&
+    typeof backend.bucket === "string" &&
     (backend.bucket as string).startsWith("gs://")
   ) {
     throw new Error(
@@ -126,7 +129,6 @@ export function loadConfig(cwd: string): TraceCaptureConfig | null {
 
   return {
     enabled: parsed.enabled,
-    agent,
     backend: {
       type: backend.type as string,
       bucket: backend.bucket as string,
