@@ -21,6 +21,7 @@ export interface BackendConfig {
 
 export interface StorageBackend {
   upload(key: string, data: Buffer): Promise<UploadResult>;
+  delete(key: string): Promise<UploadResult>;
 }
 
 // ---------------------------------------------------------------------------

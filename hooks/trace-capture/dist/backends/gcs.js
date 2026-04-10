@@ -7,15 +7,55 @@ class GCSBackend {
     constructor(config) {
         this.bucket = config.bucket;
     }
-    upload(key, data) {
-        const gcsUri = `gs://${this.bucket}/${key}`;
+    gcsUri(key) {
+        return `gs://${this.bucket}/${key}`;
+    }
+    /**
+     * Classify a gsutil stderr message into an error category.
+     */
+    classifyError(stderr, fallback) {
+        const lower = stderr.toLowerCase();
+        if (lower.includes("401") ||
+            lower.includes("credentials") ||
+            lower.includes("not authorized") ||
+            lower.includes("login")) {
+            return { success: false, error: "auth_failure", details: stderr.trim() };
+        }
+        if (lower.includes("404") ||
+            lower.includes("bucket not found") ||
+            lower.includes("does not exist")) {
+            return {
+                success: false,
+                error: "bucket_not_found",
+                details: stderr.trim(),
+            };
+        }
+        if (lower.includes("403") ||
+            lower.includes("access denied") ||
+            lower.includes("forbidden")) {
+            return {
+                success: false,
+                error: "permission_denied",
+                details: stderr.trim(),
+            };
+        }
+        return {
+            success: false,
+            error: fallback,
+            details: stderr.trim() || `gsutil exited with non-zero code`,
+        };
+    }
+    /**
+     * Run a gsutil command.  Returns { success, error?, details? }.
+     * If stdinData is provided it is piped to the child's stdin.
+     */
+    run(args, stdinData) {
         return new Promise((resolve) => {
-            const child = (0, child_process_1.spawn)("gsutil", ["cp", "-", gcsUri], {
-                stdio: ["pipe", "ignore", "pipe"],
+            const child = (0, child_process_1.spawn)("gsutil", args, {
+                stdio: [stdinData ? "pipe" : "ignore", "ignore", "pipe"],
             });
             let stderr = "";
             child.stderr.on("data", (chunk) => {
-                // Cap stderr collection at 4KB to prevent memory issues.
                 if (stderr.length < 4096) {
                     stderr += chunk.toString("utf-8");
                 }
@@ -42,48 +82,19 @@ class GCSBackend {
                     resolve({ success: true });
                     return;
                 }
-                // Classify the error from stderr content.
-                const lower = stderr.toLowerCase();
-                if (lower.includes("401") ||
-                    lower.includes("credentials") ||
-                    lower.includes("not authorized") ||
-                    lower.includes("login")) {
-                    resolve({
-                        success: false,
-                        error: "auth_failure",
-                        details: stderr.trim(),
-                    });
-                }
-                else if (lower.includes("404") ||
-                    lower.includes("bucket not found") ||
-                    lower.includes("does not exist")) {
-                    resolve({
-                        success: false,
-                        error: "bucket_not_found",
-                        details: stderr.trim(),
-                    });
-                }
-                else if (lower.includes("403") ||
-                    lower.includes("access denied") ||
-                    lower.includes("forbidden")) {
-                    resolve({
-                        success: false,
-                        error: "permission_denied",
-                        details: stderr.trim(),
-                    });
-                }
-                else {
-                    resolve({
-                        success: false,
-                        error: "upload_failed",
-                        details: stderr.trim() || `gsutil exited with code ${code}`,
-                    });
-                }
+                resolve(this.classifyError(stderr, "command_failed"));
             });
-            // Pipe the tar.gz data to gsutil's stdin.
-            child.stdin.write(data);
-            child.stdin.end();
+            if (stdinData && child.stdin) {
+                child.stdin.write(stdinData);
+                child.stdin.end();
+            }
         });
+    }
+    upload(key, data) {
+        return this.run(["cp", "-", this.gcsUri(key)], data);
+    }
+    delete(key) {
+        return this.run(["rm", this.gcsUri(key)]);
     }
 }
 exports.GCSBackend = GCSBackend;

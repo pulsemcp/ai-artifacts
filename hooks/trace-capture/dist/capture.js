@@ -14,6 +14,7 @@ const redactor_1 = require("./redactor");
 const identity_1 = require("./identity");
 const archive_1 = require("./archive");
 const error_page_1 = require("./error-page");
+const manifest_1 = require("./manifest");
 // ---------------------------------------------------------------------------
 // Stdin reader
 // ---------------------------------------------------------------------------
@@ -97,6 +98,24 @@ async function main() {
     const backend = (0, interface_2.createBackend)(config.backend);
     const result = await backend.upload(key, archive);
     if (result.success) {
+        // Record the upload locally so the CLI can list/delete it.
+        try {
+            const gcsUri = `gs://${config.backend.bucket}/${key}`;
+            (0, manifest_1.appendRecord)({
+                session_id: bundle.sessionId,
+                timestamp: now.toISOString(),
+                gcs_key: key,
+                gcs_uri: gcsUri,
+                bucket: config.backend.bucket,
+                agent: adapter.name,
+                status: "uploaded",
+            });
+        }
+        catch {
+            // Manifest failure must not fail the hook.
+        }
+        process.stderr.write(`trace-capture: uploaded session ${bundle.sessionId}\n` +
+            `  Run: node hooks/trace-capture/dist/cli.js list\n`);
         process.exit(0);
     }
     // 8. Loud failure.

@@ -221,6 +221,45 @@ traces/alice/2026/04/10/5f1a4e51-5354-4a2d-99bf-4a7fb40594a5.tar.gz
 
 This structure puts the user segment first, making it straightforward to scope GCS IAM permissions per developer (e.g., grant each user access to `traces/{their-username}/*`).
 
+## CLI
+
+After each successful upload, the hook writes a line to stderr so you know it happened:
+
+```
+trace-capture: uploaded session 5f1a4e51-5354-4a2d-99bf-4a7fb40594a5
+  Run: node hooks/trace-capture/dist/cli.js list
+```
+
+The CLI lets you list and delete uploaded sessions.
+
+### `list`
+
+```bash
+node hooks/trace-capture/dist/cli.js list            # most recent 25
+node hooks/trace-capture/dist/cli.js list -n 50       # most recent 50
+node hooks/trace-capture/dist/cli.js list --all       # include deleted sessions
+```
+
+Output:
+
+```
+SESSION        UPLOADED          STATUS    URI
+--------------------------------------------------------------------------------
+5f1a4e51-5354  2026-04-10 12:00  uploaded  gs://my-org-claude-traces/traces/alice/...
+```
+
+### `delete`
+
+```bash
+node hooks/trace-capture/dist/cli.js delete 5f1a4e51
+```
+
+Deletes the archive from GCS and marks it as deleted in the local manifest. You can use a prefix of the session ID — the CLI will match it as long as it's unambiguous.
+
+### How it works
+
+The hook records every upload to a local JSONL manifest at `~/.trace-capture/uploads.jsonl`. The CLI reads this manifest for `list` and uses it to resolve session IDs for `delete`. Deletions append a new record with `status: "deleted"` rather than removing the original entry, so the manifest is append-only.
+
 ## Agent support
 
 The hook auto-detects the agent from the hook input. Currently supported:

@@ -13,6 +13,7 @@ import { redactContent } from "./redactor";
 import { getUsername, hashUser, scrubUsername } from "./identity";
 import { buildTarGz, ArchiveEntry } from "./archive";
 import { showError } from "./error-page";
+import { appendRecord } from "./manifest";
 
 // ---------------------------------------------------------------------------
 // Stdin reader
@@ -114,6 +115,26 @@ async function main(): Promise<void> {
   const result = await backend.upload(key, archive);
 
   if (result.success) {
+    // Record the upload locally so the CLI can list/delete it.
+    try {
+      const gcsUri = `gs://${config.backend.bucket}/${key}`;
+      appendRecord({
+        session_id: bundle.sessionId,
+        timestamp: now.toISOString(),
+        gcs_key: key,
+        gcs_uri: gcsUri,
+        bucket: config.backend.bucket,
+        agent: adapter.name,
+        status: "uploaded",
+      });
+    } catch {
+      // Manifest failure must not fail the hook.
+    }
+
+    process.stderr.write(
+      `trace-capture: uploaded session ${bundle.sessionId}\n` +
+        `  Run: node hooks/trace-capture/dist/cli.js list\n`
+    );
     process.exit(0);
   }
 
