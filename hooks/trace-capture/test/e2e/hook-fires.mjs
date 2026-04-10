@@ -44,7 +44,7 @@ const HOOK_ROOT = resolve(__dirname, "..", "..");
 const CAPTURE_JS = join(HOOK_ROOT, "dist", "capture.js");
 const CLI_JS = join(HOOK_ROOT, "dist", "cli.js");
 const CONFIG_PATH = join(HOOK_ROOT, "trace-capture.json");
-const CLAUDE_BIN = process.env.CLAUDE_BIN || "/home/rails/.local/bin/claude";
+const CLAUDE_BIN = process.env.CLAUDE_BIN || "claude";
 const E2E_BUCKET = "pulsemcp-trace-capture-e2e";
 
 // ---------------------------------------------------------------------------
@@ -109,8 +109,10 @@ function setupGcsCredentials(tmpDir) {
 // ---------------------------------------------------------------------------
 
 function preflight(gcsEnv) {
-  if (!existsSync(CLAUDE_BIN)) {
-    console.log(`SKIP: Claude binary not found at ${CLAUDE_BIN}`);
+  try {
+    execFileSync(CLAUDE_BIN, ["--version"], { stdio: "pipe", timeout: 10_000 });
+  } catch {
+    console.log(`SKIP: Claude binary not found (CLAUDE_BIN=${CLAUDE_BIN})`);
     process.exit(0);
   }
   if (!existsSync(CAPTURE_JS)) {

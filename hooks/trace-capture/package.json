@@ -9,7 +9,6 @@
     "rebuild": "npm run clean && npm run build",
     "test": "vitest run",
     "test:e2e": "node test/e2e/hook-fires.mjs",
-    "test:e2e:gcs": "node test/e2e/gcs-roundtrip.mjs",
     "test:all": "npm test && npm run test:e2e"
   },
   "devDependencies": {
