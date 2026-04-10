@@ -49,13 +49,11 @@ describe("loadConfig", () => {
 
   it("loads a valid full-mode config", () => {
     writeConfig({
-      enabled: true,
       backend: { type: "gcs", bucket: "my-bucket", prefix: "traces/" },
       privacy: { mode: "full", org_salt: "" },
     });
     const config = loadConfig();
     expect(config).not.toBeNull();
-    expect(config!.enabled).toBe(true);
     expect(config!.backend.type).toBe("gcs");
     expect(config!.backend.bucket).toBe("my-bucket");
     expect(config!.backend.prefix).toBe("traces/");
@@ -64,13 +62,11 @@ describe("loadConfig", () => {
 
   it("loads a valid redacted-mode config without identity hashing", () => {
     writeConfig({
-      enabled: false,
       backend: { type: "gcs", bucket: "bucket" },
       privacy: { mode: "redacted" },
     });
     const config = loadConfig();
     expect(config).not.toBeNull();
-    expect(config!.enabled).toBe(false);
     expect(config!.privacy.mode).toBe("redacted");
     expect(config!.privacy.hash_user_identity).toBe(false);
     expect(config!.backend.prefix).toBe(""); // default
@@ -78,7 +74,6 @@ describe("loadConfig", () => {
 
   it("loads a valid redacted-mode config with identity hashing", () => {
     writeConfig({
-      enabled: true,
       backend: { type: "gcs", bucket: "bucket" },
       privacy: { mode: "redacted", hash_user_identity: true, org_salt: "my-salt" },
     });
@@ -93,23 +88,13 @@ describe("loadConfig", () => {
     expect(() => loadConfig()).toThrow("not valid JSON");
   });
 
-  it("throws when enabled is not a boolean", () => {
-    writeConfig({
-      enabled: "yes",
-      backend: { type: "gcs", bucket: "b" },
-      privacy: { mode: "full" },
-    });
-    expect(() => loadConfig()).toThrow("'enabled' must be a boolean");
-  });
-
   it("throws when backend is missing", () => {
-    writeConfig({ enabled: true, privacy: { mode: "full" } });
+    writeConfig({ privacy: { mode: "full" } });
     expect(() => loadConfig()).toThrow("'backend' is required");
   });
 
   it("throws when backend.type is missing", () => {
     writeConfig({
-      enabled: true,
       backend: { bucket: "b" },
       privacy: { mode: "full" },
     });
@@ -118,7 +103,6 @@ describe("loadConfig", () => {
 
   it("throws when backend.bucket is a gs:// URI", () => {
     writeConfig({
-      enabled: true,
       backend: { type: "gcs", bucket: "gs://my-bucket" },
       privacy: { mode: "full" },
     });
@@ -127,7 +111,6 @@ describe("loadConfig", () => {
 
   it("throws when privacy.mode is invalid", () => {
     writeConfig({
-      enabled: true,
       backend: { type: "gcs", bucket: "b" },
       privacy: { mode: "summary" },
     });
@@ -136,7 +119,6 @@ describe("loadConfig", () => {
 
   it("throws when hash_user_identity is true but org_salt is missing", () => {
     writeConfig({
-      enabled: true,
       backend: { type: "gcs", bucket: "b" },
       privacy: { mode: "redacted", hash_user_identity: true },
     });
@@ -145,7 +127,6 @@ describe("loadConfig", () => {
 
   it("does not require org_salt when hash_user_identity is false", () => {
     writeConfig({
-      enabled: true,
       backend: { type: "gcs", bucket: "b" },
       privacy: { mode: "redacted" },
     });
@@ -156,7 +137,6 @@ describe("loadConfig", () => {
 
   it("parses extra_patterns", () => {
     writeConfig({
-      enabled: true,
       backend: { type: "gcs", bucket: "b" },
       privacy: {
         mode: "redacted",

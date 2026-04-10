@@ -46,7 +46,7 @@ async function main() {
     }
     // 2. Load config (lives alongside the hook, not in the project).
     const config = (0, config_1.loadConfig)();
-    if (!config || !config.enabled) {
+    if (!config) {
         process.exit(0);
     }
     // 3. Auto-detect agent and collect session files.

@@ -20,7 +20,6 @@ export interface PrivacyConfig {
 }
 
 export interface TraceCaptureConfig {
-  enabled: boolean;
   backend: BackendConfig;
   privacy: PrivacyConfig;
 }
@@ -66,11 +65,6 @@ export function loadConfig(): TraceCaptureConfig | null {
     throw new Error(
       `trace-capture config is not valid JSON: ${configPath}`
     );
-  }
-
-  // --- enabled ---
-  if (typeof parsed.enabled !== "boolean") {
-    throw new Error("trace-capture config: 'enabled' must be a boolean");
   }
 
   // --- backend ---
@@ -131,7 +125,6 @@ export function loadConfig(): TraceCaptureConfig | null {
   }
 
   return {
-    enabled: parsed.enabled,
     backend: {
       type: backend.type as string,
       bucket: backend.bucket as string,

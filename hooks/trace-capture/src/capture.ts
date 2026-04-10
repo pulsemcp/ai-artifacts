@@ -53,7 +53,7 @@ async function main(): Promise<void> {
 
   // 2. Load config (lives alongside the hook, not in the project).
   const config = loadConfig();
-  if (!config || !config.enabled) {
+  if (!config) {
     process.exit(0);
   }
 

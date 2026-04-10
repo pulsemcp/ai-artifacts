@@ -1,5 +1,4 @@
 {
-  "enabled": true,
   "backend": {
     "type": "gcs",
     "bucket": "my-org-claude-traces",

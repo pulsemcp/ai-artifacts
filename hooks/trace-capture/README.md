@@ -48,7 +48,6 @@ Edit `trace-capture.json` (ships with sensible defaults):
 
 ```json
 {
-  "enabled": true,
   "backend": {
     "type": "gcs",
     "bucket": "my-org-claude-traces",   // ← change to your bucket
@@ -85,12 +84,6 @@ The compiled `dist/` directory is checked into the repo, so you only need to reb
 ## Configuration reference
 
 The config file is `trace-capture.json` in the hook's root directory (next to `HOOK.json`).
-
-### `enabled`
-
-**Type:** `boolean` — **Required**
-
-Set to `false` to disable the hook without removing it. When disabled, the hook exits immediately with no side effects.
 
 ### `backend`
 
@@ -237,7 +230,7 @@ Common errors and their remediation:
 | `bucket not found` | Check the bucket name in `trace-capture.json` |
 | `permission denied` | Grant `roles/storage.objectCreator` on the bucket |
 
-If the config file is missing or `enabled` is `false`, the hook exits silently (code 0) with no side effects.
+If the config file is missing, the hook exits silently (code 0) with no side effects.
 
 ## Development
 

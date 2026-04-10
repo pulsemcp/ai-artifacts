@@ -63,10 +63,6 @@ function loadConfig() {
     catch {
         throw new Error(`trace-capture config is not valid JSON: ${configPath}`);
     }
-    // --- enabled ---
-    if (typeof parsed.enabled !== "boolean") {
-        throw new Error("trace-capture config: 'enabled' must be a boolean");
-    }
     // --- backend ---
     const backend = parsed.backend;
     if (!backend || typeof backend !== "object") {
@@ -108,7 +104,6 @@ function loadConfig() {
         }
     }
     return {
-        enabled: parsed.enabled,
         backend: {
             type: backend.type,
             bucket: backend.bucket,
