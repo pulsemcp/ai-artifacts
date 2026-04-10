@@ -5,11 +5,13 @@ exports.redactContent = redactContent;
 // Built-in patterns (ordered most-specific-first)
 // ---------------------------------------------------------------------------
 const BUILTIN_RULES = [
+    // --- Block patterns (multiline, most distinctive) ---
     {
         name: "private_key",
         regex: /-----BEGIN[A-Z ]*PRIVATE KEY-----[\s\S]*?-----END[A-Z ]*PRIVATE KEY-----/g,
         replacement: "[REDACTED:private_key]",
     },
+    // --- Token patterns (ordered so longer prefixes match before shorter) ---
     {
         name: "jwt",
         regex: /eyJ[A-Za-z0-9_-]{10,}\.eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_.-]{10,}/g,
@@ -26,9 +28,26 @@ const BUILTIN_RULES = [
         replacement: "$1[REDACTED:aws_secret]",
     },
     {
+        name: "github_pat",
+        regex: /github_pat_[A-Za-z0-9_]{20,}/g,
+        replacement: "[REDACTED:github_pat]",
+    },
+    {
         name: "github_token",
         regex: /(?:ghp|gho|ghu|ghs|ghr)_[A-Za-z0-9_]{36,}/g,
         replacement: "[REDACTED:github_token]",
+    },
+    {
+        // Must come before openai_key since sk- prefix overlaps.
+        name: "anthropic_key",
+        regex: /sk-ant-[A-Za-z0-9_-]{20,}/g,
+        replacement: "[REDACTED:anthropic_key]",
+    },
+    {
+        // Must come before openai_key since sk_ prefix overlaps.
+        name: "stripe_key",
+        regex: /sk_(?:live|test)_[A-Za-z0-9]+/g,
+        replacement: "[REDACTED:stripe_key]",
     },
     {
         name: "openai_key",
@@ -36,10 +55,11 @@ const BUILTIN_RULES = [
         replacement: "[REDACTED:openai_key]",
     },
     {
-        name: "anthropic_key",
-        regex: /sk-ant-[A-Za-z0-9_-]{20,}/g,
-        replacement: "[REDACTED:anthropic_key]",
+        name: "bearer_token",
+        regex: /Bearer\s+[A-Za-z0-9._\-]{20,}/g,
+        replacement: "Bearer [REDACTED:bearer_token]",
     },
+    // --- Assignment / context-aware patterns ---
     {
         name: "generic_api_key",
         regex: /(?:api[_-]?key|apikey|api[_-]?secret)\s*[:=]\s*['"]?[A-Za-z0-9_\-/.+=]{16,}['"]?/gi,
@@ -56,10 +76,12 @@ const BUILTIN_RULES = [
         replacement: "$1[REDACTED:password]$2",
     },
     {
+        // Negative lookahead for ${ avoids redacting template variable references.
         name: "env_secret",
-        regex: /((?:SECRET|KEY|TOKEN|PASS|PASSWORD|CREDENTIAL)[A-Z_]*\s*=\s*['"]?)[^\s'"]{4,}(['"]?)/g,
+        regex: /((?:SECRET|KEY|TOKEN|PASS|PASSWORD|CREDENTIAL|PRIVATE_KEY|CREDENTIALS)[A-Z_]*\s*=\s*['"]?)(?!\$\{)[^\s'"]{4,}(['"]?)/g,
         replacement: "$1[REDACTED:env_secret]$2",
     },
+    // --- Broad patterns (last to avoid over-matching) ---
     {
         name: "email",
         regex: /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g,

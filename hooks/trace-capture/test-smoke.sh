@@ -20,6 +20,7 @@ cat > "$TEST_DIR/$SESSION_ID.jsonl" << 'JSONL'
 {"type":"user","message":{"role":"user","content":"Deploy using API key AKIAIOSFODNN7EXAMPLE and password=hunter2"},"sessionId":"abc123-test-session","cwd":"/home/testuser/myproject"}
 {"type":"assistant","message":{"role":"assistant","content":"Connecting to mongodb://admin:s3cret@prod.db.example.com:27017/app with token ghp_ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmn"},"sessionId":"abc123-test-session"}
 {"type":"user","message":{"role":"user","content":"Email user@example.com. JWT: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTE2MjM5MDIyfQ.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c"},"sessionId":"abc123-test-session"}
+{"type":"assistant","message":{"role":"assistant","content":"Using Bearer eyJhbGciOiJIUzI1NiJ9.abc123456789012345 and stripe key sk_live_abc123DEF456 and github_pat_ABCDEFghijklmnopqrst01234"},"sessionId":"abc123-test-session"}
 JSONL
 
 cat > "$TEST_DIR/$SESSION_ID/subagents/agent-def456.jsonl" << 'JSONL'
@@ -133,6 +134,8 @@ async function test() {
     ['hunter2', '[REDACTED:password]'],
     ['ghp_ABCDEFGHIJKLMNOPQRSTUVWXYZ', '[REDACTED:github_token]'],
     ['user@example.com', '[REDACTED:email]'],
+    ['sk_live_abc123DEF456', '[REDACTED:stripe_key]'],
+    ['github_pat_ABCDEFghijklmnopqrst01234', '[REDACTED:github_pat]'],
     ['mongodb://admin:s3cret@prod.db', '[REDACTED:connection_string]'],
   ];
 
@@ -207,6 +210,39 @@ async function test() {
     console.log('[OK] Meta.json preserved (not redacted)');
   } else {
     console.log('[FAIL] Meta.json was unexpectedly modified');
+  }
+
+  // Test manifest generation (via full capture pipeline)
+  // We can't run the full pipeline without gsutil, but we can verify the
+  // manifest would be generated correctly by importing capture's logic.
+  // Instead, just verify the archive module works with a manifest entry.
+  const manifestEntry = {
+    path: 'manifest.json',
+    content: Buffer.from(JSON.stringify({
+      version: 1,
+      created: new Date().toISOString(),
+      session_id: '$SESSION_ID',
+      agent: 'claude',
+      privacy_mode: 'redacted',
+      user_hash: hashUser('test-salt'),
+      files: entries.map(e => e.path),
+    }, null, 2)),
+  };
+  const withManifest = [manifestEntry, ...entries];
+  const manifestArchive = await buildTarGz(withManifest);
+  fs.writeFileSync('$TEST_DIR/manifest-test.tar.gz', manifestArchive);
+  const manifestListing = execSync('tar tzf $TEST_DIR/manifest-test.tar.gz').toString();
+  if (manifestListing.includes('manifest.json')) {
+    console.log('[OK] Manifest included in archive');
+  } else {
+    console.log('[FAIL] Manifest missing from archive');
+  }
+  const manifestContent = execSync('tar xzf $TEST_DIR/manifest-test.tar.gz -O manifest.json').toString();
+  const parsedManifest = JSON.parse(manifestContent);
+  if (parsedManifest.version === 1 && parsedManifest.session_id === '$SESSION_ID' && parsedManifest.files.length === 4) {
+    console.log('[OK] Manifest content is valid (version=' + parsedManifest.version + ', files=' + parsedManifest.files.length + ')');
+  } else {
+    console.log('[FAIL] Manifest content unexpected: ' + JSON.stringify(parsedManifest));
   }
 
   console.log('\\n=== All smoke tests passed ===');

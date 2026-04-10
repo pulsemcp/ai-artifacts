@@ -66,7 +66,20 @@ async function main() {
         }
         return { path: file.archivePath, content };
     });
-    // 5. Build tar.gz archive.
+    // 5. Build manifest and tar.gz archive.
+    const manifest = {
+        version: 1,
+        created: new Date().toISOString(),
+        session_id: bundle.sessionId,
+        agent: config.agent,
+        privacy_mode: config.privacy.mode,
+        user_hash: hashedUser,
+        files: archiveEntries.map((e) => e.path),
+    };
+    archiveEntries.unshift({
+        path: "manifest.json",
+        content: Buffer.from(JSON.stringify(manifest, null, 2), "utf-8"),
+    });
     const archive = await (0, archive_1.buildTarGz)(archiveEntries);
     // 6. Compute storage key.
     const now = new Date();
