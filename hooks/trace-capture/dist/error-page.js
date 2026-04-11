@@ -32,30 +32,35 @@ const child_process_1 = require("child_process");
 // Remediation messages keyed by error category
 // ---------------------------------------------------------------------------
 const REMEDIATION = {
-    gsutil_not_found: `
-    <ol>
-      <li>Install the Google Cloud SDK: <a href="https://cloud.google.com/sdk/docs/install">https://cloud.google.com/sdk/docs/install</a></li>
-      <li>Run <code>gcloud auth login</code></li>
-      <li>Run <code>gcloud config set project YOUR_PROJECT</code></li>
-      <li>Restart your Claude Code session</li>
-    </ol>`,
+    // SDK backend (gcs) errors
     auth_failure: `
     <ol>
-      <li>Run <code>gcloud auth login</code> to refresh your credentials</li>
-      <li>If using a service account, ensure <code>GOOGLE_APPLICATION_CREDENTIALS</code> is set</li>
+      <li>Set <code>GOOGLE_APPLICATION_CREDENTIALS</code> to a service account key JSON file</li>
+      <li>Or run <code>gcloud auth application-default login</code> for local development</li>
       <li>Restart your Claude Code session</li>
     </ol>`,
     bucket_not_found: `
     <ol>
       <li>Verify the bucket name in <code>HOOK.json</code></li>
-      <li>Ensure the bucket exists: <code>gsutil ls gs://YOUR_BUCKET</code></li>
-      <li>Check your GCP project: <code>gcloud config get-value project</code></li>
+      <li>Ensure the bucket exists in your GCP project</li>
+      <li>Check your GCP project configuration</li>
     </ol>`,
     permission_denied: `
     <ol>
       <li>Ensure your account has <code>roles/storage.objectCreator</code> on the bucket</li>
-      <li>Check bucket IAM: <code>gsutil iam get gs://YOUR_BUCKET</code></li>
       <li>If using a service account, verify its permissions in the GCP console</li>
+    </ol>`,
+    sdk_error: `
+    <ol>
+      <li>Ensure <code>@google-cloud/storage</code> is installed: <code>npm install</code> in the hook directory</li>
+      <li>Check the error details below for more information</li>
+    </ol>`,
+    // CLI backend (gcs-cli) errors
+    gsutil_not_found: `
+    <ol>
+      <li>Install the Google Cloud SDK: <a href="https://cloud.google.com/sdk/docs/install">https://cloud.google.com/sdk/docs/install</a></li>
+      <li>Or switch to the SDK backend by setting <code>"type": "gcs"</code> in HOOK.json (no CLI required)</li>
+      <li>Restart your Claude Code session</li>
     </ol>`,
 };
 // ---------------------------------------------------------------------------

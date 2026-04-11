@@ -10,13 +10,15 @@ exports.createBackend = createBackend;
 // ---------------------------------------------------------------------------
 // Factory
 // ---------------------------------------------------------------------------
+const gcs_sdk_1 = require("./gcs-sdk");
+const gcs_cli_1 = require("./gcs-cli");
 function createBackend(config) {
     switch (config.type) {
-        case "gcs": {
-            const { GCSBackend } = require("./gcs");
-            return new GCSBackend(config);
-        }
+        case "gcs":
+            return new gcs_sdk_1.GCSSdkBackend(config);
+        case "gcs-cli":
+            return new gcs_cli_1.GCSCliBackend(config);
         default:
-            throw new Error(`Unknown storage backend: "${config.type}". Supported: gcs`);
+            throw new Error(`Unknown storage backend: "${config.type}". Supported: gcs, gcs-cli`);
     }
 }

@@ -28,15 +28,18 @@ export interface StorageBackend {
 // Factory
 // ---------------------------------------------------------------------------
 
+import { GCSSdkBackend } from "./gcs-sdk";
+import { GCSCliBackend } from "./gcs-cli";
+
 export function createBackend(config: BackendConfig): StorageBackend {
   switch (config.type) {
-    case "gcs": {
-      const { GCSBackend } = require("./gcs");
-      return new GCSBackend(config);
-    }
+    case "gcs":
+      return new GCSSdkBackend(config);
+    case "gcs-cli":
+      return new GCSCliBackend(config);
     default:
       throw new Error(
-        `Unknown storage backend: "${config.type}". Supported: gcs`
+        `Unknown storage backend: "${config.type}". Supported: gcs, gcs-cli`
       );
   }
 }

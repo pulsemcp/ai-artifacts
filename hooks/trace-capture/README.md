@@ -92,9 +92,10 @@ echo "Wrote /tmp/trace-hook-settings.json — merge into your ~/.claude/settings
 
 **Prerequisites:**
 - Node.js 18+
-- `gsutil` authenticated (`gcloud auth login && gcloud config set project YOUR_PROJECT`)
+- Run `npm install` in the hook directory (installs `@google-cloud/storage`)
+- Set the `GOOGLE_APPLICATION_CREDENTIALS` env var to a service account key JSON, or run `gcloud auth application-default login` for local dev
 
-The compiled `dist/` directory is checked into the repo — no build step needed. Zero runtime dependencies.
+The compiled `dist/` directory is checked into the repo — no build step needed.
 
 ### Configuration
 
@@ -146,7 +147,12 @@ Configuration lives in the `x-config` key inside `HOOK.json`, keeping everything
 
 **Type:** `string` — **Required**
 
-Storage backend to use. Currently supported: `"gcs"`.
+Storage backend to use. Supported values:
+
+| Value | Description |
+|-------|-------------|
+| `"gcs"` | **(default)** Uses the `@google-cloud/storage` Node.js SDK. No CLI tools required — just `npm install` and set `GOOGLE_APPLICATION_CREDENTIALS` or use Application Default Credentials. |
+| `"gcs-cli"` | Uses the `gsutil` CLI (part of Google Cloud SDK). Requires `gsutil` to be installed and authenticated (`gcloud auth login`). Useful if you already have the Cloud SDK installed and prefer not to add a runtime npm dependency. |
 
 #### `backend.bucket`
 
@@ -332,12 +338,13 @@ When an upload fails, the hook:
 
 Common errors and their remediation:
 
-| Error | Fix |
-|-------|-----|
-| `gsutil not found` | Install [Google Cloud SDK](https://cloud.google.com/sdk/docs/install) |
-| `auth failure` | Run `gcloud auth login` |
-| `bucket not found` | Check the bucket name in `HOOK.json` `x-config` |
-| `permission denied` | Grant `roles/storage.objectCreator` on the bucket |
+| Error | Backend | Fix |
+|-------|---------|-----|
+| `auth failure` | both | Set `GOOGLE_APPLICATION_CREDENTIALS` or run `gcloud auth application-default login` |
+| `bucket not found` | both | Check the bucket name in `HOOK.json` `x-config` |
+| `permission denied` | both | Grant `roles/storage.objectCreator` on the bucket |
+| `sdk error` | `gcs` | Run `npm install` in the hook directory to install `@google-cloud/storage` |
+| `gsutil not found` | `gcs-cli` | Install [Google Cloud SDK](https://cloud.google.com/sdk/docs/install), or switch to `"type": "gcs"` |
 
 If the config file is missing, the hook exits silently (code 0) with no side effects.
 
