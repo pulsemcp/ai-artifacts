@@ -1,8 +1,8 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.GCSBackend = void 0;
+exports.GCSCliBackend = void 0;
 const child_process_1 = require("child_process");
-class GCSBackend {
+class GCSCliBackend {
     bucket;
     constructor(config) {
         this.bucket = config.bucket;
@@ -97,4 +97,4 @@ class GCSBackend {
         return this.run(["rm", this.gcsUri(key)]);
     }
 }
-exports.GCSBackend = GCSBackend;
+exports.GCSCliBackend = GCSCliBackend;

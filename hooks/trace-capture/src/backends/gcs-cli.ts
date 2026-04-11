@@ -1,7 +1,7 @@
 import { spawn } from "child_process";
 import { BackendConfig, StorageBackend, UploadResult } from "./interface";
 
-export class GCSBackend implements StorageBackend {
+export class GCSCliBackend implements StorageBackend {
   private bucket: string;
 
   constructor(config: BackendConfig) {
