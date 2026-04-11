@@ -53,9 +53,6 @@ class GCSSdkBackend {
         if (code === 403 || /access denied|forbidden/i.test(message)) {
             return { success: false, error: "permission_denied", details: message };
         }
-        if (/could not load the default credentials/i.test(message)) {
-            return { success: false, error: "auth_failure", details: message };
-        }
         return { success: false, error: "sdk_error", details: message };
     }
 }
