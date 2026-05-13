@@ -1,0 +1,65 @@
+{
+  "$schema": "https://raw.githubusercontent.com/pulsemcp/air/main/schemas/skills.schema.json",
+  "find-all-claude-code-transcripts": {
+    "title": "Find All Claude Code Transcripts",
+    "description": "List all Claude Code session transcripts on this machine and spawn a local browser UI for picking one to analyze. Privacy-preserving: server-side redaction, localhost only, no uploads.",
+    "path": "agent-transcript-analysis/1-acquire/find-all-claude-code-transcripts"
+  },
+  "get-one-claude-code-transcript": {
+    "title": "Get One Claude Code Transcript",
+    "description": "Given a session id, materialize the main transcript plus any subagent transcripts into a single tmp folder, ready for analysis.",
+    "path": "agent-transcript-analysis/1-acquire/get-one-claude-code-transcript"
+  },
+  "analyze-agent-transcript": {
+    "title": "Analyze Agent Transcript",
+    "description": "Orchestrator. Break a session into goal-aligned segments, run the per-segment analyses, and produce a single consolidated report of actionable recommendations across human prompting, Skills, and MCP servers.",
+    "path": "agent-transcript-analysis/2-orchestrate/analyze-agent-transcript",
+    "references": ["philosophy-on-skills", "philosophy-on-mcp"]
+  },
+  "analyze-user-prompt": {
+    "title": "Analyze User Prompt",
+    "description": "Per-prompt analyzer. Classify the prompt (question vs delegation), identify the goal, judge whether it was closed-loop, and feed the human-prompting recommendation bucket.",
+    "path": "agent-transcript-analysis/3-analyze/analyze-prompts/analyze-user-prompt"
+  },
+  "pull-together-goal-context": {
+    "title": "Pull Together Goal Context",
+    "description": "Reach into git repos and external systems when a prompt's goal is not self-evident from the prompt alone. Ground the analyzer's understanding before drawing conclusions.",
+    "path": "agent-transcript-analysis/3-analyze/analyze-prompts/pull-together-goal-context"
+  },
+  "analyze-skill-trigger-performance": {
+    "title": "Analyze Skill Trigger Performance",
+    "description": "Per-segment analyzer for false positives (Skills that fired but shouldn't have) and false negatives (Skills that should have fired but didn't). Recommends modify-description changes.",
+    "path": "agent-transcript-analysis/3-analyze/analyze-skills/analyze-skill-trigger-performance",
+    "references": ["philosophy-on-skills"]
+  },
+  "analyze-skill-action-performance": {
+    "title": "Analyze Skill Action Performance",
+    "description": "Per-segment analyzer for Skills that did run. Assesses helpfulness, token cost, and whether the Skill closed the loop. Recommends body refinements or deletions.",
+    "path": "agent-transcript-analysis/3-analyze/analyze-skills/analyze-skill-action-performance",
+    "references": ["philosophy-on-skills"]
+  },
+  "analyze-skill-gaps": {
+    "title": "Analyze Skill Gaps",
+    "description": "Per-segment analyzer for missing Skills. Identifies moments where a well-placed Skill would have prevented a wrong turn or saved turns, and proposes new Skills with a description and body sketch.",
+    "path": "agent-transcript-analysis/3-analyze/analyze-skills/analyze-skill-gaps",
+    "references": ["philosophy-on-skills"]
+  },
+  "analyze-mcp-trigger-performance": {
+    "title": "Analyze MCP Trigger Performance",
+    "description": "Per-segment analyzer for MCP tools that fired when they shouldn't have, and tools that should have fired but didn't (e.g. agent reached for a CLI instead). Recommends description or surface changes.",
+    "path": "agent-transcript-analysis/3-analyze/analyze-mcp/analyze-mcp-trigger-performance",
+    "references": ["philosophy-on-mcp"]
+  },
+  "analyze-mcp-action-performance": {
+    "title": "Analyze MCP Action Performance",
+    "description": "Per-segment analyzer for MCP tool calls that happened. Assesses response shape, token cost, and whether the tool closed the loop. Recommends tool or server modifications.",
+    "path": "agent-transcript-analysis/3-analyze/analyze-mcp/analyze-mcp-action-performance",
+    "references": ["philosophy-on-mcp"]
+  },
+  "analyze-mcp-gaps": {
+    "title": "Analyze MCP Gaps",
+    "description": "Per-segment analyzer for missing MCP servers / tools. Identifies foreseeable closed-loop limitations the agent could not work around, and proposes new servers or tools.",
+    "path": "agent-transcript-analysis/3-analyze/analyze-mcp/analyze-mcp-gaps",
+    "references": ["philosophy-on-mcp"]
+  }
+}

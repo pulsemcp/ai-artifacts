@@ -1,0 +1,35 @@
+{
+  "$schema": "https://raw.githubusercontent.com/pulsemcp/air/main/schemas/plugins.schema.json",
+  "agent-transcript-analysis": {
+    "title": "Agent Transcript Analysis",
+    "description": "Inspect, redact, and analyze coding agent session transcripts to surface actionable advice on human prompting, Skills (create/modify/delete), and MCP servers (create/modify/delete).",
+    "version": "0.0.1",
+    "skills": [
+      "find-all-claude-code-transcripts",
+      "get-one-claude-code-transcript",
+      "analyze-agent-transcript",
+      "analyze-user-prompt",
+      "pull-together-goal-context",
+      "analyze-skill-trigger-performance",
+      "analyze-skill-action-performance",
+      "analyze-skill-gaps",
+      "analyze-mcp-trigger-performance",
+      "analyze-mcp-action-performance",
+      "analyze-mcp-gaps"
+    ],
+    "mcp_servers": [],
+    "hooks": [],
+    "license": "MIT"
+  },
+  "agent-transcript-capture": {
+    "title": "Agent Transcript Capture",
+    "description": "Stop-event hook that captures complete agent session archives (transcripts, subagents, tool results) to cloud storage on task completion. Bundles a single hook and nothing else.",
+    "version": "0.0.1",
+    "skills": [],
+    "mcp_servers": [],
+    "hooks": [
+      "agent-transcript-capture"
+    ],
+    "license": "MIT"
+  }
+}

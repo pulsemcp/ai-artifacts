@@ -1,0 +1,13 @@
+{
+  "$schema": "https://raw.githubusercontent.com/pulsemcp/air/main/schemas/references.schema.json",
+  "philosophy-on-skills": {
+    "title": "Philosophy on Skills",
+    "description": "Team stance on when a Skill is the right answer — and when it isn't. When to create, modify, or delete a Skill.",
+    "path": "philosophy-on-skills.md"
+  },
+  "philosophy-on-mcp": {
+    "title": "Philosophy on MCP",
+    "description": "Team stance on when an MCP server is the right answer — and when it isn't. When to create, modify, or delete an MCP server.",
+    "path": "philosophy-on-mcp.md"
+  }
+}

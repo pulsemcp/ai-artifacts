@@ -1,6 +1,8 @@
-# trace-capture
+# agent-transcript-capture
 
 A hook that archives complete coding agent session transcripts to cloud storage whenever a task completes. Designed for organizations that want to audit, analyze, or learn from agent sessions across their team.
+
+> **Note:** this hook was previously named `trace-capture`. Some runtime identifiers — the env var `TRACE_CAPTURE_HOME`, the local manifest directory `~/.trace-capture/`, and a handful of log/error strings — still use the old name. They'll be renamed in a follow-up; for now, treat them as the historical name of the same hook.
 
 ## What it captures
 
@@ -39,10 +41,10 @@ Copy the hook into your project and register it in Claude Code's `settings.json`
 
 ```bash
 # From your project root — copy the hook directory
-cp -r path/to/ai-artifacts/hooks/trace-capture .claude/hooks/trace-capture
+cp -r path/to/ai-artifacts/hooks/agent-transcript-capture .claude/hooks/agent-transcript-capture
 
 # Set your GCS bucket (the only required change)
-cd .claude/hooks/trace-capture
+cd .claude/hooks/agent-transcript-capture
 sed -i 's/my-org-claude-traces/YOUR_BUCKET_NAME/' HOOK.json
 ```
 
@@ -57,7 +59,7 @@ Then add the hook to your Claude Code settings (`~/.claude/settings.json` for gl
         "hooks": [
           {
             "type": "command",
-            "command": "node .claude/hooks/trace-capture/dist/capture.js"
+            "command": "node .claude/hooks/agent-transcript-capture/dist/capture.js"
           }
         ]
       }
@@ -79,7 +81,7 @@ cat <<'EOF' > /tmp/trace-hook-settings.json
         "hooks": [
           {
             "type": "command",
-            "command": "node .claude/hooks/trace-capture/dist/capture.js"
+            "command": "node .claude/hooks/agent-transcript-capture/dist/capture.js"
           }
         ]
       }
@@ -130,7 +132,7 @@ At minimum, set `backend.bucket` to your GCS bucket name. See [Configuration ref
 Only needed if you modify the TypeScript source:
 
 ```bash
-cd .claude/hooks/trace-capture
+cd .claude/hooks/agent-transcript-capture
 npm install    # dev dependencies only (typescript, @types/node)
 npm run build
 ```
@@ -294,9 +296,9 @@ The CLI lets you list and delete uploaded sessions.
 ### `list`
 
 ```bash
-node hooks/trace-capture/dist/cli.js list            # most recent 25
-node hooks/trace-capture/dist/cli.js list -n 50       # most recent 50
-node hooks/trace-capture/dist/cli.js list --all       # include deleted sessions
+node hooks/agent-transcript-capture/dist/cli.js list            # most recent 25
+node hooks/agent-transcript-capture/dist/cli.js list -n 50       # most recent 50
+node hooks/agent-transcript-capture/dist/cli.js list --all       # include deleted sessions
 ```
 
 Output:
@@ -310,7 +312,7 @@ SESSION        UPLOADED          STATUS    URI
 ### `delete`
 
 ```bash
-node hooks/trace-capture/dist/cli.js delete 5f1a4e51
+node hooks/agent-transcript-capture/dist/cli.js delete 5f1a4e51
 ```
 
 Deletes the archive from GCS and marks it as deleted in the local manifest. You can use a prefix of the session ID — the CLI will match it as long as it's unambiguous.
