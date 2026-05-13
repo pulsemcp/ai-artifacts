@@ -9,7 +9,7 @@ Data-acquisition layer of the analysis pipeline. Skills here turn "I want to ana
 
 ## How this tier plugs into the rest
 
-Tier 1 → Tier 2 (`2-orchestrate/analyze-agent-transcript`). The orchestrator never reads from `~/.claude/projects/` directly; it consumes the tmp folder this tier produces. That contract is what lets the rest of the pipeline stay simple.
+Tier 1 → Tier 2 (`2-decompose/decompose-into-transcript-segments`). The decomposer is the only skill that reads raw JSONL out of the tmp folder; tier 3+ consume the Segment tree produced from it. Tier 1 → tmp folder → Tier 2 → `segments.json` → everything else.
 
 ## Design decisions
 

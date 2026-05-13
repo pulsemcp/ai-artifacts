@@ -9,5 +9,10 @@
     "title": "Philosophy on MCP",
     "description": "Team stance on when an MCP server is the right answer — and when it isn't. When to create, modify, or delete an MCP server.",
     "path": "philosophy-on-mcp.md"
+  },
+  "transcript-segment": {
+    "title": "Transcript Segment",
+    "description": "The central data primitive of the agent-transcript-analysis plugin. Defines Goal, Outcome, Prompt, and the recursive Segment tree that every analyzer consumes.",
+    "path": "transcript-segment.md"
   }
 }

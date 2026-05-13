@@ -13,11 +13,12 @@ The repo is a single [pulsemcp/AIR](https://github.com/pulsemcp/air) catalog: an
 │       ├── 1-<tier>/              # grouping folders are non-Skills (no SKILL.md)
 │       │   └── <skill-id>/SKILL.md
 │       ├── 2-<tier>/...
-│       └── 3-<tier>/...
+│       └── N-<tier>/...
 ├── references/
 │   ├── references.json            # AIR references index
 │   ├── philosophy-on-skills.md
-│   └── philosophy-on-mcp.md
+│   ├── philosophy-on-mcp.md
+│   └── transcript-segment.md      # data primitive for transcript analysis
 ├── plugins/
 │   └── plugins.json               # AIR plugin index
 └── hooks/
@@ -60,57 +61,70 @@ Every analysis skill should consult these before recommending a create/modify/de
 
 #### Workflow
 
+The pipeline is built around the **Transcript Segment** — a recursive primitive (one Goal, one Outcome, optional Prompt, sub-Segments). See [`references/transcript-segment.md`](references/transcript-segment.md). Tier 2 produces the Segment tree; everything downstream reads it.
+
 ```
 ┌────────────────────────────────────┐
-│ find-all-claude-code-transcripts   │  Pick a session to dig into
+│ 1: find-all-claude-code-transcripts│  Pick a session to dig into
 └────────────────┬───────────────────┘
                  │ session id
                  ▼
 ┌────────────────────────────────────┐
-│ get-one-claude-code-transcript     │  Pull main + subagent transcripts
+│ 1: get-one-claude-code-transcript  │  Pull main + subagent transcripts
 └────────────────┬───────────────────┘  into a single tmp folder
                  │ tmp dir
                  ▼
 ┌────────────────────────────────────┐
-│ analyze-agent-transcript           │  Orchestrator. Splits transcript into
-└────────────────┬───────────────────┘  goal-aligned segments and runs the
-                 │                       per-segment analyses below, then
-                 │                       aggregates their recommendations.
-       ┌─────────┴─────────┐
-       ▼                   ▼
-┌─────────────────┐  ┌─────────────────────────────┐
-│ analyze-user-   │  │ analyze-skill-trigger-perf. │
-│ prompt          │  │ analyze-skill-action-perf.  │
-└────────┬────────┘  │ analyze-skill-gaps          │
-         │           │ analyze-mcp-trigger-perf.   │
-         ▼           │ analyze-mcp-action-perf.    │
-┌─────────────────┐  │ analyze-mcp-gaps            │
-│ pull-together-  │  └─────────────────────────────┘
-│ goal-context    │            │
-└─────────────────┘            ▼
-                       Recommendations:
-                         • Prompting changes
-                         • Skill: create/modify/delete
-                         • MCP:   create/modify/delete
+│ 2: decompose-into-transcript-      │  Walk JSONL once; emit segments.json
+│    segments                        │  (Segment tree) + flamegraph.html
+└────────────────┬───────────────────┘
+                 │ segments.json
+                 ▼
+┌────────────────────────────────────┐
+│ 3: analyze-agent-transcript        │  Orchestrator. For each Segment runs
+└────────────────┬───────────────────┘  the per-Segment analyzers below,
+                 │                       then aggregates recommendations.
+   ┌───────────┬─┴─┬────────────┬─────────────────┐
+   ▼           ▼   ▼            ▼                 ▼
+┌──────────┐ ┌────────┐ ┌──────────────┐ ┌──────────────┐
+│ outcomes │ │prompts │ │ skills       │ │ mcp          │
+│ failure  │ │user-pr.│ │ trigger      │ │ trigger      │
+│ efficien.│ │ambition│ │ action       │ │ action       │
+└────┬─────┘ │goal-ctx│ │ gaps         │ │ gaps         │
+     │       └───┬────┘ └──────┬───────┘ └──────┬───────┘
+     └───────────┴──────────┬──┴────────────────┘
+                            ▼
+                Recommendations per session:
+                  • Prompting changes
+                  • Skill: create/modify/delete
+                  • MCP:   create/modify/delete
+
+           ┌────────────────────────────────────┐
+           │ 5: analyze-cross-transcript-       │   Aggregate many per-session
+           │    patterns                        │   reports → habit-level
+           └────────────────────────────────────┘   recommendations
 ```
 
 #### Skills bundled by this plugin
 
-| Skill | Role |
-|---|---|
 | Tier | Skill | Role |
 |---|---|---|
 | 1 — acquire | [`find-all-claude-code-transcripts`](skills/agent-transcript-analysis/1-acquire/find-all-claude-code-transcripts/SKILL.md) | Lists sessions from `~/.claude/projects` and spawns a local UI to pick one. |
-| 1 — acquire | [`get-one-claude-code-transcript`](skills/agent-transcript-analysis/1-acquire/get-one-claude-code-transcript/SKILL.md) | Given a session id, gathers the main transcript **plus any subagent transcripts** into a single tmp folder ready for analysis. |
-| 2 — orchestrate | [`analyze-agent-transcript`](skills/agent-transcript-analysis/2-orchestrate/analyze-agent-transcript/SKILL.md) | Orchestrator. Breaks the transcript into goal-aligned segments, runs the per-segment analyses, and aggregates recommendations. |
-| 3 — analyze (prompts) | [`analyze-user-prompt`](skills/agent-transcript-analysis/3-analyze/analyze-prompts/analyze-user-prompt/SKILL.md) | Per-prompt: question vs delegation, what was the goal, was it closed-loop. Feeds the "human prompting" recommendation bucket. |
-| 3 — analyze (prompts) | [`pull-together-goal-context`](skills/agent-transcript-analysis/3-analyze/analyze-prompts/pull-together-goal-context/SKILL.md) | Reaches into git repos / external systems when a prompt's goal isn't self-evident. Helper for `analyze-user-prompt`. |
-| 3 — analyze (skills) | [`analyze-skill-trigger-performance`](skills/agent-transcript-analysis/3-analyze/analyze-skills/analyze-skill-trigger-performance/SKILL.md) | Skills that triggered when they shouldn't have, or didn't trigger when they should have. |
-| 3 — analyze (skills) | [`analyze-skill-action-performance`](skills/agent-transcript-analysis/3-analyze/analyze-skills/analyze-skill-action-performance/SKILL.md) | Did the Skills that ran actually help? Cost vs benefit. |
-| 3 — analyze (skills) | [`analyze-skill-gaps`](skills/agent-transcript-analysis/3-analyze/analyze-skills/analyze-skill-gaps/SKILL.md) | Skills that *should have existed* — missing capabilities surfaced by this segment. |
-| 3 — analyze (mcp) | [`analyze-mcp-trigger-performance`](skills/agent-transcript-analysis/3-analyze/analyze-mcp/analyze-mcp-trigger-performance/SKILL.md) | Same as the Skill version, but for MCP servers / tools. |
-| 3 — analyze (mcp) | [`analyze-mcp-action-performance`](skills/agent-transcript-analysis/3-analyze/analyze-mcp/analyze-mcp-action-performance/SKILL.md) | Same as the Skill version, but for MCP servers / tools. |
-| 3 — analyze (mcp) | [`analyze-mcp-gaps`](skills/agent-transcript-analysis/3-analyze/analyze-mcp/analyze-mcp-gaps/SKILL.md) | Same as the Skill version, but for MCP servers / tools. |
+| 1 — acquire | [`get-one-claude-code-transcript`](skills/agent-transcript-analysis/1-acquire/get-one-claude-code-transcript/SKILL.md) | Given a session id, gathers the main transcript **plus any subagent transcripts** into a single tmp folder. |
+| 2 — decompose | [`decompose-into-transcript-segments`](skills/agent-transcript-analysis/2-decompose/decompose-into-transcript-segments/SKILL.md) | Walks the JSONL once and produces the recursive **Transcript Segment** tree (`segments.json`) plus an annotated `flamegraph.html`. Sole producer of the Segment primitive. |
+| 3 — orchestrate | [`analyze-agent-transcript`](skills/agent-transcript-analysis/3-orchestrate/analyze-agent-transcript/SKILL.md) | Orchestrator. Drives tier 2, runs the per-Segment analyzers in tier 4, and aggregates recommendations. |
+| 4 — analyze (outcomes) | [`analyze-failure-hypothesis`](skills/agent-transcript-analysis/4-analyze/analyze-outcomes/analyze-failure-hypothesis/SKILL.md) | For every Failure Outcome (and retro-Failure surfaced by a Correction Prompt), produces an improvement hypothesis. |
+| 4 — analyze (outcomes) | [`analyze-segment-efficiency`](skills/agent-transcript-analysis/4-analyze/analyze-outcomes/analyze-segment-efficiency/SKILL.md) | Wall-clock / token spend vs human counterfactual. Flags wasteful branches and model-tier mismatches — including on Successes. |
+| 4 — analyze (prompts) | [`analyze-user-prompt`](skills/agent-transcript-analysis/4-analyze/analyze-prompts/analyze-user-prompt/SKILL.md) | Per-Prompt: question vs delegation, Goal, closed-loop. Feeds the "human prompting" recommendation bucket. |
+| 4 — analyze (prompts) | [`analyze-prompt-ambition`](skills/agent-transcript-analysis/4-analyze/analyze-prompts/analyze-prompt-ambition/SKILL.md) | Per-Initial-Prompt: was it scoped right, should a deterministic trigger have fired it. |
+| 4 — analyze (prompts) | [`pull-together-goal-context`](skills/agent-transcript-analysis/4-analyze/analyze-prompts/pull-together-goal-context/SKILL.md) | Reaches into git repos / external systems when a Prompt's Goal isn't self-evident. Helper for `analyze-user-prompt`. |
+| 4 — analyze (skills) | [`analyze-skill-trigger-performance`](skills/agent-transcript-analysis/4-analyze/analyze-skills/analyze-skill-trigger-performance/SKILL.md) | Skills that triggered when they shouldn't have, or didn't trigger when they should have. |
+| 4 — analyze (skills) | [`analyze-skill-action-performance`](skills/agent-transcript-analysis/4-analyze/analyze-skills/analyze-skill-action-performance/SKILL.md) | Did the Skills that ran actually help? Cost vs benefit. |
+| 4 — analyze (skills) | [`analyze-skill-gaps`](skills/agent-transcript-analysis/4-analyze/analyze-skills/analyze-skill-gaps/SKILL.md) | Skills that *should have existed* — missing capabilities surfaced by this Segment. |
+| 4 — analyze (mcp) | [`analyze-mcp-trigger-performance`](skills/agent-transcript-analysis/4-analyze/analyze-mcp/analyze-mcp-trigger-performance/SKILL.md) | Same as the Skill version, but for MCP servers / tools. |
+| 4 — analyze (mcp) | [`analyze-mcp-action-performance`](skills/agent-transcript-analysis/4-analyze/analyze-mcp/analyze-mcp-action-performance/SKILL.md) | Same as the Skill version, but for MCP servers / tools. |
+| 4 — analyze (mcp) | [`analyze-mcp-gaps`](skills/agent-transcript-analysis/4-analyze/analyze-mcp/analyze-mcp-gaps/SKILL.md) | Same as the Skill version, but for MCP servers / tools. |
+| 5 — cross-transcript | [`analyze-cross-transcript-patterns`](skills/agent-transcript-analysis/5-cross-transcript/analyze-cross-transcript-patterns/SKILL.md) | Aggregates many per-session reports. Surfaces hindsight-as-foresight Segment patterns, recurring user prompts, deduped Skill/MCP gaps, and time-spend trends. |
 
 #### Privacy
 

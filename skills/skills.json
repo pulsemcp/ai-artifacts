@@ -10,56 +10,87 @@
     "description": "Given a session id, materialize the main transcript plus any subagent transcripts into a single tmp folder, ready for analysis.",
     "path": "agent-transcript-analysis/1-acquire/get-one-claude-code-transcript"
   },
+  "decompose-into-transcript-segments": {
+    "title": "Decompose Into Transcript Segments",
+    "description": "Walk a transcript's raw JSONL once and produce the recursive Transcript Segment tree (segments.json) plus an annotated flamegraph. Sole producer of the Segment primitive consumed by every downstream analyzer.",
+    "path": "agent-transcript-analysis/2-decompose/decompose-into-transcript-segments",
+    "references": ["transcript-segment"]
+  },
   "analyze-agent-transcript": {
     "title": "Analyze Agent Transcript",
-    "description": "Orchestrator. Break a session into goal-aligned segments, run the per-segment analyses, and produce a single consolidated report of actionable recommendations across human prompting, Skills, and MCP servers.",
-    "path": "agent-transcript-analysis/2-orchestrate/analyze-agent-transcript",
-    "references": ["philosophy-on-skills", "philosophy-on-mcp"]
+    "description": "Orchestrator. Drives decomposition (tier 2) and the per-Segment analyzers (tier 4) and produces a single consolidated report of actionable recommendations across human prompting, Skills, and MCP servers.",
+    "path": "agent-transcript-analysis/3-orchestrate/analyze-agent-transcript",
+    "references": ["philosophy-on-skills", "philosophy-on-mcp", "transcript-segment"]
+  },
+  "analyze-failure-hypothesis": {
+    "title": "Analyze Failure Hypothesis",
+    "description": "Per-Segment analyzer. Produces an improvement hypothesis for every Failure Outcome and every retro-Failure (Correction Prompt at the next Segment's head). Routes its recommendation seed to the right downstream bucket.",
+    "path": "agent-transcript-analysis/4-analyze/analyze-outcomes/analyze-failure-hypothesis",
+    "references": ["philosophy-on-skills", "philosophy-on-mcp", "transcript-segment"]
+  },
+  "analyze-segment-efficiency": {
+    "title": "Analyze Segment Efficiency",
+    "description": "Per-Segment efficiency analyzer. Compares wall-clock / tokens to a human counterfactual and flags wasteful branches and model-tier mismatches — including on Success Outcomes.",
+    "path": "agent-transcript-analysis/4-analyze/analyze-outcomes/analyze-segment-efficiency",
+    "references": ["transcript-segment"]
   },
   "analyze-user-prompt": {
     "title": "Analyze User Prompt",
-    "description": "Per-prompt analyzer. Classify the prompt (question vs delegation), identify the goal, judge whether it was closed-loop, and feed the human-prompting recommendation bucket.",
-    "path": "agent-transcript-analysis/3-analyze/analyze-prompts/analyze-user-prompt"
+    "description": "Per-Prompt analyzer. Classify the Prompt (question vs delegation), confirm the Segment's Goal, judge whether it was closed-loop, and feed the human-prompting recommendation bucket. Consumes Initial/Correction classification from Tier 2.",
+    "path": "agent-transcript-analysis/4-analyze/analyze-prompts/analyze-user-prompt",
+    "references": ["transcript-segment"]
+  },
+  "analyze-prompt-ambition": {
+    "title": "Analyze Prompt Ambition",
+    "description": "Per-Initial-Prompt analyzer. Flags Initial Prompts that under-scoped the work and Initial Prompts that should have been deterministic triggers reacting to external events.",
+    "path": "agent-transcript-analysis/4-analyze/analyze-prompts/analyze-prompt-ambition",
+    "references": ["transcript-segment"]
   },
   "pull-together-goal-context": {
     "title": "Pull Together Goal Context",
-    "description": "Reach into git repos and external systems when a prompt's goal is not self-evident from the prompt alone. Ground the analyzer's understanding before drawing conclusions.",
-    "path": "agent-transcript-analysis/3-analyze/analyze-prompts/pull-together-goal-context"
+    "description": "Reach into git repos and external systems when a Prompt's Goal is not self-evident from the Prompt alone. Ground the analyzer's understanding before drawing conclusions.",
+    "path": "agent-transcript-analysis/4-analyze/analyze-prompts/pull-together-goal-context"
   },
   "analyze-skill-trigger-performance": {
     "title": "Analyze Skill Trigger Performance",
-    "description": "Per-segment analyzer for false positives (Skills that fired but shouldn't have) and false negatives (Skills that should have fired but didn't). Recommends modify-description changes.",
-    "path": "agent-transcript-analysis/3-analyze/analyze-skills/analyze-skill-trigger-performance",
-    "references": ["philosophy-on-skills"]
+    "description": "Per-Segment analyzer for false positives (Skills that fired but shouldn't have) and false negatives (Skills that should have fired but didn't). Recommends modify-description changes.",
+    "path": "agent-transcript-analysis/4-analyze/analyze-skills/analyze-skill-trigger-performance",
+    "references": ["philosophy-on-skills", "transcript-segment"]
   },
   "analyze-skill-action-performance": {
     "title": "Analyze Skill Action Performance",
-    "description": "Per-segment analyzer for Skills that did run. Assesses helpfulness, token cost, and whether the Skill closed the loop. Recommends body refinements or deletions.",
-    "path": "agent-transcript-analysis/3-analyze/analyze-skills/analyze-skill-action-performance",
-    "references": ["philosophy-on-skills"]
+    "description": "Per-Segment analyzer for Skills that did run. Assesses helpfulness, token cost, and whether the Skill closed the loop. Recommends body refinements or deletions.",
+    "path": "agent-transcript-analysis/4-analyze/analyze-skills/analyze-skill-action-performance",
+    "references": ["philosophy-on-skills", "transcript-segment"]
   },
   "analyze-skill-gaps": {
     "title": "Analyze Skill Gaps",
-    "description": "Per-segment analyzer for missing Skills. Identifies moments where a well-placed Skill would have prevented a wrong turn or saved turns, and proposes new Skills with a description and body sketch.",
-    "path": "agent-transcript-analysis/3-analyze/analyze-skills/analyze-skill-gaps",
-    "references": ["philosophy-on-skills"]
+    "description": "Per-Segment analyzer for missing Skills. Identifies moments where a well-placed Skill would have prevented a wrong turn or saved turns, and proposes new Skills with a description and body sketch.",
+    "path": "agent-transcript-analysis/4-analyze/analyze-skills/analyze-skill-gaps",
+    "references": ["philosophy-on-skills", "transcript-segment"]
   },
   "analyze-mcp-trigger-performance": {
     "title": "Analyze MCP Trigger Performance",
-    "description": "Per-segment analyzer for MCP tools that fired when they shouldn't have, and tools that should have fired but didn't (e.g. agent reached for a CLI instead). Recommends description or surface changes.",
-    "path": "agent-transcript-analysis/3-analyze/analyze-mcp/analyze-mcp-trigger-performance",
-    "references": ["philosophy-on-mcp"]
+    "description": "Per-Segment analyzer for MCP tools that fired when they shouldn't have, and tools that should have fired but didn't (e.g. agent reached for a CLI instead). Recommends description or surface changes.",
+    "path": "agent-transcript-analysis/4-analyze/analyze-mcp/analyze-mcp-trigger-performance",
+    "references": ["philosophy-on-mcp", "transcript-segment"]
   },
   "analyze-mcp-action-performance": {
     "title": "Analyze MCP Action Performance",
-    "description": "Per-segment analyzer for MCP tool calls that happened. Assesses response shape, token cost, and whether the tool closed the loop. Recommends tool or server modifications.",
-    "path": "agent-transcript-analysis/3-analyze/analyze-mcp/analyze-mcp-action-performance",
-    "references": ["philosophy-on-mcp"]
+    "description": "Per-Segment analyzer for MCP tool calls that happened. Assesses response shape, token cost, and whether the tool closed the loop. Recommends tool or server modifications.",
+    "path": "agent-transcript-analysis/4-analyze/analyze-mcp/analyze-mcp-action-performance",
+    "references": ["philosophy-on-mcp", "transcript-segment"]
   },
   "analyze-mcp-gaps": {
     "title": "Analyze MCP Gaps",
-    "description": "Per-segment analyzer for missing MCP servers / tools. Identifies foreseeable closed-loop limitations the agent could not work around, and proposes new servers or tools.",
-    "path": "agent-transcript-analysis/3-analyze/analyze-mcp/analyze-mcp-gaps",
-    "references": ["philosophy-on-mcp"]
+    "description": "Per-Segment analyzer for missing MCP servers / tools. Identifies foreseeable closed-loop limitations the agent could not work around, and proposes new servers or tools.",
+    "path": "agent-transcript-analysis/4-analyze/analyze-mcp/analyze-mcp-gaps",
+    "references": ["philosophy-on-mcp", "transcript-segment"]
+  },
+  "analyze-cross-transcript-patterns": {
+    "title": "Analyze Cross-Transcript Patterns",
+    "description": "Cross-cutting analyzer. Given the consolidated reports of several already-analyzed transcripts, surface patterns no single transcript reveals: hindsight-as-foresight Segment patterns, recurring user prompts, deduped Skill/MCP gaps, and time-spend patterns.",
+    "path": "agent-transcript-analysis/5-cross-transcript/analyze-cross-transcript-patterns",
+    "references": ["philosophy-on-skills", "philosophy-on-mcp", "transcript-segment"]
   }
 }
