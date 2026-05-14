@@ -1,0 +1,499 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Findings review · agent-transcript-analysis</title>
+<style>
+:root {
+  color-scheme: light dark;
+  --fg: #111; --bg: #fff; --muted: #666; --accent: #0a6; --accent-fg: #fff;
+  --border: #e3e3e3; --row-hover: #f4f4f4; --code: #f6f8fa; --warn: #c33;
+  --banner-bg: #f0f7f3; --pill-bg: #eef2f1;
+  --ok: #0a6; --fail: #c33; --corr: #c80; --muted-badge: #888;
+}
+@media (prefers-color-scheme: dark) {
+  :root { --fg: #eee; --bg: #0e0e0e; --muted: #999; --accent: #5cf;
+          --accent-fg: #001; --border: #2a2a2a; --row-hover: #1c1c1c;
+          --code: #1a1a1a; --warn: #f88; --banner-bg: #11201a; --pill-bg: #1a1a1a;
+          --ok: #5c9; --fail: #f88; --corr: #eb6; --muted-badge: #888; }
+}
+* { box-sizing: border-box; }
+body { margin: 0; padding: 1rem 1.5rem 6rem;
+       font: 14px/1.45 -apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif;
+       color: var(--fg); background: var(--bg); }
+a { color: var(--accent); }
+code { background: var(--code); padding: 1px 5px; border-radius: 3px;
+       font: 12px ui-monospace, SFMono-Regular, Menlo, monospace; }
+
+header { position: sticky; top: 0; z-index: 20; background: var(--bg);
+         border-bottom: 1px solid var(--border); margin: -1rem -1.5rem 1rem;
+         padding: .7rem 1.5rem; display: flex; align-items: center;
+         gap: 1rem; flex-wrap: wrap; }
+h1 { margin: 0; font-size: 1.05rem; font-weight: 600; }
+.meta-line { color: var(--muted); font-size: 12px; margin-top: .15rem; }
+.meta-line code { font-size: 11.5px; }
+.src-pill { font-size: 11px; padding: .15rem .55rem; border-radius: 999px;
+            background: var(--pill-bg); color: var(--muted); }
+.src-pill.reviewed { background: color-mix(in srgb, var(--accent) 18%, transparent);
+                     color: var(--accent); }
+.spacer { flex: 1; }
+.dirty-dot { color: var(--corr); font-size: 12px; }
+button { padding: .35rem .7rem; border: 1px solid var(--border); border-radius: 5px;
+         background: var(--bg); color: var(--fg); cursor: pointer; font-size: 12.5px;
+         font-family: inherit; }
+button:hover { border-color: var(--accent); color: var(--accent); }
+button.primary { background: var(--accent); color: var(--accent-fg);
+                 border-color: var(--accent); font-weight: 600; }
+button.primary:hover { filter: brightness(1.1); color: var(--accent-fg); }
+button:disabled { opacity: .5; cursor: default; }
+button.tiny { padding: .12rem .45rem; font-size: 11px; }
+button.approve:hover { border-color: var(--ok); color: var(--ok); }
+button.reject:hover { border-color: var(--fail); color: var(--fail); }
+
+.banner { background: var(--banner-bg); border: 1px solid var(--border);
+          border-left: 3px solid var(--accent); padding: .6rem 1rem;
+          border-radius: 6px; margin-bottom: 1rem; font-size: 13px; line-height: 1.5; }
+.warnings { background: color-mix(in srgb, var(--warn) 10%, transparent);
+            border: 1px solid color-mix(in srgb, var(--warn) 40%, var(--border));
+            border-left: 3px solid var(--warn); padding: .55rem 1rem;
+            border-radius: 6px; margin-bottom: 1rem; font-size: 12.5px; }
+.warnings ul { margin: .3rem 0 0; padding-left: 1.2rem; }
+.warnings.empty { background: var(--banner-bg); border-left-color: var(--accent);
+                  border-color: var(--border); color: var(--muted); }
+
+.summary { display: flex; gap: .5rem; flex-wrap: wrap; margin-bottom: 1rem;
+           font-size: 12px; }
+.vc { padding: .2rem .6rem; border-radius: 999px; border: 1px solid var(--border);
+      color: var(--muted); }
+.vc b { font-weight: 600; }
+.vc.approved { color: var(--ok); border-color: color-mix(in srgb, var(--ok) 45%, var(--border)); }
+.vc.corrected { color: var(--corr); border-color: color-mix(in srgb, var(--corr) 45%, var(--border)); }
+.vc.rejected { color: var(--fail); border-color: color-mix(in srgb, var(--fail) 45%, var(--border)); }
+
+.item { border: 1px solid var(--border); border-radius: 8px; margin: .5rem 0;
+        background: var(--bg); }
+.item.v-approved { border-color: color-mix(in srgb, var(--ok) 40%, var(--border)); }
+.item.v-corrected { border-color: color-mix(in srgb, var(--corr) 45%, var(--border)); }
+.item.v-rejected { border-color: color-mix(in srgb, var(--fail) 40%, var(--border)); }
+.item-head { display: flex; align-items: center; gap: .5rem; padding: .5rem .7rem;
+             cursor: pointer; }
+.item-head:hover { background: var(--row-hover); border-radius: 8px 8px 0 0; }
+.twist { width: 1rem; color: var(--muted); font-size: 11px; user-select: none; }
+.item-id { font: 600 12px ui-monospace, SFMono-Regular, Menlo, monospace;
+           background: var(--pill-bg); padding: .1rem .4rem; border-radius: 4px;
+           white-space: nowrap; }
+.item-preview { flex: 1; overflow: hidden; text-overflow: ellipsis;
+                white-space: nowrap; color: var(--muted); }
+.verdict-badge { font-size: 10.5px; padding: .1rem .45rem; border-radius: 999px;
+                 border: 1px solid var(--border); white-space: nowrap;
+                 color: var(--muted-badge); text-transform: uppercase;
+                 letter-spacing: .03em; }
+.verdict-badge.approved { color: var(--ok); border-color: color-mix(in srgb, var(--ok) 45%, var(--border)); }
+.verdict-badge.corrected { color: var(--corr); border-color: color-mix(in srgb, var(--corr) 45%, var(--border)); }
+.verdict-badge.rejected { color: var(--fail); border-color: color-mix(in srgb, var(--fail) 45%, var(--border)); }
+
+.item-body { padding: .2rem .7rem .7rem; border-top: 1px solid var(--border); }
+.item.collapsed .item-body { display: none; }
+
+.grid { display: grid; grid-template-columns: max-content 1fr; gap: .35rem .7rem;
+        align-items: start; margin: .55rem 0; }
+.grid > label { color: var(--muted); font-size: 11px; text-transform: uppercase;
+                letter-spacing: .03em; padding-top: .4rem; overflow: hidden;
+                text-overflow: ellipsis; max-width: 12rem; }
+input, select, textarea {
+  padding: .32rem .5rem; border: 1px solid var(--border); border-radius: 5px;
+  background: var(--bg); color: var(--fg); font-size: 13px; font-family: inherit;
+  width: 100%;
+}
+textarea { resize: vertical; min-height: 2.4rem; line-height: 1.4; }
+select { cursor: pointer; }
+.json-ro { background: var(--code); border: 1px solid var(--border);
+           border-radius: 5px; padding: .4rem .6rem; margin: 0; overflow-x: auto;
+           font: 11.5px ui-monospace, SFMono-Regular, Menlo, monospace;
+           max-height: 14rem; }
+
+.actions { display: flex; gap: .4rem; flex-wrap: wrap; align-items: center;
+           margin: .6rem 0 .3rem; }
+.note-row { display: flex; gap: .4rem; align-items: stretch; margin: .3rem 0; }
+.note-row input { flex: 1; }
+
+.corrlog { list-style: none; margin: .5rem 0 0; padding: .4rem .6rem;
+           background: var(--code); border-radius: 5px; font-size: 12px; }
+.corrlog li { padding: .15rem 0; border-bottom: 1px solid var(--border); }
+.corrlog li:last-child { border-bottom: 0; }
+.corrlog .at { color: var(--muted); font-size: 10.5px; margin-left: .4rem; }
+.corrlog .t-reject b { color: var(--fail); }
+.corrlog .t-field b { color: var(--corr); }
+.corrlog .t-approve b { color: var(--ok); }
+.corrlog .t-note b { color: var(--muted); }
+
+#err { color: var(--warn); padding: 2rem; text-align: center; }
+#loading { color: var(--muted); padding: 2rem; text-align: center; }
+</style>
+</head>
+<body>
+<header>
+  <div>
+    <h1 id="title">Findings review</h1>
+    <div class="meta-line" id="meta"></div>
+  </div>
+  <span class="src-pill" id="src-pill" hidden></span>
+  <span class="spacer"></span>
+  <span class="dirty-dot" id="dirty-dot" hidden>● unsaved changes</span>
+  <button id="reload" title="Reload from disk (discards unsaved changes)">Reload</button>
+  <button class="primary" id="save" disabled>Save reviewed</button>
+</header>
+
+<div class="banner">
+  Thumbs-up each finding you agree with, correct the fields the analyzer got wrong, or
+  reject the whole finding. Saving writes
+  <code id="reviewed-name">findings.&lt;kind&gt;.reviewed.json</code> next to the AI draft —
+  the draft is never touched. <code>learn-from-analysis-corrections</code> reads the
+  append-only correction log to flag analyzer improvement opportunities.
+</div>
+
+<div class="warnings empty" id="warnings" hidden></div>
+<div class="summary" id="summary" hidden></div>
+<div id="loading">loading findings…</div>
+<div id="err" hidden></div>
+<div id="items"></div>
+
+<script>
+"use strict";
+const $ = (id) => document.getElementById(id);
+
+let DOC = null;          // the findings document; field edits are applied here
+let LOG = [];            // append-only correction log, seeded from existing_log
+let KIND = "", SOURCE = "draft", TMP_DIR = "", TITLE = "Findings review";
+let DIRTY = false;
+const NOTES = {};        // item id -> in-progress note-box text (survives re-render)
+const COLLAPSED = new Set();
+
+function nowIso() { return new Date().toISOString().replace(/\.\d+Z$/, "Z"); }
+function escapeHTML(s) {
+  return String(s).replace(/[&<>"']/g, (c) =>
+    ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+}
+function jsonShort(v) {
+  let s;
+  try { s = JSON.stringify(v); } catch (e) { s = String(v); }
+  if (s === undefined) s = "undefined";
+  return s.length > 80 ? s.slice(0, 79) + "…" : s;
+}
+
+function items() { return (DOC && Array.isArray(DOC.items)) ? DOC.items : []; }
+function itemById(id) { return items().find((it) => it && it.id === id); }
+function logFor(id) { return LOG.filter((e) => e && e.item_id === id); }
+
+// Mirror review.py::_verdict — reject beats correction beats approval.
+function verdictFor(id) {
+  const types = new Set(logFor(id).map((e) => e.type));
+  if (types.has("reject")) return "rejected";
+  if (types.has("field")) return "corrected";
+  if (types.has("approve")) return "approved";
+  return "unreviewed";
+}
+function verdictCounts() {
+  const c = { unreviewed: 0, approved: 0, corrected: 0, rejected: 0 };
+  for (const it of items()) c[verdictFor(it.id)]++;
+  return c;
+}
+
+function markDirty() { DIRTY = true; $("dirty-dot").hidden = false; $("save").disabled = false; }
+function clearDirty() { DIRTY = false; $("dirty-dot").hidden = true; $("save").disabled = true; }
+
+function pushLog(entry) {
+  entry.at = entry.at || nowIso();
+  LOG.push(entry);
+  markDirty();
+  render();
+}
+
+// Drop the most recent unsaved log entry for an item; revert a field edit's value.
+function undoLast(id) {
+  for (let i = LOG.length - 1; i >= 0; i--) {
+    if (LOG[i].item_id === id) {
+      const e = LOG.splice(i, 1)[0];
+      if (e.type === "field") {
+        const it = itemById(id);
+        if (it) it[e.field] = e.before;
+      }
+      markDirty();
+      render();
+      return;
+    }
+  }
+}
+
+function fieldKind(v) {
+  if (v === null || v === undefined) return "null";
+  if (typeof v === "boolean") return "bool";
+  if (typeof v === "number") return "number";
+  if (typeof v === "string") return "string";
+  return "complex"; // object / array — shown read-only
+}
+
+function fieldControl(itemId, key, val) {
+  const kind = fieldKind(val);
+  const di = escapeHTML(itemId), df = escapeHTML(key);
+  if (kind === "complex") {
+    return `<pre class="json-ro">${escapeHTML(JSON.stringify(val, null, 2))}</pre>`;
+  }
+  if (kind === "bool") {
+    return `<select data-item="${di}" data-field="${df}" data-type="bool">
+      <option value="true"${val === true ? " selected" : ""}>true</option>
+      <option value="false"${val === false ? " selected" : ""}>false</option></select>`;
+  }
+  const sval = val == null ? "" : String(val);
+  const long = sval.length > 60 || sval.includes("\n");
+  if (long) {
+    return `<textarea data-item="${di}" data-field="${df}" data-type="${kind}" rows="3">${escapeHTML(sval)}</textarea>`;
+  }
+  return `<input type="text" data-item="${di}" data-field="${df}" data-type="${kind}" value="${escapeHTML(sval)}" />`;
+}
+
+const PREVIEW_KEYS = ["summary", "title", "headline", "finding", "recommendation",
+                      "hypothesis", "text", "description", "detail"];
+function previewOf(it) {
+  for (const k of PREVIEW_KEYS) {
+    if (typeof it[k] === "string" && it[k].trim()) return it[k].trim();
+  }
+  for (const k of Object.keys(it)) {
+    if (k !== "id" && typeof it[k] === "string" && it[k].trim()) return it[k].trim();
+  }
+  return "(no text preview)";
+}
+
+function corrLine(e) {
+  let inner;
+  if (e.type === "field") {
+    inner = `<b>field</b> <code>${escapeHTML(e.field)}</code> ` +
+            `${escapeHTML(jsonShort(e.before))} → ${escapeHTML(jsonShort(e.after))}`;
+  } else if (e.type === "approve") {
+    inner = `<b>approved</b>`;
+  } else if (e.type === "reject") {
+    inner = `<b>rejected</b>${e.note ? " — " + escapeHTML(e.note) : ""}`;
+  } else if (e.type === "note") {
+    inner = `<b>note</b> — ${escapeHTML(e.note || "")}`;
+  } else {
+    inner = escapeHTML(e.type || "?");
+  }
+  return `<li class="t-${escapeHTML(e.type || "x")}">${inner}` +
+         `<span class="at">${escapeHTML(e.at || "")}</span></li>`;
+}
+
+function itemCard(it) {
+  const rawId = it.id;
+  const id = rawId == null ? "" : String(rawId);
+  const verdict = verdictFor(rawId);
+  const collapsed = COLLAPSED.has(rawId);
+  const fieldKeys = Object.keys(it).filter((k) => k !== "id" && k !== "review");
+  const gridRows = fieldKeys.map((k) =>
+    `<label title="${escapeHTML(k)}">${escapeHTML(k)}</label>` +
+    `<div>${fieldControl(rawId, k, it[k])}</div>`).join("");
+  const corr = logFor(rawId);
+  const corrList = corr.length
+    ? `<ul class="corrlog">${corr.map(corrLine).join("")}</ul>` : "";
+  const di = escapeHTML(id);
+  return `<div class="item v-${verdict}${collapsed ? " collapsed" : ""}">
+    <div class="item-head" data-action="toggle" data-item="${di}">
+      <span class="twist">${collapsed ? "▸" : "▾"}</span>
+      <span class="item-id">${id ? di : "(no id)"}</span>
+      <span class="item-preview">${escapeHTML(previewOf(it).slice(0, 160))}</span>
+      <span class="verdict-badge ${verdict}">${verdict}</span>
+    </div>
+    <div class="item-body">
+      <div class="grid">${gridRows || "<label>—</label><div><em>no fields</em></div>"}</div>
+      <div class="actions">
+        <button class="tiny approve" data-action="approve" data-item="${di}">👍 Approve</button>
+        <button class="tiny reject" data-action="reject" data-item="${di}">✕ Reject</button>
+        <button class="tiny" data-action="note" data-item="${di}">+ Note</button>
+        <button class="tiny" data-action="undo" data-item="${di}"${corr.length ? "" : " disabled"}>↩ Undo last</button>
+      </div>
+      <div class="note-row">
+        <input type="text" data-note-for="${di}" placeholder="why / context — attached to the next Reject or Note"
+               value="${escapeHTML(NOTES[id] || "")}" />
+      </div>
+      ${corrList}
+    </div>
+  </div>`;
+}
+
+function updateSrcPill() {
+  const pill = $("src-pill");
+  pill.hidden = false;
+  pill.textContent = SOURCE === "reviewed" ? "iterating on reviewed" : "AI draft";
+  pill.className = "src-pill" + (SOURCE === "reviewed" ? " reviewed" : "");
+}
+
+function renderSummary(counts) {
+  const el = $("summary");
+  el.hidden = false;
+  const order = ["unreviewed", "approved", "corrected", "rejected"];
+  el.innerHTML = order.map((v) =>
+    `<span class="vc ${v}"><b>${counts[v] || 0}</b> ${v}</span>`).join("");
+}
+
+function renderWarnings(warnings) {
+  const el = $("warnings");
+  el.hidden = false;
+  if (!warnings || !warnings.length) {
+    el.className = "warnings empty";
+    el.textContent = "envelope OK — every finding has a unique id.";
+    return;
+  }
+  el.className = "warnings";
+  el.innerHTML = "<b>" + warnings.length + " envelope warning(s)</b> " +
+    "(warnings never block a save — your judgment wins):" +
+    "<ul>" + warnings.map((w) => `<li>${escapeHTML(w)}</li>`).join("") + "</ul>";
+}
+
+function render() {
+  document.title = TITLE + " · review";
+  $("title").textContent = TITLE;
+  $("meta").innerHTML =
+    `kind <code>${escapeHTML(KIND || "?")}</code> · ${items().length} finding(s) · ` +
+    `<code>${escapeHTML(TMP_DIR)}</code>`;
+  $("reviewed-name").textContent = `findings.${KIND || "<kind>"}.reviewed.json`;
+  updateSrcPill();
+  renderSummary(verdictCounts());
+  const list = items();
+  $("items").innerHTML = list.length
+    ? list.map(itemCard).join("")
+    : `<div id="loading">no findings in this document — nothing to review.</div>`;
+}
+
+// --- events ---------------------------------------------------------------
+$("items").addEventListener("change", (ev) => {
+  const el = ev.target;
+  if (!el.dataset || !el.dataset.item || !el.dataset.field) return;
+  const id = el.dataset.item, field = el.dataset.field, type = el.dataset.type;
+  // data-item is always a string; match it against the real (possibly non-string) id
+  const it = items().find((x) => x && String(x.id) === id);
+  if (!it) return;
+  const before = it[field];
+  let after = el.value;
+  if (type === "bool") {
+    after = el.value === "true";
+  } else if (type === "number") {
+    const n = Number(el.value);
+    after = (el.value.trim() !== "" && !Number.isNaN(n)) ? n : el.value;
+  }
+  if (after === before) return;
+  it[field] = after;
+  pushLog({
+    type: "field", item_id: it.id, field,
+    before: before === undefined ? null : before, after, note: "",
+  });
+});
+
+$("items").addEventListener("input", (ev) => {
+  const el = ev.target;
+  if (el.dataset && el.dataset.noteFor) NOTES[el.dataset.noteFor] = el.value;
+});
+
+$("items").addEventListener("click", (ev) => {
+  const head = ev.target.closest(".item-head");
+  const btn = ev.target.closest("button[data-action]");
+  const el = btn || head;
+  if (!el) return;
+  const action = el.dataset.action;
+  const idStr = el.dataset.item;
+  const it = items().find((x) => x && String(x.id) === idStr);
+  const realId = it ? it.id : idStr;
+  if (action === "toggle") {
+    if (COLLAPSED.has(realId)) COLLAPSED.delete(realId);
+    else COLLAPSED.add(realId);
+    render();
+    return;
+  }
+  if (action === "approve") {
+    pushLog({ type: "approve", item_id: realId });
+    return;
+  }
+  if (action === "reject") {
+    const note = (NOTES[idStr] || "").trim();
+    NOTES[idStr] = "";
+    pushLog({ type: "reject", item_id: realId, note });
+    return;
+  }
+  if (action === "note") {
+    const note = (NOTES[idStr] || "").trim();
+    if (!note) { alert("Type a note in the box first."); return; }
+    NOTES[idStr] = "";
+    pushLog({ type: "note", item_id: realId, note });
+    return;
+  }
+  if (action === "undo") {
+    undoLast(realId);
+    return;
+  }
+});
+
+$("reload").addEventListener("click", () => {
+  if (DIRTY && !confirm("Discard unsaved changes and reload from disk?")) return;
+  loadBundle();
+});
+
+$("save").addEventListener("click", save);
+
+window.addEventListener("beforeunload", (e) => {
+  if (DIRTY) { e.preventDefault(); e.returnValue = ""; }
+});
+
+// --- IO -------------------------------------------------------------------
+async function loadBundle() {
+  $("loading").hidden = false;
+  $("err").hidden = true;
+  try {
+    const r = await fetch("/api/bundle");
+    const data = await r.json();
+    if (!r.ok) throw new Error(data.error || ("HTTP " + r.status));
+    DOC = (data.findings && typeof data.findings === "object")
+      ? data.findings : { items: [] };
+    KIND = data.kind || DOC.kind || "";
+    SOURCE = data.source || "draft";
+    TMP_DIR = data.tmp_dir || "";
+    TITLE = data.title || (KIND ? KIND + " findings" : "Findings review");
+    LOG = Array.isArray(data.existing_log) ? data.existing_log.slice() : [];
+    for (const k of Object.keys(NOTES)) delete NOTES[k];
+    $("loading").hidden = true;
+    clearDirty();
+    render();
+    renderWarnings(data.warnings || []);
+  } catch (e) {
+    $("loading").hidden = true;
+    $("err").hidden = false;
+    $("err").textContent = "Could not load findings: " + e.message;
+  }
+}
+
+async function save() {
+  $("save").disabled = true;
+  $("save").textContent = "Saving…";
+  try {
+    const r = await fetch("/api/save", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ doc: DOC, log: LOG, base: SOURCE, reviewer: "user" }),
+    });
+    const data = await r.json();
+    if (!r.ok || !data.ok) throw new Error(data.error || ("HTTP " + r.status));
+    SOURCE = "reviewed";
+    clearDirty();
+    updateSrcPill();
+    renderWarnings(data.warnings || []);
+    if (data.verdict_counts) renderSummary(data.verdict_counts);
+    $("save").textContent = "Saved ✓";
+    setTimeout(() => { $("save").textContent = "Save reviewed"; }, 1500);
+  } catch (e) {
+    $("save").textContent = "Save reviewed";
+    $("save").disabled = false;
+    alert("Save failed: " + e.message);
+  }
+}
+
+loadBundle();
+</script>
+</body>
+</html>

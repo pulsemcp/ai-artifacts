@@ -22,9 +22,11 @@ agent-transcript-analysis/
     get-claude-code-transcript-from-local/      # session id → deterministic CC → OpenTranscripts mapping
     gather-external-context/                    # pull the ticket / PR / user context into external-context.json
     review-external-context/                    # optional human-review UI for the gathered context
-  2-decompose/            # tier 2: produce the Segment tree (segments.json + flamegraph)
+  2-decompose/            # tier 2: produce the Segment tree (segments.json + flamegraph) + review loop
     decompose-agent-transcript-into-transcript-segments/
-  3-orchestrate/          # tier 3: drive fan-out and aggregation (single skill)
+    review-transcript-segments/                 # optional human-review UI over the Segment tree
+    learn-from-segment-corrections/              # cluster review corrections; flag decomposer fixes
+  3-orchestrate/          # tier 3: drive fan-out + hand off to synthesis (single skill)
     analyze-agent-transcript/
   4-analyze/              # tier 4: per-Segment analyzers (4 buckets) + cross-transcript + review loop
     analyze-outcomes/         { analyze-failure-hypothesis, analyze-segment-efficiency }
@@ -35,9 +37,13 @@ agent-transcript-analysis/
     analyze-cross-transcript/ { analyze-cross-transcript-patterns }
     review-analysis/                  # human-review UI over any findings.<kind>.json draft
     learn-from-analysis-corrections/  # cluster review corrections; flag tier-4 analyzer fixes
+  5-report/               # tier 5: synthesize findings into the recommendation report + review loop
+    synthesize-report/                # tier-4 findings → findings.report.json + report.md
+    review-report/                    # optional human-review UI over the recommendation slate
+    learn-from-report-corrections/    # cluster review corrections; flag synthesize-report fixes
 ```
 
-Tier 1 → 2 → 3 → 4. The `analyze-cross-transcript` bucket in tier 4 runs separately from the per-Segment buckets, consuming the consolidated outputs of many Tier 3 reports at once.
+Tier 1 → 2 → 3 → 4 → 5. Tier 3's orchestrator drives tier 2, tier 4, and tier 5's `synthesize-report` in sequence. The `analyze-cross-transcript` bucket in tier 4 runs separately from the per-Segment buckets, consuming the consolidated `report.md` outputs of many transcripts at once — and its findings then feed back into `synthesize-report` for a cross-transcript report.
 
 Numbered prefixes only land on grouping folders, never on Skill folders themselves — the Skills spec requires a Skill's folder name to match its `name`.
 
@@ -61,7 +67,7 @@ flowchart TD
     end
 
     subgraph T3["Tier 3 · orchestrate"]
-        ORCH["<b>analyze-agent-transcript</b><br/>entry point; drives tiers 2 + 4 into one consolidated report"]
+        ORCH["<b>analyze-agent-transcript</b><br/>entry point; drives tiers 2, 4, and 5 — decompose, analyze, then hand findings to synthesis"]
     end
 
     subgraph T4["Tier 4 · analyze"]
@@ -91,6 +97,12 @@ flowchart TD
         LAC["<b>learn-from-analysis-corrections</b><br/>cluster review corrections; flag tier-4 analyzer heuristic fixes"]
     end
 
+    subgraph T5["Tier 5 · report"]
+        SYN["<b>synthesize-report</b><br/>tier-4 findings to one consolidated report; findings.report.json + report.md"]
+        RR["<b>review-report</b><br/>optional human-review UI over the recommendation slate; writes findings.report.reviewed.json"]
+        LRC["<b>learn-from-report-corrections</b><br/>cluster review corrections; flag synthesize-report heuristic fixes"]
+    end
+
     FA -->|pick session id| GET
     GET -->|transcript.json| GEC
     GEC -.->|optional checkpoint| REC
@@ -108,11 +120,16 @@ flowchart TD
     T4P --> ORCH
     T4S --> ORCH
     T4M --> ORCH
-    ORCH -->|consolidated report, one per transcript| XT
     ORCH -.->|findings drafts: outcomes / prompts / skills / mcp| RA
     XT -.->|findings.cross-transcript.json| RA
     RA -->|reviewed findings + correction log| LAC
     LAC -.->|flags heuristic fixes| T4O & T4P & T4S & T4M & T4X
+    ORCH -->|findings.kind.json| SYN
+    XT -->|findings.cross-transcript.json| SYN
+    SYN -->|report.md, one per transcript| XT
+    SYN -.->|optional checkpoint| RR
+    RR -->|reviewed report + correction log| LRC
+    LRC -.->|flags heuristic fixes| SYN
 ```
 
 ## Design decisions
@@ -120,10 +137,11 @@ flowchart TD
 - **Two data primitives, one downstream contract.** `Transcript` (tier 1 output) carries vendor-coupled detail; `TranscriptSegment` (tier 2 output) is the analysis tree. The downstream tiers read only `segments.json` and dereference event ids back into `transcript.json` for evidence. If either is wrong, fix the producing tier and re-run — don't patch around it downstream.
 - **OpenTranscripts is the cross-vendor contract.** Tier 1's output shape is governed by the `open-transcripts` reference set, not by any one vendor's JSONL. When CC changes its format, only the mapping doc + the transformation skill change.
 - **External context is gathered once, up front.** A transcript records *what* the agent did; it rarely records *why*. Tier 1's `gather-external-context` pulls the ticket, the PR, and light user context into one `external-context.json` that rides alongside `transcript.json` through every later tier — so no analyzer has to re-derive the Goal's backdrop. It is best-effort (missing sources are recorded, never fatal) and has `review-external-context` as its optional human checkpoint, mirroring tier 2's `review-transcript-segments`.
-- **Numbered tiers, not flat buckets.** The execution layers (acquire → decompose → orchestrate → analyze) are visible in the directory tree.
-- **Grouping folders are never Skills.** `1-acquire/`, `2-decompose/`, `3-orchestrate/`, `4-analyze/`, and the per-domain buckets under tier 4 contain no `SKILL.md` of their own. That keeps the spec's "everything under a skill folder belongs to that skill" model intact.
-- **Four per-Segment tier-4 buckets, three output buckets.** `analyze-outcomes/` is Segment-shaped (failure hypotheses, efficiency); its findings *route* into the three artifact buckets (Prompting / Skills / MCP) via `recommendation_route`. The final report keeps a clean three-bucket structure.
-- **Cross-transcript is tier-4 labeling, not its own tier.** Patterns visible only at scale (recurring prompts, hindsight-as-foresight Segment shapes, time-spend trends) need many reports as input — but they are still *labeling*, the same kind of work as the per-Segment buckets, just at a wider scope. So `analyze-cross-transcript/` lives in tier 4. It runs separately from the per-transcript orchestrator, which would only muddy both if it drove cross-transcript fan-out too.
+- **Numbered tiers, not flat buckets.** The execution layers (acquire → decompose → orchestrate → analyze → report) are visible in the directory tree.
+- **Grouping folders are never Skills.** `1-acquire/`, `2-decompose/`, `3-orchestrate/`, `4-analyze/`, `5-report/`, and the per-domain buckets under tier 4 contain no `SKILL.md` of their own. That keeps the spec's "everything under a skill folder belongs to that skill" model intact.
+- **Four per-Segment tier-4 buckets, three output buckets.** `analyze-outcomes/` is Segment-shaped (failure hypotheses, efficiency); its findings *route* into the three artifact buckets (Prompting / Skills / MCP) via `recommendation_route`. `synthesize-report` (tier 5) follows that route to fold the findings into a clean three-bucket report.
+- **Labeling and synthesis are separate tiers.** Tier 4 produces *findings* — flat lists of conclusions. Tier 5 (`synthesize-report`) makes the *leap* from those findings to a prioritized, deduped recommendation slate. Splitting them gives the leap its own review checkpoint (`review-report`) and learn loop (`learn-from-report-corrections`) — the same draft → review → learn shape tiers 2 and 4 already have — instead of burying the synthesis inside the orchestrator where no one could review it.
+- **Cross-transcript is tier-4 labeling, not its own tier.** Patterns visible only at scale (recurring prompts, hindsight-as-foresight Segment shapes, time-spend trends) need many reports as input — but they are still *labeling*, the same kind of work as the per-Segment buckets, just at a wider scope. So `analyze-cross-transcript/` lives in tier 4. It runs separately from the per-transcript orchestrator, which would only muddy both if it drove cross-transcript fan-out too — its findings feed `synthesize-report` for a cross-transcript report.
 - **Folder hierarchy is for humans.** AIR resolves Skills via `skills.json`, which is flat. The nested folders exist so contributors can see the orchestration shape at a glance.
-- **Philosophy docs are the tie-breaker.** Every analyzer cross-checks its recommendation against the `philosophy-on-skills` and `philosophy-on-mcp` references so the output stays consistent with team stance, not just per-Segment heuristics.
+- **Philosophy docs are the tie-breaker.** The tier-4 analyzers consult the `philosophy-on-skills` and `philosophy-on-mcp` references as they draft findings, and `synthesize-report` cross-checks every recommendation against them at the synthesis step — so the output stays consistent with team stance, not just per-Segment heuristics.
 - **Local-first.** Nothing in this plugin uploads or phones home; all analysis happens against the local tmp folder.

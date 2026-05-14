@@ -42,7 +42,7 @@
   },
   "analyze-agent-transcript": {
     "title": "Analyze Agent Transcript",
-    "description": "Orchestrator. Drives decomposition (tier 2) and the per-Segment analyzers (tier 4) and produces a single consolidated report of actionable recommendations across human prompting, Skills, and MCP servers.",
+    "description": "Orchestrator. Drives decomposition (tier 2) and the per-Segment analyzers (tier 4), writes the findings.<kind>.json set, then invokes synthesize-report (tier 5) to turn those findings into the consolidated report of actionable recommendations across human prompting, Skills, and MCP servers.",
     "path": "agent-transcript-analysis/3-orchestrate/analyze-agent-transcript",
     "references": ["philosophy-on-skills", "philosophy-on-mcp", "transcript-segment"]
   },
@@ -126,5 +126,21 @@
     "title": "Learn From Analysis Corrections",
     "description": "Read the human corrections captured in findings.<kind>.reviewed.json files, cluster them into recurring patterns, and surface flagged improvement opportunities for the tier-4 analyzers that drafted the findings. Flags opportunities; never edits a skill. The tier-4 twin of learn-from-segment-corrections.",
     "path": "agent-transcript-analysis/4-analyze/learn-from-analysis-corrections"
+  },
+  "synthesize-report": {
+    "title": "Synthesize Report",
+    "description": "Tier-5 synthesis. Reads the tier-4 findings for a transcript (findings.<kind>.json, preferring the reviewed siblings) and synthesizes them into one consolidated report of actionable next steps across human prompting, Skills, and MCP servers. Writes findings.report.json (the reviewable recommendation slate) and report.md (the human-readable report, with the distance-from-ideal north-star block). Driven by analyze-agent-transcript for a single session, or invoked directly on a cross-transcript batch.",
+    "path": "agent-transcript-analysis/5-report/synthesize-report",
+    "references": ["philosophy-on-skills", "philosophy-on-mcp", "transcript-segment"]
+  },
+  "review-report": {
+    "title": "Review Report",
+    "description": "Open a localhost UI to audit and correct the AI-synthesized tier-5 report — findings.report.json, the consolidated recommendation slate. Thumbs-up, correct, or reject each recommendation; this is where a human reviews the leap from analysis to recommendations against the findings each one cites. Saves findings.report.reviewed.json next to the draft with full correction provenance. Optional human review checkpoint for tier 5.",
+    "path": "agent-transcript-analysis/5-report/review-report"
+  },
+  "learn-from-report-corrections": {
+    "title": "Learn From Report Corrections",
+    "description": "Read the human corrections captured in findings.report.reviewed.json files, cluster them into recurring patterns, and surface flagged improvement opportunities for synthesize-report — where its leap from findings to recommendations over-reaches, mis-routes, or mis-prioritizes. Flags opportunities; never edits a skill. The tier-5 twin of learn-from-analysis-corrections.",
+    "path": "agent-transcript-analysis/5-report/learn-from-report-corrections"
   }
 }

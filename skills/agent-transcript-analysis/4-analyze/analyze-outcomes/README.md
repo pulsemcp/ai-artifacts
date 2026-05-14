@@ -11,7 +11,7 @@ The Segment-level analysis bucket. Where `analyze-prompts/`, `analyze-skills/`, 
 
 `analyze-agent-transcript` runs both per Segment. `analyze-failure-hypothesis` answers "why did this Segment fail and what would have prevented it"; `analyze-segment-efficiency` answers "even on Successes, where did time and tokens go that shouldn't have." The two are complementary — a Segment can be Success-but-wasteful, or Failure-but-fast-fail.
 
-Output from this bucket *does not* directly map to one of the final report's three buckets — instead, each finding declares which downstream bucket(s) (Prompting / Skills / MCP) its recommendation flows to. The orchestrator handles the routing.
+Output from this bucket *does not* directly map to one of the final report's three buckets — instead, each finding declares, via a `recommendation_route`, which downstream bucket(s) (Prompting / Skills / MCP) its recommendation flows to. `synthesize-report` (tier 5) follows that route when it folds the findings into the report.
 
 ## Design decisions
 

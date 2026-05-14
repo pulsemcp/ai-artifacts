@@ -26,7 +26,10 @@
       "analyze-mcp-gaps",
       "analyze-cross-transcript-patterns",
       "review-analysis",
-      "learn-from-analysis-corrections"
+      "learn-from-analysis-corrections",
+      "synthesize-report",
+      "review-report",
+      "learn-from-report-corrections"
     ],
     "mcp_servers": [],
     "hooks": [],

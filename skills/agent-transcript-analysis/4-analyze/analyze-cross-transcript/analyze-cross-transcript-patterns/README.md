@@ -5,7 +5,7 @@ The labeling skill of tier 4's `analyze-cross-transcript` bucket. Operates on th
 ## How it plugs in
 
 Upstream: a batch of single-transcript reports produced by `analyze-agent-transcript`.
-Downstream: its findings feed `synthesize-report` in tier 5 — the same as every other tier-4 bucket. This skill produces *findings* ("this pattern recurs in N sessions"); turning them into a prioritized change list is `5-report`'s job.
+Downstream: its findings feed `synthesize-report` in tier 5 — the same as every other tier-4 bucket. This skill produces *findings* ("this pattern recurs in N sessions"); turning them into a prioritized change list is `synthesize-report`'s job.
 
 Unlike the per-Segment analyzers, it is not fanned out by the orchestrator — it is invoked directly with a batch of reports.
 

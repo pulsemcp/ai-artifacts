@@ -15,11 +15,11 @@ It is not driven by the per-transcript orchestrator (`analyze-agent-transcript`)
 ## How this bucket plugs into the rest
 
 Upstream: a batch of consolidated reports, each produced by `analyze-agent-transcript`.
-Downstream: its findings feed `5-report/synthesize-report`, the same as every other tier-4 bucket — the report tier can synthesize a single transcript's findings or a cross-transcript batch's findings into actionable next steps.
+Downstream: its `findings.cross-transcript.json` feeds `synthesize-report` in tier 5, the same as every other tier-4 bucket — `synthesize-report` can synthesize a single transcript's findings or a cross-transcript batch's findings into actionable next steps.
 
 ## Design decisions
 
 - **Pure aggregation, no re-walking.** This bucket reads only the structured outputs of per-transcript analysis. If something is missing from a `segments.json`, fix tier 2 and re-run the lower tiers; don't paper over it here.
 - **Clusters require a minimum count.** Patterns flagged here must appear in at least two (often three) sessions. One-off recommendations belong in the per-transcript report.
-- **Labeling, not synthesis.** This bucket produces findings — "this pattern recurs in N sessions." Turning those findings into a prioritized change list is `5-report`'s job, not this bucket's.
+- **Labeling, not synthesis.** This bucket produces findings — "this pattern recurs in N sessions." Turning those findings into a prioritized change list is `synthesize-report`'s job (tier 5), not this bucket's.
 - **A different scope, intentionally.** The per-Segment buckets answer "how could this Segment have gone better"; this bucket answers "what pattern recurs across sessions." Same tier, different unit of analysis.
