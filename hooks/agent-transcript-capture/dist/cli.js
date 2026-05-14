@@ -1,6 +1,6 @@
 "use strict";
 /**
- * CLI for managing trace-capture uploads.
+ * CLI for managing agent-transcript-capture uploads.
  *
  * Usage:
  *   node dist/cli.js list [--all] [-n <count>]
@@ -26,7 +26,7 @@ function formatTimestamp(iso) {
     return `${date} ${time}`;
 }
 function formatList(records, opts) {
-    let filtered = opts.all
+    const filtered = opts.all
         ? records
         : records.filter((r) => r.status !== "deleted");
     if (filtered.length === 0) {
@@ -34,12 +34,11 @@ function formatList(records, opts) {
     }
     const shown = filtered.slice(0, opts.count);
     const lines = [];
-    // Header.
     lines.push(`${"SESSION".padEnd(14)} ${"UPLOADED".padEnd(17)} ${"STATUS".padEnd(9)} URI`);
     lines.push("-".repeat(80));
     for (const r of shown) {
         const status = r.status === "deleted" ? "deleted" : "uploaded";
-        lines.push(`${shortId(r.session_id).padEnd(14)} ${formatTimestamp(r.timestamp).padEnd(17)} ${status.padEnd(9)} ${r.gcs_uri}`);
+        lines.push(`${shortId(r.session_id).padEnd(14)} ${formatTimestamp(r.timestamp).padEnd(17)} ${status.padEnd(9)} ${r.object_uri}`);
     }
     if (filtered.length > opts.count) {
         lines.push(`\n... and ${filtered.length - opts.count} more. Use -n to show more.`);
@@ -64,12 +63,18 @@ function cmdList(args) {
 async function performDelete(sessionPrefix, backend) {
     const record = (0, manifest_1.findBySessionId)(sessionPrefix);
     if (!record) {
-        return { success: false, message: `No upload found matching "${sessionPrefix}".` };
+        return {
+            success: false,
+            message: `No upload found matching "${sessionPrefix}".`,
+        };
     }
     if (record.status === "deleted") {
-        return { success: false, message: `Session ${record.session_id} was already deleted.` };
+        return {
+            success: false,
+            message: `Session ${record.session_id} was already deleted.`,
+        };
     }
-    const result = await backend.delete(record.gcs_key);
+    const result = await backend.delete(record.object_key);
     if (!result.success) {
         return {
             success: false,
@@ -81,7 +86,10 @@ async function performDelete(sessionPrefix, backend) {
         status: "deleted",
         deleted_at: new Date().toISOString(),
     });
-    return { success: true, message: `Deleted session ${record.session_id} from ${record.gcs_uri}` };
+    return {
+        success: true,
+        message: `Deleted session ${record.session_id} from ${record.object_uri}`,
+    };
 }
 async function cmdDelete(args) {
     const sessionPrefix = args[0];
@@ -91,10 +99,10 @@ async function cmdDelete(args) {
     }
     const config = (0, config_1.loadConfig)();
     if (!config) {
-        console.error("trace-capture is not configured (no x-config in HOOK.json).");
+        console.error("agent-transcript-capture is not configured (no x-config in HOOK.json).");
         process.exit(1);
     }
-    const backend = (0, interface_1.createBackend)(config.backend);
+    const backend = (0, interface_1.createBackend)((0, config_1.toBackendConfig)(config.no_auth));
     try {
         const result = await performDelete(sessionPrefix, backend);
         if (result.success) {
@@ -114,7 +122,7 @@ async function cmdDelete(args) {
 // help
 // ---------------------------------------------------------------------------
 function cmdHelp() {
-    console.log(`trace-capture CLI
+    console.log(`agent-transcript-capture CLI
 
 Usage:
   node dist/cli.js <command> [options]

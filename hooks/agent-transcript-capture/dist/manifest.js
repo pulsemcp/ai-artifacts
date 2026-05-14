@@ -2,7 +2,7 @@
 /**
  * Local JSONL manifest for tracking uploads.
  *
- * Each upload appends a record to ~/.trace-capture/uploads.jsonl.
+ * Each upload appends a record to ~/.agent-transcript-capture/uploads.jsonl.
  * Deletions append a new record with status "deleted" for the same session.
  * The last entry for a given session_id wins (append-only dedup).
  */
@@ -41,7 +41,8 @@ const path = __importStar(require("path"));
 // Path
 // ---------------------------------------------------------------------------
 function manifestPath() {
-    const home = process.env.TRACE_CAPTURE_HOME || path.join(os.homedir(), ".trace-capture");
+    const home = process.env.AGENT_TRANSCRIPT_CAPTURE_HOME ||
+        path.join(os.homedir(), ".agent-transcript-capture");
     return path.join(home, "uploads.jsonl");
 }
 // ---------------------------------------------------------------------------
@@ -88,8 +89,8 @@ function readRecords() {
 // Query
 // ---------------------------------------------------------------------------
 /**
- * Find a record by session ID prefix.  Throws if the prefix matches multiple
- * sessions (ambiguous).  Returns null if no match.
+ * Find a record by session ID prefix. Throws if the prefix matches multiple
+ * sessions (ambiguous). Returns null if no match.
  */
 function findBySessionId(prefix) {
     const records = readRecords();

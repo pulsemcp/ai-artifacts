@@ -1,52 +1,59 @@
 /**
  * Storage backend interface.
  *
- * Each backend (GCS, S3, Azure Blob, etc.) implements a single `upload`
- * method. The hook pipes a tar.gz buffer through it.
+ * No-authentication mode uses pure `fetch` against a bucket configured to allow
+ * unauthenticated PUT/DELETE scoped to a namespace_key prefix. No SDK,
+ * no CLI, no auth header.
  */
 
 export interface UploadResult {
   success: boolean;
-  /** Short error category (e.g., "auth_failure", "bucket_not_found"). */
+  /** Short error category (e.g., "permission_denied", "network_error"). */
   error?: string;
-  /** Raw details — typically stderr from the CLI tool. */
+  /** Raw details — typically the response body. */
   details?: string;
 }
 
+export type StorageProvider = "gcs" | "s3";
+
 export interface BackendConfig {
-  type: string;
+  provider: StorageProvider;
   bucket: string;
-  prefix: string;
+  namespace_key: string;
+  /** AWS region — required for s3, ignored for gcs. */
+  region?: string;
 }
 
 export interface StorageBackend {
+  /** Provider identifier for diagnostics. */
+  readonly provider: StorageProvider;
+
+  /** Bucket name (public infrastructure, OK to expose in URIs/messages). */
+  readonly bucket: string;
+
+  /** A canonical object URL for diagnostics / manifest records. */
+  objectUrl(key: string): string;
+
   upload(key: string, data: Buffer): Promise<UploadResult>;
   delete(key: string): Promise<UploadResult>;
 }
 
 // ---------------------------------------------------------------------------
 // Factory
-//
-// Lazy-require each backend so that unused backends never load their
-// dependencies.  This lets gcs-cli work without @google-cloud/storage
-// installed, and vice versa.
 // ---------------------------------------------------------------------------
 
+import { GcsNoAuthBackend } from "./gcs-no-auth";
+import { S3NoAuthBackend } from "./s3-no-auth";
+
 export function createBackend(config: BackendConfig): StorageBackend {
-  switch (config.type) {
-    case "gcs": {
-      // eslint-disable-next-line @typescript-eslint/no-var-requires
-      const { GCSSdkBackend } = require("./gcs-sdk");
-      return new GCSSdkBackend(config);
-    }
-    case "gcs-cli": {
-      // eslint-disable-next-line @typescript-eslint/no-var-requires
-      const { GCSCliBackend } = require("./gcs-cli");
-      return new GCSCliBackend(config);
-    }
+  switch (config.provider) {
+    case "gcs":
+      return new GcsNoAuthBackend(config);
+    case "s3":
+      return new S3NoAuthBackend(config);
     default:
       throw new Error(
-        `Unknown storage backend: "${config.type}". Supported: gcs, gcs-cli`
+        `Unknown storage provider: "${(config as { provider: string }).provider}". Supported: gcs, s3`
       );
   }
 }

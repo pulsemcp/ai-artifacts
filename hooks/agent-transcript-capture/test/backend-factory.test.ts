@@ -1,63 +1,73 @@
 import { describe, it, expect } from "vitest";
 import { createBackend } from "../src/backends/interface";
-import { GCSSdkBackend } from "../src/backends/gcs-sdk";
-import { GCSCliBackend } from "../src/backends/gcs-cli";
+import { GcsNoAuthBackend } from "../src/backends/gcs-no-auth";
+import { S3NoAuthBackend } from "../src/backends/s3-no-auth";
+
+const GOOD_KEY = "secret-do-not-share-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
 
 describe("createBackend", () => {
-  it("throws on unknown backend type", () => {
+  it("returns a GcsNoAuthBackend for provider=gcs", () => {
+    const backend = createBackend({
+      provider: "gcs",
+      bucket: "b",
+      namespace_key: GOOD_KEY,
+    });
+    expect(backend.provider).toBe("gcs");
+    expect(backend.bucket).toBe("b");
+  });
+
+  it("returns an S3NoAuthBackend for provider=s3", () => {
+    const backend = createBackend({
+      provider: "s3",
+      bucket: "b",
+      namespace_key: GOOD_KEY,
+      region: "us-east-1",
+    });
+    expect(backend.provider).toBe("s3");
+  });
+
+  it("throws on unknown provider", () => {
     expect(() =>
-      createBackend({ type: "s3", bucket: "b", prefix: "" })
-    ).toThrow('Unknown storage backend: "s3"');
+      createBackend({
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        provider: "azure" as any,
+        bucket: "b",
+        namespace_key: GOOD_KEY,
+      })
+    ).toThrow(/Unknown storage provider/);
   });
 });
 
-describe("GCSSdkBackend", () => {
-  it("implements upload and delete", () => {
-    const backend = new GCSSdkBackend({ type: "gcs", bucket: "test-bucket", prefix: "" });
-    expect(typeof backend.upload).toBe("function");
-    expect(typeof backend.delete).toBe("function");
-  });
-
-  it("classifies 401 as auth_failure", () => {
-    const backend = new GCSSdkBackend({ type: "gcs", bucket: "b", prefix: "" });
-    const err = Object.assign(new Error("Unauthorized"), { code: 401 });
-    const result = (backend as any).classifyError(err);
-    expect(result).toEqual({ success: false, error: "auth_failure", details: "Unauthorized" });
-  });
-
-  it("classifies 'could not load the default credentials' as auth_failure", () => {
-    const backend = new GCSSdkBackend({ type: "gcs", bucket: "b", prefix: "" });
-    const result = (backend as any).classifyError(
-      new Error("Could not load the default credentials")
-    );
-    expect(result.error).toBe("auth_failure");
-  });
-
-  it("classifies 404 as bucket_not_found", () => {
-    const backend = new GCSSdkBackend({ type: "gcs", bucket: "b", prefix: "" });
-    const err = Object.assign(new Error("Not Found"), { code: 404 });
-    const result = (backend as any).classifyError(err);
-    expect(result).toEqual({ success: false, error: "bucket_not_found", details: "Not Found" });
-  });
-
-  it("classifies 403 as permission_denied", () => {
-    const backend = new GCSSdkBackend({ type: "gcs", bucket: "b", prefix: "" });
-    const err = Object.assign(new Error("Forbidden"), { code: 403 });
-    const result = (backend as any).classifyError(err);
-    expect(result).toEqual({ success: false, error: "permission_denied", details: "Forbidden" });
-  });
-
-  it("classifies unknown errors as sdk_error", () => {
-    const backend = new GCSSdkBackend({ type: "gcs", bucket: "b", prefix: "" });
-    const result = (backend as any).classifyError(new Error("Something weird happened"));
-    expect(result).toEqual({ success: false, error: "sdk_error", details: "Something weird happened" });
+describe("GcsNoAuthBackend", () => {
+  it("produces a gs:// object URL", () => {
+    const backend = new GcsNoAuthBackend({
+      provider: "gcs",
+      bucket: "my-bucket",
+      namespace_key: GOOD_KEY,
+    });
+    expect(backend.objectUrl("foo/bar.tar.gz")).toBe("gs://my-bucket/foo/bar.tar.gz");
   });
 });
 
-describe("GCSCliBackend", () => {
-  it("implements upload and delete", () => {
-    const backend = new GCSCliBackend({ type: "gcs-cli", bucket: "test-bucket", prefix: "" });
-    expect(typeof backend.upload).toBe("function");
-    expect(typeof backend.delete).toBe("function");
+describe("S3NoAuthBackend", () => {
+  it("requires region", () => {
+    expect(
+      () =>
+        new S3NoAuthBackend({
+          provider: "s3",
+          bucket: "b",
+          namespace_key: GOOD_KEY,
+        })
+    ).toThrow(/'region' is required/);
+  });
+
+  it("produces an s3:// object URL", () => {
+    const backend = new S3NoAuthBackend({
+      provider: "s3",
+      bucket: "my-bucket",
+      namespace_key: GOOD_KEY,
+      region: "us-east-1",
+    });
+    expect(backend.objectUrl("foo/bar.tar.gz")).toBe("s3://my-bucket/foo/bar.tar.gz");
   });
 });

@@ -24,37 +24,24 @@ var __importStar = (this && this.__importStar) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.getUsername = getUsername;
-exports.hashUser = hashUser;
-exports.scrubUsername = scrubUsername;
-const crypto = __importStar(require("crypto"));
+exports.sanitizeUserId = sanitizeUserId;
 const os = __importStar(require("os"));
-/** Return the current system username. */
+/**
+ * Local system username, used verbatim for the {user_id} segment of the
+ * object key. Without auth, per-user hashing is theatre — the user_id is
+ * organizational, not a security boundary.
+ */
 function getUsername() {
-    return os.userInfo().username;
+    return os.userInfo().username || "unknown";
 }
 /**
- * Compute a pseudonymised user identifier.
- * sha256(orgSalt + username) truncated to 12 hex characters.
+ * Sanitize a username for use as a path segment.
+ *
+ * Replaces anything that isn't a safe path character with a dash, and
+ * lower-cases the result. Defends against pathological usernames containing
+ * slashes, dots, or whitespace.
  */
-function hashUser(orgSalt) {
-    return crypto
-        .createHash("sha256")
-        .update(orgSalt + getUsername())
-        .digest("hex")
-        .slice(0, 12);
-}
-/**
- * Replace every literal occurrence of the system username in `content` with
- * a pseudonymised placeholder.  Catches paths like /home/username/ and
- * JSON-escaped variants like \\/home\\/username.
- */
-function scrubUsername(content, hashedUser) {
-    const username = os.userInfo().username;
-    if (!username)
-        return content;
-    const placeholder = `[USER:${hashedUser}]`;
-    // Escape for use in a regex (username could contain dots, etc.)
-    const escaped = username.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-    const re = new RegExp(escaped, "g");
-    return content.replace(re, placeholder);
+function sanitizeUserId(name) {
+    const safe = name.replace(/[^A-Za-z0-9._-]/g, "-").toLowerCase();
+    return safe || "unknown";
 }

@@ -11,19 +11,19 @@ import {
 } from "../src/manifest";
 
 let tmpDir: string;
-const origEnv = process.env.TRACE_CAPTURE_HOME;
+const origEnv = process.env.AGENT_TRANSCRIPT_CAPTURE_HOME;
 
 beforeEach(() => {
   tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "manifest-test-"));
-  process.env.TRACE_CAPTURE_HOME = tmpDir;
+  process.env.AGENT_TRANSCRIPT_CAPTURE_HOME = tmpDir;
 });
 
 afterEach(() => {
   fs.rmSync(tmpDir, { recursive: true, force: true });
   if (origEnv !== undefined) {
-    process.env.TRACE_CAPTURE_HOME = origEnv;
+    process.env.AGENT_TRANSCRIPT_CAPTURE_HOME = origEnv;
   } else {
-    delete process.env.TRACE_CAPTURE_HOME;
+    delete process.env.AGENT_TRANSCRIPT_CAPTURE_HOME;
   }
 });
 
@@ -31,24 +31,27 @@ function makeRecord(overrides: Partial<UploadRecord> = {}): UploadRecord {
   return {
     session_id: "aaaa-bbbb-cccc",
     timestamp: "2026-04-10T12:00:00.000Z",
-    gcs_key: "traces/alice/2026/04/10/aaaa-bbbb-cccc.tar.gz",
-    gcs_uri: "gs://bucket/traces/alice/2026/04/10/aaaa-bbbb-cccc.tar.gz",
+    provider: "gcs",
     bucket: "bucket",
-    agent: "claude-code",
+    object_key:
+      "secret-do-not-share-deadbeef/alice/2026/04/10/aaaa-bbbb-cccc.tar.gz",
+    object_uri:
+      "gs://bucket/secret-do-not-share-deadbeef/alice/2026/04/10/aaaa-bbbb-cccc.tar.gz",
+    agent: "claude",
     status: "uploaded",
     ...overrides,
   };
 }
 
 describe("manifestPath", () => {
-  it("uses TRACE_CAPTURE_HOME when set", () => {
+  it("uses AGENT_TRANSCRIPT_CAPTURE_HOME when set", () => {
     expect(manifestPath()).toBe(path.join(tmpDir, "uploads.jsonl"));
   });
 
-  it("falls back to ~/.trace-capture", () => {
-    delete process.env.TRACE_CAPTURE_HOME;
+  it("falls back to ~/.agent-transcript-capture", () => {
+    delete process.env.AGENT_TRANSCRIPT_CAPTURE_HOME;
     expect(manifestPath()).toBe(
-      path.join(os.homedir(), ".trace-capture", "uploads.jsonl")
+      path.join(os.homedir(), ".agent-transcript-capture", "uploads.jsonl")
     );
   });
 });
@@ -56,7 +59,7 @@ describe("manifestPath", () => {
 describe("appendRecord", () => {
   it("creates the directory and file if they don't exist", () => {
     const subDir = path.join(tmpDir, "nested");
-    process.env.TRACE_CAPTURE_HOME = subDir;
+    process.env.AGENT_TRANSCRIPT_CAPTURE_HOME = subDir;
     appendRecord(makeRecord());
     expect(fs.existsSync(path.join(subDir, "uploads.jsonl"))).toBe(true);
   });
@@ -103,7 +106,7 @@ describe("readRecords", () => {
   it("skips malformed lines", () => {
     fs.writeFileSync(
       manifestPath(),
-      '{"session_id":"ok","timestamp":"2026-04-10T00:00:00Z","gcs_key":"k","gcs_uri":"u","bucket":"b","agent":"a","status":"uploaded"}\nnot json\n',
+      JSON.stringify(makeRecord({ session_id: "ok" })) + "\nnot json\n",
       "utf-8"
     );
     const records = readRecords();
