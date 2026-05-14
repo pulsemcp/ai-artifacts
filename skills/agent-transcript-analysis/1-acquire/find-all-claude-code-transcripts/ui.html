@@ -8,22 +8,24 @@
     color-scheme: light dark;
     --fg: #111; --bg: #fff; --muted: #666; --accent: #0a6; --accent-fg: #fff;
     --border: #e3e3e3; --row-hover: #f4f4f4; --code: #f6f8fa; --warn: #c33;
-    --banner-bg: #f0f7f3; --chip: #eef2ef;
+    --banner-bg: #f0f7f3; --pill-bg: #eef2f1;
   }
   @media (prefers-color-scheme: dark) {
     :root { --fg: #eee; --bg: #0e0e0e; --muted: #999; --accent: #5cf;
             --accent-fg: #001;
             --border: #2a2a2a; --row-hover: #1c1c1c; --code: #1a1a1a; --warn: #f88;
-            --banner-bg: #11201a; --chip: #1a221c; }
+            --banner-bg: #11201a; --pill-bg: #1a1a1a; }
   }
   * { box-sizing: border-box; }
   body { margin: 0; padding: 1rem 1.5rem 6rem; font: 14px/1.45 -apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif;
          color: var(--fg); background: var(--bg); }
   header { display: flex; align-items: baseline; gap: 1rem; margin-bottom: .75rem; flex-wrap: wrap; }
   h1 { margin: 0; font-size: 1.1rem; font-weight: 600; }
-  .count { color: var(--muted); font-size: 13px; }
-  .stats { color: var(--muted); font-size: 12px; }
+  .stats { color: var(--muted); font-size: 12.5px; }
   .stats b { color: var(--fg); font-weight: 600; }
+  .stats .sep { margin: 0 .5rem; opacity: .5; }
+  .index-pill { font-size: 11.5px; padding: .15rem .5rem; background: var(--pill-bg);
+                color: var(--muted); border-radius: 999px; margin-left: .25rem; }
 
   .banner { background: var(--banner-bg); border: 1px solid var(--border);
             border-left: 3px solid var(--accent);
@@ -34,62 +36,55 @@
   .banner ol { margin: .35rem 0 0 1.1rem; padding: 0; }
   .banner li { margin: .15rem 0; }
 
-  .controls { display: flex; gap: .5rem; margin: 0 0 .5rem; align-items: center; flex-wrap: wrap; }
-  .controls > * { flex-shrink: 0; }
-  input[type=search], input[type=text], input[type=number], input[type=date] {
-    padding: .42rem .55rem; border: 1px solid var(--border);
+  .filters { display: grid; grid-template-columns: 2fr 0.7fr 0.7fr 1fr 1fr 0.9fr auto;
+             gap: .5rem; margin: 0 0 .75rem; align-items: end; }
+  .filters input, .filters select {
+    width: 100%; padding: .42rem .55rem; border: 1px solid var(--border);
     background: var(--bg); color: var(--fg); border-radius: 6px; font-size: 13px;
     font-family: inherit;
   }
-  input[type=search] { flex: 1; min-width: 220px; }
-  input[type=number] { width: 5.5rem; }
-  input[type=date] { width: 8.5rem; }
-  .controls label { font-size: 12px; color: var(--muted); display: inline-flex;
-                    align-items: center; gap: .25rem; }
-  .controls label.toggle { padding: .35rem .55rem; border: 1px solid var(--border);
-                           border-radius: 6px; cursor: pointer; user-select: none; }
-  .controls label.toggle input { accent-color: var(--accent); }
-  .bulkbar { display: flex; gap: .5rem; margin: 0 0 .4rem; font-size: 12px;
-             color: var(--muted); align-items: center; flex-wrap: wrap; }
-  .bulkbar button { font-size: 12px; }
-  .sep { width: 1px; height: 1.1rem; background: var(--border); }
+  .filters input[type=number] { padding-right: .25rem; }
+  .filters label { font-size: 11px; color: var(--muted); text-transform: uppercase;
+                   letter-spacing: .03em; display: block; margin-bottom: 2px; }
+  .filters .group { display: flex; flex-direction: column; }
+  .filters button.reset { padding: .42rem .7rem; border: 1px solid var(--border);
+                          border-radius: 6px; background: var(--bg); color: var(--fg);
+                          font-size: 12.5px; cursor: pointer; height: 30.5px; }
+  .filters button.reset:hover { border-color: var(--accent); color: var(--accent); }
 
-  .progress { font-size: 12px; color: var(--muted); padding: .2rem 0 .5rem;
-              display: flex; align-items: center; gap: .5rem; }
-  .progress .bar { flex: 1; height: 4px; background: var(--border); border-radius: 2px;
-                   overflow: hidden; max-width: 240px; }
-  .progress .bar > div { height: 100%; background: var(--accent); width: 0;
-                         transition: width .25s ease; }
-
-  table { width: 100%; border-collapse: collapse; font-size: 13px; }
-  th, td { text-align: left; padding: .5rem .6rem; border-bottom: 1px solid var(--border);
+  table { width: 100%; border-collapse: collapse; font-size: 13px; table-layout: fixed; }
+  th, td { text-align: left; padding: .5rem .55rem; border-bottom: 1px solid var(--border);
            vertical-align: top; }
-  th { font-weight: 600; color: var(--muted); user-select: none; font-size: 12px;
-       text-transform: uppercase; letter-spacing: .03em; }
+  th { font-weight: 600; color: var(--muted); user-select: none; font-size: 11.5px;
+       text-transform: uppercase; letter-spacing: .03em;
+       border-bottom: 2px solid var(--border); }
   th.sortable { cursor: pointer; }
   th.sortable:hover { color: var(--fg); }
-  th.sortable .arrow { display: inline-block; margin-left: 2px; opacity: 0; font-size: 10px; }
-  th.sortable.active .arrow { opacity: 1; color: var(--accent); }
-  th.num, td.num { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
+  th .arrow { display: inline-block; width: 10px; opacity: .5; margin-left: 2px; }
+  th.sort-active { color: var(--fg); }
+  th.sort-active .arrow { opacity: 1; }
+
+  th.col-check, td.check { width: 28px; padding-right: 0; }
+  th.col-id, td.session { width: 110px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; white-space: nowrap; }
+  th.col-project, td.project { width: 180px; color: var(--muted);
+                               overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  td.project .branch { display: block; font-size: 11px; color: var(--accent);
+                       font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+                       overflow: hidden; text-overflow: ellipsis; }
+  td.snippet .first { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  td.snippet .last { display: block; color: var(--muted); font-style: italic; margin-top: 2px;
+                     overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  td.snippet .placeholder { color: var(--muted); opacity: .5; }
+  th.col-turns, td.turns { width: 70px; text-align: right; font-variant-numeric: tabular-nums; }
+  th.col-tokens, td.tokens { width: 88px; text-align: right; font-variant-numeric: tabular-nums; }
+  th.col-size, td.size { width: 80px; text-align: right; font-variant-numeric: tabular-nums; color: var(--muted); }
+  th.col-when, td.when { width: 100px; white-space: nowrap; color: var(--muted); font-size: 12px; }
+  th.col-actions, td.actions { width: 84px; white-space: nowrap; text-align: right; }
+  td.turns.dim, td.tokens.dim { color: var(--muted); opacity: .55; }
 
   tbody tr { cursor: pointer; }
   tbody tr:hover { background: var(--row-hover); }
   tbody tr.selected { background: color-mix(in srgb, var(--accent) 12%, transparent); }
-
-  td.check { width: 28px; padding-right: 0; }
-  td.session { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; white-space: nowrap; }
-  td.project { color: var(--muted); max-width: 200px; overflow: hidden; text-overflow: ellipsis;
-               white-space: nowrap; }
-  td.snippet { max-width: 320px; }
-  td.snippet .first { display: block; }
-  td.snippet .last { display: block; color: var(--muted); font-style: italic; margin-top: 2px; }
-  td.snippet .placeholder { color: var(--muted); opacity: .5; }
-  td.when { white-space: nowrap; color: var(--muted); font-size: 12px; }
-  td.actions { white-space: nowrap; text-align: right; }
-  td.branch { color: var(--muted); font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-              font-size: 12px; max-width: 140px; overflow: hidden; text-overflow: ellipsis;
-              white-space: nowrap; }
-  td.muted { color: var(--muted); }
 
   button { padding: .3rem .65rem; border: 1px solid var(--border); border-radius: 5px;
            background: var(--bg); color: var(--fg); cursor: pointer; font-size: 12px;
@@ -121,63 +116,64 @@
 
 <header>
   <h1>Claude Code transcripts</h1>
-  <span class="count" id="count">loading…</span>
-  <span class="stats" id="stats"></span>
+  <span class="stats" id="stats">loading…</span>
+  <span class="index-pill" id="index-pill" style="display:none"></span>
 </header>
 
 <div class="banner">
   <strong>This UI just picks transcripts.</strong> The actual analysis runs inside Claude Code (Skills can't be invoked from a browser). To analyze:
   <ol>
-    <li>Pick one or more transcripts below (click rows, or use the checkboxes for batch).</li>
-    <li>Copy the prompt that appears in the bar at the bottom.</li>
-    <li>Paste it into a Claude Code session that has this plugin installed.</li>
+    <li>Filter / sort to find the sessions you care about (column headers sort; the bar below filters).</li>
+    <li>Tick the boxes (or click rows) for the transcripts you want.</li>
+    <li>Copy the prompt from the bar at the bottom and paste it into a Claude Code session with this plugin installed.</li>
   </ol>
 </div>
 
-<div class="controls">
-  <input type="search" id="filter" placeholder="filter by project, session id, branch, or snippet text…" autofocus>
-  <label>From <input type="date" id="from-date"></label>
-  <label>To <input type="date" id="to-date"></label>
-  <label>Min turns <input type="number" id="min-turns" min="0" step="1" placeholder="0"></label>
-  <label>Min tokens <input type="number" id="min-tokens" min="0" step="1000" placeholder="0"></label>
-  <label class="toggle"><input type="checkbox" id="hide-tiny"> Hide tiny (&lt;5 KiB)</label>
-  <label class="toggle"><input type="checkbox" id="selected-only"> Selected only</label>
-  <button id="reset-filters" title="clear all filters">Reset</button>
-</div>
-
-<div class="bulkbar">
-  <button id="sel-visible">Select visible</button>
-  <button id="sel-all">Select all (filtered)</button>
-  <button id="sel-invert">Invert visible</button>
-  <button id="sel-clear">Clear selection</button>
-  <span class="sep"></span>
-  <span id="render-note"></span>
-</div>
-
-<div class="progress" id="progress" style="display:none">
-  <span id="progress-label">previews 0 / 0</span>
-  <div class="bar"><div id="progress-bar"></div></div>
-  <button id="cancel-prefetch" style="font-size:11px; padding:.15rem .4rem">pause</button>
+<div class="filters">
+  <div class="group">
+    <label for="f-search">Search</label>
+    <input type="search" id="f-search" placeholder="project, session id, snippet, model…" autofocus>
+  </div>
+  <div class="group">
+    <label for="f-min-turns">Min turns</label>
+    <input type="number" id="f-min-turns" min="0" step="1" placeholder="any">
+  </div>
+  <div class="group">
+    <label for="f-min-tokens">Min tokens</label>
+    <input type="number" id="f-min-tokens" min="0" step="1000" placeholder="any">
+  </div>
+  <div class="group">
+    <label for="f-project">Project</label>
+    <select id="f-project"><option value="">all</option></select>
+  </div>
+  <div class="group">
+    <label for="f-branch">Branch</label>
+    <select id="f-branch"><option value="">all</option></select>
+  </div>
+  <div class="group">
+    <label for="f-since">Since</label>
+    <input type="date" id="f-since">
+  </div>
+  <button class="reset" id="f-reset" title="Clear all filters">Reset</button>
 </div>
 
 <table>
   <thead>
     <tr>
-      <th class="check"><input type="checkbox" class="checkbox" id="check-all" title="select all visible"></th>
-      <th data-sort="session" class="sortable">Session <span class="arrow"></span></th>
-      <th data-sort="project" class="sortable">Project <span class="arrow"></span></th>
-      <th>Snippet</th>
-      <th data-sort="when" class="sortable">When <span class="arrow"></span></th>
-      <th data-sort="turns" class="sortable num">Turns <span class="arrow"></span></th>
-      <th data-sort="tokens" class="sortable num">Tokens <span class="arrow"></span></th>
-      <th data-sort="size" class="sortable num">Size <span class="arrow"></span></th>
-      <th data-sort="branch" class="sortable">Branch <span class="arrow"></span></th>
-      <th></th>
+      <th class="col-check"><input type="checkbox" class="checkbox" id="check-all" title="select all visible"></th>
+      <th class="col-id sortable" data-sort="session_id">Session<span class="arrow"></span></th>
+      <th class="col-project sortable" data-sort="project">Project / Branch<span class="arrow"></span></th>
+      <th class="col-snippet">Snippet</th>
+      <th class="col-turns sortable" data-sort="turns" title="user + assistant turns">Turns<span class="arrow"></span></th>
+      <th class="col-tokens sortable" data-sort="tokens" title="input + output + cache tokens">Tokens<span class="arrow"></span></th>
+      <th class="col-size sortable" data-sort="size">Size<span class="arrow"></span></th>
+      <th class="col-when sortable sort-active" data-sort="when">When<span class="arrow">↓</span></th>
+      <th class="col-actions"></th>
     </tr>
   </thead>
   <tbody id="rows"></tbody>
 </table>
-<div id="empty" style="display:none">no sessions match these filters</div>
+<div id="empty" style="display:none">no sessions match your filters</div>
 
 <div class="selbar" id="selbar">
   <span class="count-pill" id="selcount">0</span>
@@ -188,48 +184,37 @@
 </div>
 
 <script>
-const $rows = document.getElementById('rows');
-const $count = document.getElementById('count');
-const $stats = document.getElementById('stats');
-const $renderNote = document.getElementById('render-note');
-const $filter = document.getElementById('filter');
-const $fromDate = document.getElementById('from-date');
-const $toDate = document.getElementById('to-date');
-const $minTurns = document.getElementById('min-turns');
-const $minTokens = document.getElementById('min-tokens');
-const $hideTiny = document.getElementById('hide-tiny');
-const $selectedOnly = document.getElementById('selected-only');
-const $resetFilters = document.getElementById('reset-filters');
-const $empty = document.getElementById('empty');
-const $selbar = document.getElementById('selbar');
-const $selcount = document.getElementById('selcount');
-const $prompt = document.getElementById('prompt-template');
-const $copyPrompt = document.getElementById('copy-prompt');
-const $copyIds = document.getElementById('copy-ids');
-const $clearSel = document.getElementById('clear-sel');
-const $checkAll = document.getElementById('check-all');
-const $selVisible = document.getElementById('sel-visible');
-const $selAll = document.getElementById('sel-all');
-const $selInvert = document.getElementById('sel-invert');
-const $selClear = document.getElementById('sel-clear');
-const $progress = document.getElementById('progress');
-const $progressLabel = document.getElementById('progress-label');
-const $progressBar = document.getElementById('progress-bar');
-const $cancelPrefetch = document.getElementById('cancel-prefetch');
+const $ = (id) => document.getElementById(id);
+const $rows = $('rows');
+const $stats = $('stats');
+const $indexPill = $('index-pill');
+const $empty = $('empty');
+const $selbar = $('selbar');
+const $selcount = $('selcount');
+const $prompt = $('prompt-template');
+const $copyPrompt = $('copy-prompt');
+const $copyIds = $('copy-ids');
+const $clearSel = $('clear-sel');
+const $checkAll = $('check-all');
 
-let SESSIONS = [];                        // raw list from /api/sessions
-let PREVIEWS = new Map();                 // session_id -> preview object
+const $fSearch = $('f-search');
+const $fMinTurns = $('f-min-turns');
+const $fMinTokens = $('f-min-tokens');
+const $fProject = $('f-project');
+const $fBranch = $('f-branch');
+const $fSince = $('f-since');
+const $fReset = $('f-reset');
+
+let SESSIONS = [];
+let PREVIEWS = new Map();
 let SELECTED = new Set();
-let VISIBLE = [];                         // currently rendered session order
-let FILTERED = [];                        // post-filter, pre-render-limit
+let VISIBLE = [];
 const RENDER_LIMIT = 500;
-const PREVIEW_PARALLEL = 12;
-const TINY_BYTES = 5 * 1024;
 
-let sortKey = 'when';
-let sortDir = 'desc';                     // 'asc' | 'desc'
+let SORT = { key: 'when', dir: 'desc' };
 
 function fmtSize(n) {
+  if (n == null) return '—';
   if (n < 1024) return n + ' B';
   if (n < 1024*1024) return (n/1024).toFixed(1) + ' KiB';
   return (n/1024/1024).toFixed(1) + ' MiB';
@@ -237,8 +222,12 @@ function fmtSize(n) {
 function fmtNum(n) {
   if (n == null) return '—';
   if (n < 1000) return String(n);
-  if (n < 1e6) return (n/1000).toFixed(n < 10000 ? 1 : 0) + 'k';
-  return (n/1e6).toFixed(1) + 'M';
+  if (n < 1000000) return (n/1000).toFixed(n < 10000 ? 1 : 0) + 'k';
+  return (n/1000000).toFixed(1) + 'M';
+}
+function fmtNumLong(n) {
+  if (n == null) return '—';
+  return n.toLocaleString();
 }
 function fmtWhen(iso, fallbackEpoch) {
   const d = iso ? new Date(iso) : (fallbackEpoch ? new Date(fallbackEpoch * 1000) : null);
@@ -257,291 +246,238 @@ function escapeHTML(s) {
   }[c]));
 }
 
-// Session date for filtering: prefer preview.started_at, fall back to mtime.
-function sessionDateISO(s) {
+// Per-session derived fields are computed ONCE in indexSession() and then
+// stamped onto the session object as ``_tokens / _turns / _branch /
+// _whenEpoch / _search``. Filter and sort hot paths then read these
+// directly with no Map lookups, no string allocations, and no DOM reads.
+
+function indexSession(s) {
   const p = PREVIEWS.get(s.session_id);
-  if (p && p.started_at) return p.started_at;
-  return new Date(s.mtime * 1000).toISOString();
-}
-function sessionTurns(s) {
-  const p = PREVIEWS.get(s.session_id);
-  return p ? p.user_turns : null;
-}
-function sessionTokens(s) {
-  const p = PREVIEWS.get(s.session_id);
-  if (!p) return null;
-  return (p.input_tokens || 0) + (p.output_tokens || 0);
-}
-function sessionBranch(s) {
-  const p = PREVIEWS.get(s.session_id);
-  return p ? (p.git_branch || '') : '';
-}
-
-function applyFilters() {
-  const q = $filter.value.toLowerCase().trim();
-  const fromStr = $fromDate.value;            // YYYY-MM-DD
-  const toStr = $toDate.value;
-  const minTurns = parseInt($minTurns.value || '0', 10);
-  const minTokens = parseInt($minTokens.value || '0', 10);
-  const hideTiny = $hideTiny.checked;
-  const selectedOnly = $selectedOnly.checked;
-
-  FILTERED = SESSIONS.filter(s => {
-    if (selectedOnly && !SELECTED.has(s.session_id)) return false;
-    if (hideTiny && s.size_bytes < TINY_BYTES) return false;
-
-    const iso = sessionDateISO(s).slice(0, 10);
-    if (fromStr && iso < fromStr) return false;
-    if (toStr && iso > toStr) return false;
-
-    if (minTurns > 0) {
-      const t = sessionTurns(s);
-      if (t == null || t < minTurns) return false;   // exclude unknown when filter is on
+  if (p) {
+    s._turns = p.message_count ?? null;
+    s._tokens = (p.input_tokens || 0) + (p.output_tokens || 0)
+              + (p.cache_creation_tokens || 0) + (p.cache_read_tokens || 0);
+    s._branch = p.git_branch || '';
+    if (p.started_at) {
+      const t = +new Date(p.started_at);
+      s._whenEpoch = Number.isNaN(t) ? s.mtime : t / 1000;
+    } else {
+      s._whenEpoch = s.mtime;
     }
-    if (minTokens > 0) {
-      const tk = sessionTokens(s);
-      if (tk == null || tk < minTokens) return false;
-    }
-
-    if (q) {
-      if (s.session_id.toLowerCase().includes(q)) return true;
-      if ((s.project_label || '').toLowerCase().includes(q)) return true;
-      if ((s.project_slug || '').toLowerCase().includes(q)) return true;
-      const p = PREVIEWS.get(s.session_id);
-      if (p) {
-        if ((p.first_prompt || '').toLowerCase().includes(q)) return true;
-        if ((p.last_response || '').toLowerCase().includes(q)) return true;
-        if ((p.git_branch || '').toLowerCase().includes(q)) return true;
-      }
-      return false;
-    }
-    return true;
-  });
-
-  applySort();
+    s._search = [
+      s.session_id, s.project_label || '', s.project_slug,
+      p.first_prompt || '', p.last_response || '', p.model || '', p.git_branch || '',
+    ].join(' ').toLowerCase();
+  } else {
+    s._turns = null; s._tokens = null; s._branch = '';
+    s._whenEpoch = s.mtime;
+    s._search = (s.session_id + ' ' + (s.project_label || '') + ' ' + s.project_slug).toLowerCase();
+  }
 }
 
-function applySort() {
-  const dir = sortDir === 'asc' ? 1 : -1;
-  const key = sortKey;
-  FILTERED.sort((a, b) => {
-    let av, bv;
-    if (key === 'session') { av = a.session_id; bv = b.session_id; }
-    else if (key === 'project') { av = (a.project_label || a.project_slug || ''); bv = (b.project_label || b.project_slug || ''); }
-    else if (key === 'when') { av = sessionDateISO(a); bv = sessionDateISO(b); }
-    else if (key === 'turns') {
-      av = sessionTurns(a); bv = sessionTurns(b);
-      av = av == null ? -Infinity : av; bv = bv == null ? -Infinity : bv;
-    }
-    else if (key === 'tokens') {
-      av = sessionTokens(a); bv = sessionTokens(b);
-      av = av == null ? -Infinity : av; bv = bv == null ? -Infinity : bv;
-    }
-    else if (key === 'size') { av = a.size_bytes; bv = b.size_bytes; }
-    else if (key === 'branch') { av = sessionBranch(a) || ''; bv = sessionBranch(b) || ''; }
-    if (av < bv) return -1 * dir;
-    if (av > bv) return 1 * dir;
+function reindexAllSessions() {
+  for (const s of SESSIONS) indexSession(s);
+}
+
+function previewOf(s) { return PREVIEWS.get(s.session_id); }
+
+// Build a frozen "filter spec" once per render — passesFilters then has no
+// DOM reads or repeated parsing in the hot loop.
+function readFilterSpec() {
+  const sinceVal = $fSince.value;
+  let sinceEpoch = null;
+  if (sinceVal) {
+    const d = +new Date(sinceVal);
+    if (!Number.isNaN(d)) sinceEpoch = d / 1000;
+  }
+  const minT = parseInt($fMinTurns.value, 10);
+  const minK = parseInt($fMinTokens.value, 10);
+  return {
+    q: $fSearch.value.toLowerCase().trim(),
+    minTurns: Number.isNaN(minT) ? null : minT,
+    minTokens: Number.isNaN(minK) ? null : minK,
+    project: $fProject.value,
+    branch: $fBranch.value,
+    sinceEpoch,
+  };
+}
+
+function passesFilters(s, f) {
+  if (f.q && !s._search.includes(f.q)) return false;
+  if (f.minTurns != null && s._turns != null && s._turns < f.minTurns) return false;
+  if (f.minTokens != null && s._tokens != null && s._tokens < f.minTokens) return false;
+  if (f.project && s.project_slug !== f.project) return false;
+  if (f.branch) {
+    if (!s._branch) return false;
+    if (s._branch !== f.branch) return false;
+  }
+  if (f.sinceEpoch != null && s._whenEpoch < f.sinceEpoch) return false;
+  return true;
+}
+
+function sortRows(rows) {
+  const { key, dir } = SORT;
+  const mul = dir === 'asc' ? 1 : -1;
+  const cmp = (va, vb) => {
+    if (va == null && vb == null) return 0;
+    if (va == null) return 1;     // missing always sinks to bottom regardless of direction
+    if (vb == null) return -1;
+    if (va < vb) return -1 * mul;
+    if (va > vb) return 1 * mul;
     return 0;
-  });
+  };
+  const accessor = {
+    session_id: (s) => s.session_id,
+    project: (s) => (s.project_label || s.project_slug || '').toLowerCase(),
+    turns: (s) => s._turns,
+    tokens: (s) => s._tokens,
+    size: (s) => s.size_bytes,
+    when: (s) => s._whenEpoch,
+  }[key] || ((s) => s.mtime);
+  rows.sort((a, b) => cmp(accessor(a), accessor(b)));
 }
 
-function rowHTML(s) {
-  const preview = PREVIEWS.get(s.session_id);
-  const first = preview ? escapeHTML(preview.first_prompt || '') : '';
-  const last = preview ? escapeHTML(preview.last_response || '') : '';
-  const snippetHTML = preview
+function rebuildProjectOptions() {
+  const cur = $fProject.value;
+  const slugs = new Map();
+  for (const s of SESSIONS) {
+    if (!slugs.has(s.project_slug)) slugs.set(s.project_slug, s.project_label || s.project_slug);
+  }
+  const sorted = [...slugs.entries()].sort((a, b) => a[1].localeCompare(b[1]));
+  $fProject.innerHTML = '<option value="">all</option>'
+    + sorted.map(([slug, label]) =>
+        `<option value="${escapeHTML(slug)}">${escapeHTML(label)}</option>`).join('');
+  if (slugs.has(cur)) $fProject.value = cur;
+}
+
+function rebuildBranchOptions() {
+  const cur = $fBranch.value;
+  const set = new Set();
+  for (const p of PREVIEWS.values()) {
+    if (p && p.git_branch) set.add(p.git_branch);
+  }
+  const sorted = [...set].sort((a, b) => a.localeCompare(b));
+  $fBranch.innerHTML = '<option value="">all</option>'
+    + sorted.map(b => `<option value="${escapeHTML(b)}">${escapeHTML(b)}</option>`).join('');
+  if (set.has(cur)) $fBranch.value = cur;
+}
+
+function updateStats(filteredRows) {
+  let totalTurns = 0, totalTokens = 0, totalSize = 0;
+  for (const s of filteredRows) {
+    totalSize += s.size_bytes || 0;
+    if (s._turns != null) totalTurns += s._turns;
+    if (s._tokens != null) totalTokens += s._tokens;
+  }
+  const filteredCount = filteredRows.length;
+  const truncated = filteredCount > RENDER_LIMIT
+    ? ` (showing first ${RENDER_LIMIT})` : '';
+  $stats.innerHTML =
+    `<b>${filteredCount}</b> of ${SESSIONS.length} sessions${truncated}` +
+    `<span class="sep">•</span><b>${fmtNumLong(totalTurns)}</b> turns` +
+    `<span class="sep">•</span><b>${fmtNumLong(totalTokens)}</b> tokens` +
+    `<span class="sep">•</span><b>${fmtSize(totalSize)}</b>`;
+  const indexed = PREVIEWS.size;
+  if (indexed < SESSIONS.length) {
+    $indexPill.style.display = '';
+    $indexPill.textContent = `indexed ${indexed}/${SESSIONS.length}`;
+  } else {
+    $indexPill.style.display = 'none';
+  }
+}
+
+function renderRow(s) {
+  const tr = document.createElement('tr');
+  tr.dataset.id = s.session_id;
+  if (SELECTED.has(s.session_id)) tr.classList.add('selected');
+  patchRow(tr, s);
+  return tr;
+}
+
+function patchRow(tr, s) {
+  const p = previewOf(s);
+  const first = p ? escapeHTML(p.first_prompt || '') : '';
+  const last = p ? escapeHTML(p.last_response || '') : '';
+  const snippetHTML = p
     ? (first ? `<span class="first">${first}</span>` : '<span class="first placeholder">(no user text)</span>') +
       (last ? `<span class="last">↳ ${last}</span>` : '')
     : '<span class="placeholder">loading…</span>';
-
-  const whenStr = preview && preview.started_at
-    ? fmtWhen(preview.started_at, s.mtime)
-    : fmtWhen(null, s.mtime);
-
-  const turns = preview ? preview.user_turns : null;
-  const turnsTitle = preview ? `${preview.user_turns} user / ${preview.assistant_turns} asst` : '';
-  const tokens = preview ? (preview.input_tokens + preview.output_tokens) : null;
-  const tokensTitle = preview
-    ? `in: ${preview.input_tokens.toLocaleString()}\nout: ${preview.output_tokens.toLocaleString()}\ncache create: ${preview.cache_creation_tokens.toLocaleString()}\ncache read: ${preview.cache_read_tokens.toLocaleString()}\nmodel: ${preview.model || 'unknown'}`
+  const branchPill = p && p.git_branch
+    ? `<span class="branch" title="${escapeHTML(p.git_branch)}">⎇ ${escapeHTML(p.git_branch)}</span>`
     : '';
-  const branch = preview ? (preview.git_branch || '') : '';
+  const turns = s._turns;
+  const tokens = s._tokens;
+  const whenStr = fmtWhen(p && p.started_at ? p.started_at : null, s.mtime);
+  const turnsTitle = p ? `${p.user_turns ?? '?'} user / ${p.assistant_turns ?? '?'} assistant` : '';
+  const tokensTitle = p
+    ? `in ${fmtNumLong(p.input_tokens)} / out ${fmtNumLong(p.output_tokens)} / cache_c ${fmtNumLong(p.cache_creation_tokens)} / cache_r ${fmtNumLong(p.cache_read_tokens)}${p.model ? ` • ${p.model}` : ''}`
+    : '';
 
-  const checked = SELECTED.has(s.session_id);
-  return `
-    <td class="check"><input type="checkbox" class="checkbox row-check" ${checked ? 'checked' : ''}></td>
+  tr.innerHTML = `
+    <td class="check"><input type="checkbox" class="checkbox row-check" ${SELECTED.has(s.session_id) ? 'checked' : ''}></td>
     <td class="session" title="${escapeHTML(s.session_id)}">${shortId(s.session_id)}</td>
-    <td class="project" title="${escapeHTML(s.project_label || s.project_slug)}">${escapeHTML(s.project_label || s.project_slug)}</td>
+    <td class="project" title="${escapeHTML(s.project_label || s.project_slug)}">
+      ${escapeHTML(s.project_label || s.project_slug)}${branchPill}
+    </td>
     <td class="snippet">${snippetHTML}</td>
-    <td class="when">${whenStr}</td>
-    <td class="num ${turns == null ? 'muted' : ''}" title="${escapeHTML(turnsTitle)}">${turns == null ? '—' : turns}</td>
-    <td class="num ${tokens == null ? 'muted' : ''}" title="${escapeHTML(tokensTitle)}">${tokens == null ? '—' : fmtNum(tokens)}</td>
-    <td class="num" title="${fmtSize(s.size_bytes)}">${fmtSize(s.size_bytes)}</td>
-    <td class="branch" title="${escapeHTML(branch)}">${escapeHTML(branch)}</td>
+    <td class="turns ${turns == null ? 'dim' : ''}" title="${turnsTitle}">${fmtNum(turns)}</td>
+    <td class="tokens ${tokens == null ? 'dim' : ''}" title="${tokensTitle}">${fmtNum(tokens)}</td>
+    <td class="size" title="${s.size_bytes} bytes">${fmtSize(s.size_bytes)}</td>
+    <td class="when" title="${p && p.started_at ? p.started_at : new Date(s.mtime*1000).toISOString()}">${whenStr}</td>
     <td class="actions"><button class="copy-id">Copy ID</button></td>
   `;
 }
 
 function render() {
-  applyFilters();
-
-  VISIBLE = FILTERED.slice(0, RENDER_LIMIT);
-
-  $count.textContent = FILTERED.length + ' of ' + SESSIONS.length;
-  $renderNote.textContent = FILTERED.length > RENDER_LIMIT
-    ? `showing first ${RENDER_LIMIT}`
-    : '';
-
-  // Update sort header arrows
-  document.querySelectorAll('th.sortable').forEach(th => {
-    const k = th.dataset.sort;
-    th.classList.toggle('active', k === sortKey);
-    const arrow = th.querySelector('.arrow');
-    if (arrow) arrow.textContent = k === sortKey ? (sortDir === 'asc' ? '▲' : '▼') : '';
-  });
+  const spec = readFilterSpec();
+  const rows = [];
+  for (const s of SESSIONS) {
+    if (passesFilters(s, spec)) rows.push(s);
+  }
+  sortRows(rows);
+  VISIBLE = rows.slice(0, RENDER_LIMIT);
 
   const frag = document.createDocumentFragment();
-  for (const s of VISIBLE) {
-    const tr = document.createElement('tr');
-    tr.dataset.id = s.session_id;
-    if (SELECTED.has(s.session_id)) tr.classList.add('selected');
-    tr.innerHTML = rowHTML(s);
-    frag.appendChild(tr);
-  }
+  for (const s of VISIBLE) frag.appendChild(renderRow(s));
   $rows.replaceChildren(frag);
   $empty.style.display = VISIBLE.length === 0 ? '' : 'none';
 
-  updateStats();
+  updateStats(rows);
+  updateSortIndicators();
   updateSelectionBar();
 }
 
-function updateStats() {
-  let previewed = 0;
-  let totalTurns = 0;
-  let totalTokens = 0;
-  let totalCacheRead = 0;
-  for (const s of FILTERED) {
-    const p = PREVIEWS.get(s.session_id);
-    if (!p) continue;
-    previewed++;
-    totalTurns += p.user_turns;
-    totalTokens += p.input_tokens + p.output_tokens;
-    totalCacheRead += p.cache_read_tokens;
-  }
-  const pct = SESSIONS.length ? Math.round(PREVIEWS.size / SESSIONS.length * 100) : 0;
-  const parts = [
-    `<b>${totalTurns.toLocaleString()}</b> turns`,
-    `<b>${fmtNum(totalTokens)}</b> in+out tokens`,
-    `<b>${fmtNum(totalCacheRead)}</b> cache reads`,
-    `previewed <b>${previewed}/${FILTERED.length}</b>`,
-  ];
-  $stats.innerHTML = parts.join(' • ');
-
-  if (PREVIEWS.size < SESSIONS.length) {
-    $progress.style.display = '';
-    $progressLabel.textContent = `previews ${PREVIEWS.size.toLocaleString()} / ${SESSIONS.length.toLocaleString()} (${pct}%)`;
-    $progressBar.style.width = pct + '%';
-  } else {
-    $progress.style.display = 'none';
-  }
-}
-
-// ---------------------------------------------------------------------------
-// Preview prefetch
-// ---------------------------------------------------------------------------
-
-let previewQueue = [];                    // queue of session_ids
-let previewInFlight = 0;
-let previewPaused = false;
-let pendingRerender = false;
-let rerenderTimer = 0;
-
-function schedulePartialRerender() {
-  if (rerenderTimer) return;
-  rerenderTimer = setTimeout(() => {
-    rerenderTimer = 0;
-    // Cheap path: just update the rows currently visible in-place + stats.
-    for (const s of VISIBLE) {
-      const tr = $rows.querySelector(`tr[data-id="${CSS.escape(s.session_id)}"]`);
-      if (tr && PREVIEWS.has(s.session_id)) {
-        tr.innerHTML = rowHTML(s);
-      }
+function updateSortIndicators() {
+  document.querySelectorAll('th.sortable').forEach(th => {
+    th.classList.remove('sort-active');
+    th.querySelector('.arrow').textContent = '';
+    if (th.dataset.sort === SORT.key) {
+      th.classList.add('sort-active');
+      th.querySelector('.arrow').textContent = SORT.dir === 'asc' ? '↑' : '↓';
     }
-    updateStats();
-  }, 200);
+  });
 }
 
-function scheduleFullRerender() {
-  if (pendingRerender) return;
-  pendingRerender = true;
-  setTimeout(() => {
-    pendingRerender = false;
-    render();
-  }, 400);
-}
+const PREVIEW_FIELDS = [
+  'first_prompt', 'last_response', 'started_at', 'ended_at',
+  'user_turns', 'assistant_turns', 'message_count',
+  'input_tokens', 'output_tokens', 'cache_creation_tokens', 'cache_read_tokens',
+  'git_branch', 'model',
+];
 
-function queueAllPreviews() {
-  // Queue in mtime-desc order so recent sessions get previews first.
-  const ordered = SESSIONS.slice().sort((a, b) => b.mtime - a.mtime);
-  for (const s of ordered) {
-    if (!PREVIEWS.has(s.session_id)) previewQueue.push(s.session_id);
-  }
-  pumpPreviewQueue();
-}
-
-function pumpPreviewQueue() {
-  if (previewPaused) return;
-  while (previewInFlight < PREVIEW_PARALLEL && previewQueue.length) {
-    const id = previewQueue.shift();
-    if (PREVIEWS.has(id)) continue;
-    previewInFlight++;
-    fetch('/api/sessions/' + encodeURIComponent(id) + '/preview')
-      .then(r => r.ok ? r.json() : null)
-      .then(p => {
-        if (p) PREVIEWS.set(id, p);
-        const tr = $rows.querySelector(`tr[data-id="${CSS.escape(id)}"]`);
-        if (tr && p) {
-          const s = SESSIONS.find(x => x.session_id === id);
-          if (s) tr.innerHTML = rowHTML(s);
-        }
-        // If the new preview could affect filters/sort, re-render lazily.
-        // (We don't re-render on every preview — that'd thrash. Throttle.)
-        scheduleStatsAndMaybeResort();
-      })
-      .catch(() => {})
-      .finally(() => { previewInFlight--; pumpPreviewQueue(); });
-  }
-  if (!previewQueue.length && previewInFlight === 0) {
-    // Done — final render to apply any filter/sort that depends on previews.
-    scheduleFullRerender();
+function hydratePreviewsFromSessions() {
+  for (const s of SESSIONS) {
+    if (!s.indexed) continue;
+    const p = {};
+    for (const f of PREVIEW_FIELDS) p[f] = s[f];
+    PREVIEWS.set(s.session_id, p);
   }
 }
 
-let statsTimer = 0;
-function scheduleStatsAndMaybeResort() {
-  if (statsTimer) return;
-  statsTimer = setTimeout(() => {
-    statsTimer = 0;
-    updateStats();
-    // If sort or filters depend on preview fields, periodically re-render
-    // so newly-loaded rows slot into the right place.
-    const filtersUsePreview = !!($minTurns.value || $minTokens.value || $fromDate.value || $toDate.value || $filter.value);
-    const sortUsesPreview = ['turns', 'tokens', 'branch', 'when'].includes(sortKey);
-    if (filtersUsePreview || sortUsesPreview) scheduleFullRerender();
-  }, 300);
-}
-
-$cancelPrefetch.addEventListener('click', () => {
-  previewPaused = !previewPaused;
-  $cancelPrefetch.textContent = previewPaused ? 'resume' : 'pause';
-  if (!previewPaused) pumpPreviewQueue();
-});
-
-// ---------------------------------------------------------------------------
-// Selection bar
-// ---------------------------------------------------------------------------
+function selectedIds() { return [...SELECTED]; }
 
 function updateSelectionBar() {
-  const ids = [...SELECTED];
+  const ids = selectedIds();
   $selcount.textContent = ids.length;
   if (ids.length === 0) {
     $selbar.classList.remove('open');
@@ -549,7 +485,6 @@ function updateSelectionBar() {
     return;
   }
   $selbar.classList.add('open');
-
   if (ids.length === 1) {
     $prompt.value = `Run the analyze-agent-transcript skill on session ${ids[0]}`;
   } else {
@@ -557,7 +492,6 @@ function updateSelectionBar() {
       `Run the analyze-agent-transcript skill on these sessions: ${ids.join(', ')}` +
       `. Then run analyze-cross-transcript-patterns over the consolidated reports.`;
   }
-
   const visibleIds = VISIBLE.map(s => s.session_id);
   const allChecked = visibleIds.length > 0 && visibleIds.every(id => SELECTED.has(id));
   const someChecked = visibleIds.some(id => SELECTED.has(id));
@@ -567,7 +501,7 @@ function updateSelectionBar() {
 
 function toggle(id) {
   if (SELECTED.has(id)) SELECTED.delete(id); else SELECTED.add(id);
-  const tr = $rows.querySelector(`tr[data-id="${CSS.escape(id)}"]`);
+  const tr = $rows.querySelector(`tr[data-id="${id}"]`);
   if (tr) {
     tr.classList.toggle('selected', SELECTED.has(id));
     const cb = tr.querySelector('.row-check');
@@ -575,10 +509,6 @@ function toggle(id) {
   }
   updateSelectionBar();
 }
-
-// ---------------------------------------------------------------------------
-// Events
-// ---------------------------------------------------------------------------
 
 $rows.addEventListener('click', (e) => {
   const btn = e.target.closest('button.copy-id');
@@ -608,22 +538,18 @@ $checkAll.addEventListener('change', () => {
   render();
 });
 
-$selVisible.addEventListener('click', () => {
-  for (const s of VISIBLE) SELECTED.add(s.session_id);
-  render();
+document.querySelectorAll('th.sortable').forEach(th => {
+  th.addEventListener('click', () => {
+    const key = th.dataset.sort;
+    if (SORT.key === key) {
+      SORT.dir = SORT.dir === 'asc' ? 'desc' : 'asc';
+    } else {
+      SORT.key = key;
+      SORT.dir = (key === 'session_id' || key === 'project') ? 'asc' : 'desc';
+    }
+    render();
+  });
 });
-$selAll.addEventListener('click', () => {
-  for (const s of FILTERED) SELECTED.add(s.session_id);
-  render();
-});
-$selInvert.addEventListener('click', () => {
-  for (const s of VISIBLE) {
-    if (SELECTED.has(s.session_id)) SELECTED.delete(s.session_id);
-    else SELECTED.add(s.session_id);
-  }
-  render();
-});
-$selClear.addEventListener('click', () => { SELECTED.clear(); render(); });
 
 $copyPrompt.addEventListener('click', () => {
   navigator.clipboard.writeText($prompt.value).then(() => {
@@ -633,7 +559,7 @@ $copyPrompt.addEventListener('click', () => {
   });
 });
 $copyIds.addEventListener('click', () => {
-  const ids = [...SELECTED].join(',');
+  const ids = selectedIds().join(',');
   navigator.clipboard.writeText(ids).then(() => {
     const orig = $copyIds.textContent;
     $copyIds.textContent = 'Copied ✓';
@@ -645,34 +571,22 @@ $clearSel.addEventListener('click', () => { SELECTED.clear(); render(); });
 let filterTimer = 0;
 function onFilterChange() {
   clearTimeout(filterTimer);
-  filterTimer = setTimeout(render, 80);
+  filterTimer = setTimeout(render, 90);
 }
-$filter.addEventListener('input', onFilterChange);
-$fromDate.addEventListener('change', render);
-$toDate.addEventListener('change', render);
-$minTurns.addEventListener('input', onFilterChange);
-$minTokens.addEventListener('input', onFilterChange);
-$hideTiny.addEventListener('change', render);
-$selectedOnly.addEventListener('change', render);
-$resetFilters.addEventListener('click', () => {
-  $filter.value = '';
-  $fromDate.value = ''; $toDate.value = '';
-  $minTurns.value = ''; $minTokens.value = '';
-  $hideTiny.checked = false; $selectedOnly.checked = false;
+$fSearch.addEventListener('input', onFilterChange);
+$fMinTurns.addEventListener('input', onFilterChange);
+$fMinTokens.addEventListener('input', onFilterChange);
+$fProject.addEventListener('change', render);
+$fBranch.addEventListener('change', render);
+$fSince.addEventListener('change', render);
+$fReset.addEventListener('click', () => {
+  $fSearch.value = '';
+  $fMinTurns.value = '';
+  $fMinTokens.value = '';
+  $fProject.value = '';
+  $fBranch.value = '';
+  $fSince.value = '';
   render();
-});
-
-document.querySelectorAll('th.sortable').forEach(th => {
-  th.addEventListener('click', () => {
-    const k = th.dataset.sort;
-    if (sortKey === k) {
-      sortDir = sortDir === 'asc' ? 'desc' : 'asc';
-    } else {
-      sortKey = k;
-      sortDir = (k === 'session' || k === 'project' || k === 'branch') ? 'asc' : 'desc';
-    }
-    render();
-  });
 });
 
 async function loadSessions() {
@@ -680,10 +594,48 @@ async function loadSessions() {
     const r = await fetch('/api/sessions');
     const data = await r.json();
     SESSIONS = data.sessions || [];
+    PREVIEWS = new Map();
+    hydratePreviewsFromSessions();
+    reindexAllSessions();
+    rebuildProjectOptions();
+    rebuildBranchOptions();
     render();
-    queueAllPreviews();
+    if (data.progress && !data.progress.complete) {
+      pollProgress();
+    }
   } catch (e) {
-    $count.textContent = 'failed to load';
+    $stats.textContent = 'failed to load: ' + e;
+  }
+}
+
+// Poll the cheap /api/progress endpoint every few seconds. When the indexed
+// count advances, fetch /api/sessions once to refresh the full snapshot —
+// much cheaper than per-row round-trips, and avoids re-fetching when nothing
+// new is ready yet.
+let lastIndexedSeen = 0;
+async function pollProgress() {
+  while (true) {
+    await new Promise(r => setTimeout(r, 1800));
+    try {
+      const r = await fetch('/api/progress');
+      const p = await r.json();
+      if (p.indexed > lastIndexedSeen) {
+        lastIndexedSeen = p.indexed;
+        const r2 = await fetch('/api/sessions');
+        const data = await r2.json();
+        SESSIONS = data.sessions || SESSIONS;
+        hydratePreviewsFromSessions();
+        reindexAllSessions();
+        rebuildBranchOptions();
+        render();
+      }
+      if (p.complete) {
+        $indexPill.style.display = 'none';
+        return;
+      }
+    } catch (e) {
+      // keep polling; transient errors are fine
+    }
   }
 }
 
