@@ -13,7 +13,7 @@ Data-acquisition layer of the analysis pipeline. Skills here turn "I want to ana
 
 Tier 1 → Tier 2 (`2-decompose/decompose-agent-transcript-into-transcript-segments`). Tier 2 is the only skill that walks `transcript.json` to build the Segment tree; tier 3+ consume the Segment tree (and dereference event ids back into `transcript.json` for evidence). Tier 1 → `transcript.json` → Tier 2 → `segments.json` → everything else.
 
-`external-context.json` rides alongside `transcript.json` in the same `tmp_dir` and is available — unchanged — to tier 2 and every tier-4 analyzer, so judgments about a Segment's Goal and Outcome can lean on the ticket and PR behind the work rather than guessing. It is best-effort: the pipeline runs fine when it is absent.
+`external-context.json` rides alongside `transcript.json` in the same `tmp_dir` and is available — unchanged — to tier 2 and every tier-3 analyzer, so judgments about a Segment's Goal and Outcome can lean on the ticket and PR behind the work rather than guessing. It is best-effort: the pipeline runs fine when it is absent.
 
 ## Design decisions
 

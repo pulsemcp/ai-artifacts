@@ -10,7 +10,7 @@ Decomposition layer. Turns an OpenTranscripts `transcript.json` (produced by tie
 
 ## How this tier plugs into the rest
 
-Tier 1 → Tier 2 → Tier 3. The orchestrator and every per-segment analyzer in Tier 4 read the Segment tree and dereference event ids back into `transcript.json` — they never re-walk events from scratch.
+Tier 1 → Tier 2 → Tier 3. The orchestrator that opens Tier 3 and every per-segment analyzer it fans out read the Segment tree and dereference event ids back into `transcript.json` — they never re-walk events from scratch.
 
 When tier 1's `gather-external-context` has run, `external-context.json` (or its reviewed sibling) sits in the same `tmp_dir`. Decomposition may read it to ground a Segment's Trigger and Goal in the ticket and PR behind the work, but it is best-effort context, not a required input — the tree is built from `transcript.json` alone when it is absent.
 

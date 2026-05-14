@@ -9,7 +9,7 @@ description: >
   subagent), a Goal (Plan | Action), an Outcome (Success | Failure), child
   sub-segments, and a meta block (event range, wall-clock, tokens, model).
   Emits segments.json (structured) and flamegraph.html (annotated). All
-  tier-4 analyzers read segments.json — they never walk transcript.json
+  tier-3 analyzers read segments.json — they never walk transcript.json
   events directly. Use this skill immediately after acquisition and before
   any analyze-* skill.
 user-invocable: false

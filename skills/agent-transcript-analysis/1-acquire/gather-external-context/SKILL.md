@@ -19,7 +19,7 @@ user-invocable: true
 
 `transcript.json` captures **what the agent did**. It rarely captures **why** — the ticket that motivated the work, the PR it became, the fact that the user is a backend engineer three weeks into a migration. Without that, every downstream analyzer is guessing at the Goal.
 
-This skill closes that gap. Once per transcript, it pulls the surrounding context from the systems that hold it and consolidates it into a single `external-context.json` that rides in `tmp_dir` alongside `transcript.json` for tiers 2-5 to read.
+This skill closes that gap. Once per transcript, it pulls the surrounding context from the systems that hold it and consolidates it into a single `external-context.json` that rides in `tmp_dir` alongside `transcript.json` for tiers 2-4 to read.
 
 It is **best-effort**. No Jira integration, no associated PR, no org directory — none of that is a failure. The skill records what it could not find and moves on; the pipeline runs fine without `external-context.json`.
 
@@ -76,12 +76,12 @@ One file written into `tmp_dir`:
 
 - Acquiring the transcript itself — that's `get-claude-code-transcript-from-local`.
 - Correcting the gathered context — that's `review-external-context`.
-- Per-Segment context lookups during analysis — that's `pull-together-goal-context` in tier 4, which does narrow, on-demand pulls once a specific Segment's Goal is unclear. This skill does the one-time, transcript-wide gather up front.
-- Any judgment about whether the session went well — that's tiers 3-5.
+- Per-Segment context lookups during analysis — that's `pull-together-goal-context` in tier 3, which does narrow, on-demand pulls once a specific Segment's Goal is unclear. This skill does the one-time, transcript-wide gather up front.
+- Any judgment about whether the session went well — that's tiers 3-4.
 
 ## Notes
 
 - **Best-effort, never blocking.** The pipeline runs without `external-context.json`; this skill only ever *adds* signal.
 - **Confidence and provenance are mandatory.** A wrong-but-confident ticket is worse than an honest `unresolved` entry — both the review UI and downstream analyzers lean on `confidence` and `how_found`.
 - **The source set is meant to grow.** Today: ticket + PR + light user context. As new systems become reachable (design docs, incident records, org chart), add a step here and a block to the schema. Treat "we don't know how to get X yet" as a tracked gap, not a reason to drop X silently.
-- **Consolidate, don't analyze.** This skill structures context; it draws no conclusions about the session. That's tiers 3-5.
+- **Consolidate, don't analyze.** This skill structures context; it draws no conclusions about the session. That's tiers 3-4.

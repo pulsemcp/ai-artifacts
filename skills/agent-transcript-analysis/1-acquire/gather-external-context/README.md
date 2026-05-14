@@ -6,7 +6,7 @@ Tier 1's context-gathering step. Pulls the ticket, the pull request, and the use
 
 A transcript is a record of *what the agent did*. Analysis needs *why it was doing it* — the ticket behind the work, the PR it turned into, who the user is and what project they're on. Without that, every downstream judgment ("was this Segment a Failure?", "was the Goal closed?") is made in a vacuum.
 
-`get-claude-code-transcript-from-local` gives you the *what*. This skill gathers the *why*, once, up front, so tiers 2-5 never have to.
+`get-claude-code-transcript-from-local` gives you the *what*. This skill gathers the *why*, once, up front, so tiers 2-4 never have to.
 
 ## Where it sits
 
@@ -26,7 +26,7 @@ It runs after acquisition and before decomposition. It is **best-effort**: a ses
 
 ## Design decisions
 
-- **Gather once, transcript-wide.** One up-front pull beats every analyzer re-deriving context per Segment. The narrow, per-Segment counterpart is `pull-together-goal-context` in tier 4 — it reaches out only when a specific Segment's Goal is still unclear.
+- **Gather once, transcript-wide.** One up-front pull beats every analyzer re-deriving context per Segment. The narrow, per-Segment counterpart is `pull-together-goal-context` in tier 3 — it reaches out only when a specific Segment's Goal is still unclear.
 - **Best-effort, with honest gaps.** Missing sources are recorded in `unresolved`, never fabricated. A confident-but-wrong ticket would poison every downstream analyzer.
 - **Provenance over trust.** `confidence` + `how_found` on every block make the bundle reviewable — which is the whole point of the sibling `review-external-context`.
 - **The source set grows.** Ticket + PR + light user context is the starting point, not the ceiling. New resolvers get added here as the systems become reachable.

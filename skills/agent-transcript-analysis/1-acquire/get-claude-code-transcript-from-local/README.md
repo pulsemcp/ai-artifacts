@@ -6,7 +6,7 @@ Given a session id (or a JSONL path), produces a single OpenTranscripts `transcr
 
 Upstream: usually `find-all-claude-code-transcripts-on-local`, sometimes a session id the user already has.
 
-Downstream: tier 2 (`decompose-agent-transcript-into-transcript-segments`) reads `transcript.json` and builds the Segment tree. All tier-4 analyzers read the Segment tree plus dereference event ids back into the same `transcript.json` for evidence.
+Downstream: tier 2 (`decompose-agent-transcript-into-transcript-segments`) reads `transcript.json` and builds the Segment tree. All tier-3 analyzers read the Segment tree plus dereference event ids back into the same `transcript.json` for evidence.
 
 This skill owns the deterministic CC→OpenTranscripts transformation. The canonical mapping is documented in the `open-transcripts-claude-code-mapping` reference — the source of truth for the CC → OT shape. When CC's format changes, the drift surfaces as unmapped lines in this skill's output; that's the cue to flag the mapping reference for reconciliation at its source.
 

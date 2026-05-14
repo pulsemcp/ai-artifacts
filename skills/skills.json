@@ -42,105 +42,105 @@
   },
   "analyze-agent-transcript": {
     "title": "Analyze Agent Transcript",
-    "description": "Orchestrator. Drives decomposition (tier 2) and the per-Segment analyzers (tier 4), writes the findings.<kind>.json set, then invokes synthesize-report (tier 5) to turn those findings into the consolidated report of actionable recommendations across human prompting, Skills, and MCP servers.",
-    "path": "agent-transcript-analysis/3-orchestrate/analyze-agent-transcript",
+    "description": "Orchestrator and entry point of the analyze tier (tier 3). Picks up the Segment tree from decomposition (tier 2), drives the per-Segment analyzers across four buckets, writes the findings.<kind>.json set, then invokes synthesize-report (tier 4) to turn those findings into the consolidated report of actionable recommendations across human prompting, Skills, and MCP servers.",
+    "path": "agent-transcript-analysis/3-analyze/analyze-agent-transcript",
     "references": ["philosophy-on-skills", "philosophy-on-mcp", "transcript-segment"]
   },
   "analyze-failure-hypothesis": {
     "title": "Analyze Failure Hypothesis",
     "description": "Per-Segment analyzer. Produces an improvement hypothesis for every Failure Outcome and every retro-Failure (Correction Prompt at the next Segment's head). Routes its recommendation seed to the right downstream bucket.",
-    "path": "agent-transcript-analysis/4-analyze/analyze-outcomes/analyze-failure-hypothesis",
+    "path": "agent-transcript-analysis/3-analyze/analyze-outcomes/analyze-failure-hypothesis",
     "references": ["philosophy-on-skills", "philosophy-on-mcp", "transcript-segment"]
   },
   "analyze-segment-efficiency": {
     "title": "Analyze Segment Efficiency",
     "description": "Per-Segment efficiency analyzer. Compares wall-clock / tokens to a human counterfactual and flags wasteful branches and model-tier mismatches — including on Success Outcomes.",
-    "path": "agent-transcript-analysis/4-analyze/analyze-outcomes/analyze-segment-efficiency",
+    "path": "agent-transcript-analysis/3-analyze/analyze-outcomes/analyze-segment-efficiency",
     "references": ["transcript-segment"]
   },
   "analyze-user-prompt": {
     "title": "Analyze User Prompt",
     "description": "Per-Prompt analyzer. Classify the Prompt (question vs delegation), confirm the Segment's Goal, judge whether it was closed-loop, and feed the human-prompting recommendation bucket. Consumes Initial/Correction classification from Tier 2.",
-    "path": "agent-transcript-analysis/4-analyze/analyze-prompts/analyze-user-prompt",
+    "path": "agent-transcript-analysis/3-analyze/analyze-prompts/analyze-user-prompt",
     "references": ["transcript-segment"]
   },
   "analyze-prompt-ambition": {
     "title": "Analyze Prompt Ambition",
     "description": "Per-Initial-Prompt analyzer. Flags Initial Prompts that under-scoped the work and Initial Prompts that should have been deterministic triggers reacting to external events.",
-    "path": "agent-transcript-analysis/4-analyze/analyze-prompts/analyze-prompt-ambition",
+    "path": "agent-transcript-analysis/3-analyze/analyze-prompts/analyze-prompt-ambition",
     "references": ["transcript-segment"]
   },
   "pull-together-goal-context": {
     "title": "Pull Together Goal Context",
     "description": "Reach into git repos and external systems when a Prompt's Goal is not self-evident from the Prompt alone. Ground the analyzer's understanding before drawing conclusions.",
-    "path": "agent-transcript-analysis/4-analyze/analyze-prompts/pull-together-goal-context"
+    "path": "agent-transcript-analysis/3-analyze/analyze-prompts/pull-together-goal-context"
   },
   "analyze-skill-trigger-performance": {
     "title": "Analyze Skill Trigger Performance",
     "description": "Per-Segment analyzer for false positives (Skills that fired but shouldn't have) and false negatives (Skills that should have fired but didn't). Recommends modify-description changes.",
-    "path": "agent-transcript-analysis/4-analyze/analyze-skills/analyze-skill-trigger-performance",
+    "path": "agent-transcript-analysis/3-analyze/analyze-skills/analyze-skill-trigger-performance",
     "references": ["philosophy-on-skills", "transcript-segment"]
   },
   "analyze-skill-action-performance": {
     "title": "Analyze Skill Action Performance",
     "description": "Per-Segment analyzer for Skills that did run. Assesses helpfulness, token cost, and whether the Skill closed the loop. Recommends body refinements or deletions.",
-    "path": "agent-transcript-analysis/4-analyze/analyze-skills/analyze-skill-action-performance",
+    "path": "agent-transcript-analysis/3-analyze/analyze-skills/analyze-skill-action-performance",
     "references": ["philosophy-on-skills", "transcript-segment"]
   },
   "analyze-skill-gaps": {
     "title": "Analyze Skill Gaps",
     "description": "Per-Segment analyzer for missing Skills. Identifies moments where a well-placed Skill would have prevented a wrong turn or saved turns, and proposes new Skills with a description and body sketch.",
-    "path": "agent-transcript-analysis/4-analyze/analyze-skills/analyze-skill-gaps",
+    "path": "agent-transcript-analysis/3-analyze/analyze-skills/analyze-skill-gaps",
     "references": ["philosophy-on-skills", "transcript-segment"]
   },
   "analyze-mcp-trigger-performance": {
     "title": "Analyze MCP Trigger Performance",
     "description": "Per-Segment analyzer for MCP tools that fired when they shouldn't have, and tools that should have fired but didn't (e.g. agent reached for a CLI instead). Recommends description or surface changes.",
-    "path": "agent-transcript-analysis/4-analyze/analyze-mcp/analyze-mcp-trigger-performance",
+    "path": "agent-transcript-analysis/3-analyze/analyze-mcp/analyze-mcp-trigger-performance",
     "references": ["philosophy-on-mcp", "transcript-segment"]
   },
   "analyze-mcp-action-performance": {
     "title": "Analyze MCP Action Performance",
     "description": "Per-Segment analyzer for MCP tool calls that happened. Assesses response shape, token cost, and whether the tool closed the loop. Recommends tool or server modifications.",
-    "path": "agent-transcript-analysis/4-analyze/analyze-mcp/analyze-mcp-action-performance",
+    "path": "agent-transcript-analysis/3-analyze/analyze-mcp/analyze-mcp-action-performance",
     "references": ["philosophy-on-mcp", "transcript-segment"]
   },
   "analyze-mcp-gaps": {
     "title": "Analyze MCP Gaps",
     "description": "Per-Segment analyzer for missing MCP servers / tools. Identifies foreseeable closed-loop limitations the agent could not work around, and proposes new servers or tools.",
-    "path": "agent-transcript-analysis/4-analyze/analyze-mcp/analyze-mcp-gaps",
+    "path": "agent-transcript-analysis/3-analyze/analyze-mcp/analyze-mcp-gaps",
     "references": ["philosophy-on-mcp", "transcript-segment"]
   },
   "analyze-cross-transcript-patterns": {
     "title": "Analyze Cross-Transcript Patterns",
     "description": "Cross-cutting analyzer. Given the consolidated reports of several already-analyzed transcripts, surface patterns no single transcript reveals: hindsight-as-foresight Segment patterns, recurring user prompts, deduped Skill/MCP gaps, and time-spend patterns.",
-    "path": "agent-transcript-analysis/4-analyze/analyze-cross-transcript/analyze-cross-transcript-patterns",
+    "path": "agent-transcript-analysis/3-analyze/analyze-cross-transcript/analyze-cross-transcript-patterns",
     "references": ["philosophy-on-skills", "philosophy-on-mcp", "transcript-segment"]
   },
   "review-analysis": {
     "title": "Review Analysis",
-    "description": "Open a localhost UI to audit and correct the AI-drafted findings a tier-4 analyzer produced — findings.<kind>.json, one flat list of conclusions per bucket (outcomes, prompts, skills, mcp, cross-transcript). Thumbs-up, correct, or reject each finding; saving writes findings.<kind>.reviewed.json next to the draft with full correction provenance. Optional human review checkpoint for tier 4.",
-    "path": "agent-transcript-analysis/4-analyze/review-analysis"
+    "description": "Open a localhost UI to audit and correct the AI-drafted findings a tier-3 analyzer produced — findings.<kind>.json, one flat list of conclusions per bucket (outcomes, prompts, skills, mcp, cross-transcript). Thumbs-up, correct, or reject each finding; saving writes findings.<kind>.reviewed.json next to the draft with full correction provenance. Optional human review checkpoint for tier 3.",
+    "path": "agent-transcript-analysis/3-analyze/review-analysis"
   },
   "learn-from-analysis-corrections": {
     "title": "Learn From Analysis Corrections",
-    "description": "Read the human corrections captured in findings.<kind>.reviewed.json files, cluster them into recurring patterns, and surface flagged improvement opportunities for the tier-4 analyzers that drafted the findings. Flags opportunities; never edits a skill. The tier-4 twin of learn-from-segment-corrections.",
-    "path": "agent-transcript-analysis/4-analyze/learn-from-analysis-corrections"
+    "description": "Read the human corrections captured in findings.<kind>.reviewed.json files, cluster them into recurring patterns, and surface flagged improvement opportunities for the tier-3 analyzers that drafted the findings. Flags opportunities; never edits a skill. The tier-3 twin of learn-from-segment-corrections.",
+    "path": "agent-transcript-analysis/3-analyze/learn-from-analysis-corrections"
   },
   "synthesize-report": {
     "title": "Synthesize Report",
-    "description": "Tier-5 synthesis. Reads the tier-4 findings for a transcript (findings.<kind>.json, preferring the reviewed siblings) and synthesizes them into one consolidated report of actionable next steps across human prompting, Skills, and MCP servers. Writes findings.report.json (the reviewable recommendation slate) and report.md (the human-readable report, with the distance-from-ideal north-star block). Driven by analyze-agent-transcript for a single session, or invoked directly on a cross-transcript batch.",
-    "path": "agent-transcript-analysis/5-report/synthesize-report",
+    "description": "Tier-4 synthesis. Reads the tier-3 findings for a transcript (findings.<kind>.json, preferring the reviewed siblings) and synthesizes them into one consolidated report of actionable next steps across human prompting, Skills, and MCP servers. Writes findings.report.json (the reviewable recommendation slate) and report.md (the human-readable report, with the distance-from-ideal north-star block). Driven by analyze-agent-transcript for a single session, or invoked directly on a cross-transcript batch.",
+    "path": "agent-transcript-analysis/4-report/synthesize-report",
     "references": ["philosophy-on-skills", "philosophy-on-mcp", "transcript-segment"]
   },
   "review-report": {
     "title": "Review Report",
-    "description": "Open a localhost UI to audit and correct the AI-synthesized tier-5 report — findings.report.json, the consolidated recommendation slate. Thumbs-up, correct, or reject each recommendation; this is where a human reviews the leap from analysis to recommendations against the findings each one cites. Saves findings.report.reviewed.json next to the draft with full correction provenance. Optional human review checkpoint for tier 5.",
-    "path": "agent-transcript-analysis/5-report/review-report"
+    "description": "Open a localhost UI to audit and correct the AI-synthesized tier-4 report — findings.report.json, the consolidated recommendation slate. Thumbs-up, correct, or reject each recommendation; this is where a human reviews the leap from analysis to recommendations against the findings each one cites. Saves findings.report.reviewed.json next to the draft with full correction provenance. Optional human review checkpoint for tier 4.",
+    "path": "agent-transcript-analysis/4-report/review-report"
   },
   "learn-from-report-corrections": {
     "title": "Learn From Report Corrections",
-    "description": "Read the human corrections captured in findings.report.reviewed.json files, cluster them into recurring patterns, and surface flagged improvement opportunities for synthesize-report — where its leap from findings to recommendations over-reaches, mis-routes, or mis-prioritizes. Flags opportunities; never edits a skill. The tier-5 twin of learn-from-analysis-corrections.",
-    "path": "agent-transcript-analysis/5-report/learn-from-report-corrections"
+    "description": "Read the human corrections captured in findings.report.reviewed.json files, cluster them into recurring patterns, and surface flagged improvement opportunities for synthesize-report — where its leap from findings to recommendations over-reaches, mis-routes, or mis-prioritizes. Flags opportunities; never edits a skill. The tier-4 twin of learn-from-analysis-corrections.",
+    "path": "agent-transcript-analysis/4-report/learn-from-report-corrections"
   }
 }

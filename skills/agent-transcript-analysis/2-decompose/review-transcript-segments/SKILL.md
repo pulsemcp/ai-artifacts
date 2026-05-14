@@ -49,7 +49,7 @@ python main.py --tmp-dir /path/to/transcript-tmp-dir [--port 9850] [--no-browser
 - [ ] The user audits the tree: every Trigger / Goal / Outcome field is editable; the event-preview index next to each Segment lets them sanity-check boundaries and evidence
 - [ ] The user fixes what's wrong — edit fields, **Split** a leaf into sub-segments, **Merge ↓** a Segment into its next sibling, and add a **Why / context** note explaining each correction
 - [ ] The user clicks **Save**, which writes `segments.reviewed.json` and surfaces any validation warnings (warnings never block a save — the reviewer's judgment wins)
-- [ ] Downstream skills (tier 3/4) should now prefer `segments.reviewed.json` when it exists (the bundled `segment_review.py` `load_bundle` helper does this automatically)
+- [ ] Downstream skills (tier 3) should now prefer `segments.reviewed.json` when it exists (the bundled `segment_review.py` `load_bundle` helper does this automatically)
 
 ## What the user can edit
 
