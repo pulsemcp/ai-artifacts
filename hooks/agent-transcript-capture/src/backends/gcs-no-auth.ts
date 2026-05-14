@@ -1,9 +1,11 @@
 /**
  * GCS backend using unauthenticated PUT/DELETE via `fetch`.
  *
- * Requires the bucket to grant `storage.objects.create` and
- * `storage.objects.delete` to `allUsers`, scoped via an IAM Condition to
- * `resource.name.startsWith("projects/_/buckets/{bucket}/objects/{namespace_key}/")`.
+ * GCP refuses IAM Conditions on `allUsers` (the PublicResourceAllowConditionCheck
+ * lint), so the secret can't live in a path prefix on a shared bucket. Instead,
+ * the namespace_key is embedded in the bucket name itself, and allUsers gets a
+ * bucket-wide write+delete binding. The bucket is dedicated to transcripts, so
+ * the blast radius is the same as the S3 prefix-scoped variant.
  *
  * No SDK, no CLI, no auth header. The whole backend is two `fetch` calls.
  */
@@ -23,6 +25,11 @@ export class GcsNoAuthBackend implements StorageBackend {
 
   objectUrl(key: string): string {
     return `gs://${this.bucket}/${key}`;
+  }
+
+  // The bucket name already contains the namespace_key, so no path prefix.
+  buildObjectKey(suffix: string): string {
+    return suffix;
   }
 
   async upload(key: string, data: Buffer): Promise<UploadResult> {

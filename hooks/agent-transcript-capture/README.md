@@ -20,10 +20,10 @@ There is no per-user authentication. The bucket is configured to accept unauthen
 Object layout:
 ```
 S3:  s3://{bucket}/{namespace_key}/{user_id}/{YYYY}/{MM}/{DD}/{session_uuid}.tar.gz
-GCS: gs://{bucket-with-namespace_key-suffix}/{namespace_key}/{user_id}/{YYYY}/{MM}/{DD}/{session_uuid}.tar.gz
+GCS: gs://{bucket-with-namespace_key-suffix}/{user_id}/{YYYY}/{MM}/{DD}/{session_uuid}.tar.gz
 ```
 
-The hook always prefixes the object key with `{namespace_key}/` for consistency. On S3 that prefix is load-bearing; on GCS it's redundant (the secret is already in the bucket name) but harmless.
+On S3 the `{namespace_key}/` prefix is load-bearing — the bucket policy's Resource ARN scope requires it. On GCS the secret is already in the bucket name, so the path skips the redundant prefix.
 
 - `namespace_key` is a high-entropy random string of the form `secret-do-not-share-<12+ hex chars>` (default generator produces 32). The prefix in the name is self-documenting — anyone who sees it in logs or a screenshot knows immediately that it's a secret.
 - Unauthenticated **reads and listings are NOT granted** on either provider. Without the key, nobody can write to your bucket; with the key, you can only write — not enumerate, not download.
@@ -103,7 +103,7 @@ gcloud storage buckets update gs://$GCS_BUCKET --lifecycle-file=/tmp/lifecycle.j
 # gcloud storage buckets update gs://$GCS_BUCKET --no-public-access-prevention
 ```
 
-**In `HOOK.json`**, set `no_auth.bucket` to the full secret-suffixed bucket name (`agent-transcripts-{namespace_key}`) and `no_auth.namespace_key` to the same key (used as the object-key prefix for symmetry with S3).
+**In `HOOK.json`**, set `no_auth.bucket` to the full secret-suffixed bucket name (`agent-transcripts-{namespace_key}`) and `no_auth.namespace_key` to the same key (still required for config validation, but not added to the object path — the bucket name already provides the scoping secret).
 
 **Recommended bucket hardening:**
 - Set up a billing alert on the project so a runaway upload spree gets noticed.

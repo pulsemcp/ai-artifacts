@@ -92,14 +92,16 @@ async function main() {
         process.stderr.write(`agent-transcript-capture: archive too large (${archive.length} > ${maxBytes})\n`);
         process.exit(2);
     }
-    // 7. Compose the object key:
-    //    {namespace_key}/{user_id}/{YYYY}/{MM}/{DD}/{session_uuid}.tar.gz
+    // 7. Compose the object key. The backend decides whether to prepend the
+    //    namespace_key (S3 needs it for bucket-policy scoping; GCS doesn't,
+    //    because the secret is already in the bucket name).
     const yyyy = String(now.getUTCFullYear());
     const mm = String(now.getUTCMonth() + 1).padStart(2, "0");
     const dd = String(now.getUTCDate()).padStart(2, "0");
-    const key = `${config.no_auth.namespace_key}/${userId}/${yyyy}/${mm}/${dd}/${bundle.sessionId}.tar.gz`;
-    // 8. Upload.
+    const suffix = `${userId}/${yyyy}/${mm}/${dd}/${bundle.sessionId}.tar.gz`;
     const backend = (0, interface_2.createBackend)((0, config_1.toBackendConfig)(config.no_auth));
+    const key = backend.buildObjectKey(suffix);
+    // 8. Upload.
     const result = await backend.upload(key, archive);
     if (result.success) {
         // Record the upload locally so the CLI can list/delete it.

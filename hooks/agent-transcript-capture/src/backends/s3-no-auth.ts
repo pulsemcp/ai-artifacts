@@ -15,10 +15,12 @@ import { BackendConfig, StorageBackend, UploadResult } from "./interface";
 export class S3NoAuthBackend implements StorageBackend {
   readonly provider = "s3" as const;
   readonly bucket: string;
+  private namespaceKey: string;
   private region: string;
 
   constructor(config: BackendConfig) {
     this.bucket = config.bucket;
+    this.namespaceKey = config.namespace_key;
     if (!config.region) {
       throw new Error(
         "agent-transcript-capture config: 'region' is required for the s3 provider"
@@ -35,6 +37,12 @@ export class S3NoAuthBackend implements StorageBackend {
 
   objectUrl(key: string): string {
     return `s3://${this.bucket}/${key}`;
+  }
+
+  // The bucket policy's Resource ARN scopes writes to `{namespace_key}/*`,
+  // so every object key must start with the namespace_key.
+  buildObjectKey(suffix: string): string {
+    return `${this.namespaceKey}/${suffix}`;
   }
 
   async upload(key: string, data: Buffer): Promise<UploadResult> {

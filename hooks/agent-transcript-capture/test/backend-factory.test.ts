@@ -47,6 +47,17 @@ describe("GcsNoAuthBackend", () => {
     });
     expect(backend.objectUrl("foo/bar.tar.gz")).toBe("gs://my-bucket/foo/bar.tar.gz");
   });
+
+  it("buildObjectKey returns the suffix unchanged (namespace_key lives in the bucket name)", () => {
+    const backend = new GcsNoAuthBackend({
+      provider: "gcs",
+      bucket: `agent-transcripts-${GOOD_KEY}`,
+      namespace_key: GOOD_KEY,
+    });
+    expect(backend.buildObjectKey("alice/2026/05/14/abc.tar.gz")).toBe(
+      "alice/2026/05/14/abc.tar.gz"
+    );
+  });
 });
 
 describe("S3NoAuthBackend", () => {
@@ -69,5 +80,17 @@ describe("S3NoAuthBackend", () => {
       region: "us-east-1",
     });
     expect(backend.objectUrl("foo/bar.tar.gz")).toBe("s3://my-bucket/foo/bar.tar.gz");
+  });
+
+  it("buildObjectKey prefixes the suffix with the namespace_key", () => {
+    const backend = new S3NoAuthBackend({
+      provider: "s3",
+      bucket: "my-bucket",
+      namespace_key: GOOD_KEY,
+      region: "us-east-1",
+    });
+    expect(backend.buildObjectKey("alice/2026/05/14/abc.tar.gz")).toBe(
+      `${GOOD_KEY}/alice/2026/05/14/abc.tar.gz`
+    );
   });
 });

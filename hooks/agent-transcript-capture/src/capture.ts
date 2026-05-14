@@ -112,15 +112,17 @@ async function main(): Promise<void> {
     process.exit(2);
   }
 
-  // 7. Compose the object key:
-  //    {namespace_key}/{user_id}/{YYYY}/{MM}/{DD}/{session_uuid}.tar.gz
+  // 7. Compose the object key. The backend decides whether to prepend the
+  //    namespace_key (S3 needs it for bucket-policy scoping; GCS doesn't,
+  //    because the secret is already in the bucket name).
   const yyyy = String(now.getUTCFullYear());
   const mm = String(now.getUTCMonth() + 1).padStart(2, "0");
   const dd = String(now.getUTCDate()).padStart(2, "0");
-  const key = `${config.no_auth.namespace_key}/${userId}/${yyyy}/${mm}/${dd}/${bundle.sessionId}.tar.gz`;
+  const suffix = `${userId}/${yyyy}/${mm}/${dd}/${bundle.sessionId}.tar.gz`;
+  const backend = createBackend(toBackendConfig(config.no_auth));
+  const key = backend.buildObjectKey(suffix);
 
   // 8. Upload.
-  const backend = createBackend(toBackendConfig(config.no_auth));
   const result = await backend.upload(key, archive);
 
   if (result.success) {

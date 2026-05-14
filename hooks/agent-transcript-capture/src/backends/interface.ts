@@ -34,6 +34,16 @@ export interface StorageBackend {
   /** A canonical object URL for diagnostics / manifest records. */
   objectUrl(key: string): string;
 
+  /**
+   * Build a full object key from a suffix. Each backend decides whether the
+   * namespace_key belongs in the path:
+   *   - S3 prefixes the suffix with `{namespace_key}/` so the bucket policy's
+   *     Resource ARN scope matches.
+   *   - GCS returns the suffix unchanged; the secret is already in the bucket
+   *     name, so a path prefix would be redundant.
+   */
+  buildObjectKey(suffix: string): string;
+
   upload(key: string, data: Buffer): Promise<UploadResult>;
   delete(key: string): Promise<UploadResult>;
 }
