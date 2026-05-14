@@ -15,7 +15,7 @@ Tier 1 → Tier 2 (`2-decompose/decompose-into-transcript-segments`). Tier 2 is 
 ## Design decisions
 
 - **Acquisition is its own tier, separate from analysis.** Analyzers only ever see an OpenTranscripts `Transcript`; they never know anything about on-disk Claude Code state.
-- **OpenTranscripts is the contract.** The output shape is defined in [`references/open-transcripts/`](../../../references/open-transcripts/), not by Claude Code's JSONL. When CC changes, only the mapping doc + the transformation skill change.
+- **OpenTranscripts is the contract.** The output shape is defined by the `open-transcripts` reference set, not by Claude Code's JSONL. When CC changes, only the mapping doc + the transformation skill change.
 - **One self-contained JSON per session.** Subagents are embedded recursively under `subagents[]`. No sibling files to re-link downstream.
 - **Mapping has its own skill.** `claude-code-to-open-transcript/` is the deterministic CC→OT script. `get-one-claude-code-transcript/` is a thin orchestrator. This split keeps the mapping testable and lets new entry points reuse it.
 - **Redact on the way in.** Secret patterns are applied during transformation, so no analyzer needs to redact.

@@ -8,7 +8,7 @@ Upstream: `get-one-claude-code-transcript` (the orchestrator that drives this sk
 
 Downstream: nothing. The output of this skill is what tier 2 consumes.
 
-The canonical mapping doc is [`references/open-transcripts/mappings/claude-code.md`](../../../../references/open-transcripts/mappings/claude-code.md). When CC's format changes, that doc gets updated **first** and this skill follows.
+The canonical mapping doc is the `open-transcripts-claude-code-mapping` reference — the source of truth for the CC → OT shape. When CC's format changes, the drift surfaces as unmapped lines in this skill's output; that's the cue to flag the mapping reference for reconciliation at its source.
 
 ## Design decisions
 

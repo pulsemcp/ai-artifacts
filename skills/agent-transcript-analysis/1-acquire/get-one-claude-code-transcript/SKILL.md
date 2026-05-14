@@ -6,8 +6,8 @@ description: >
   and nested in one self-contained JSON document. Use this skill after
   find-all-claude-code-transcripts (or when the session id is already known)
   and before any of the analyze-* skills. The output is a path to a tmp
-  directory containing transcript.json conforming to
-  references/open-transcripts/schemas/transcript.md.
+  directory containing transcript.json conforming to the
+  open-transcripts-transcript reference.
 user-invocable: true
 ---
 
@@ -18,8 +18,7 @@ Orchestrates the acquisition step of the analysis pipeline: takes a CC session i
 ## Invocation
 
 ```
-python skills/agent-transcript-analysis/1-acquire/get-one-claude-code-transcript/main.py \
-    <session-uuid> [--tmp-root <dir>] [--pretty]
+python main.py <session-uuid> [--tmp-root <dir>] [--pretty]
 ```
 
 `main.py` is the reference implementation. It scans `~/.claude/projects/*/<session-uuid>.jsonl`, calls `claude-code-to-open-transcript` under the hood, and prints the output directory path on stdout. The output dir defaults to `$TMPDIR/transcript-analysis/<session-uuid>/`.
@@ -38,7 +37,7 @@ transcript.json    # the OpenTranscripts Transcript document (redacted)
 run.log            # acquisition run log: redaction counts, unmapped line counts, timings
 ```
 
-`transcript.json` conforms to [`references/open-transcripts/schemas/transcript.md`](../../../../references/open-transcripts/schemas/transcript.md) (the wrapper) and [`references/open-transcripts/schemas/events.md`](../../../../references/open-transcripts/schemas/events.md) (events). Subagents are embedded recursively under `subagents[]`; nothing is left on disk that the consumer needs to re-link.
+`transcript.json` conforms to the `open-transcripts-transcript` reference (the wrapper) and the `open-transcripts-events` reference (events). Subagents are embedded recursively under `subagents[]`; nothing is left on disk that the consumer needs to re-link.
 
 The output path is written to stdout so downstream skills can consume it.
 
@@ -47,14 +46,14 @@ The output path is written to stdout so downstream skills can consume it.
 This skill is a thin orchestrator. The actual work happens in sub-skills:
 
 - [ ] Resolve the main JSONL file under `~/.claude/projects/<project>/<session_id>.jsonl`
-- [ ] Call [`claude-code-to-open-transcript`](../claude-code-to-open-transcript/SKILL.md) with the main JSONL path — this skill handles JSONL parsing, the 4-field subagent linkage chain, recursive subagent loading, secret-redaction, and CC→OT field mapping per [`references/open-transcripts/mappings/claude-code.md`](../../../../references/open-transcripts/mappings/claude-code.md)
+- [ ] Call `claude-code-to-open-transcript` with the main JSONL path — this skill handles JSONL parsing, the 4-field subagent linkage chain, recursive subagent loading, secret-redaction, and CC→OT field mapping per the `open-transcripts-claude-code-mapping` reference
 - [ ] Write the resulting `Transcript` JSON to `<tmp_dir>/transcript.json`
 - [ ] Write a `run.log` with redaction counts (by pattern), unmapped-line counts (by CC line type), and the wall-clock breakdown
 - [ ] Print the tmp dir path to stdout
 
 ## Implementation notes
 
-- Don't re-implement the CC→OT transformation here; delegate to [`claude-code-to-open-transcript`](../claude-code-to-open-transcript/SKILL.md). That skill owns the canonical mapping.
+- Don't re-implement the CC→OT transformation here; delegate to `claude-code-to-open-transcript`. That skill owns the canonical mapping.
 - The tmp folder is the **single source of truth** for everything downstream. No analyze-* skill should reach back into `~/.claude/projects/` directly.
 - Redaction is part of the transformation skill — by the time `transcript.json` lands on disk, secrets are already gone.
 

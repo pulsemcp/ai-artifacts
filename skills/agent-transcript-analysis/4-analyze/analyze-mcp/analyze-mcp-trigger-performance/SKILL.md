@@ -18,7 +18,7 @@ Per-Segment analyzer. The MCP-side counterpart to `analyze-skill-trigger-perform
 - `segment`: a Segment from `segments.json` (Goal, Outcome, turn_range)
 - `segment_turns`: the raw turns within `segment.meta.turn_range` from `main.jsonl`
 - `available_mcp_tools`: the list of MCP tools available in the session (names + descriptions). The system messages or `.mcp.json` snapshot lists them
-- `philosophy_mcp`: `references/philosophy-on-mcp.md`
+- `philosophy_mcp`: the `philosophy-on-mcp` reference
 
 ## Output
 
@@ -45,7 +45,7 @@ Per-Segment analyzer. The MCP-side counterpart to `analyze-skill-trigger-perform
 - [ ] Walk `segment_turns` for moments where the agent did something an available MCP tool was designed for, but reached for a CLI or wrote raw HTTP / SDK calls instead
 - [ ] For false positives: tighten the tool's description, narrow its surface, or remove it if it's consistently misused
 - [ ] For false negatives: typically the **tool description** is the lever — make it match the words the agent (or user) tends to use. Sometimes the **tool surface** is the problem (too granular, too coarse)
-- [ ] Cross-check every recommendation against `philosophy-on-mcp.md`
+- [ ] Cross-check every recommendation against the `philosophy-on-mcp` reference
 
 ## Notes
 

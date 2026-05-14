@@ -17,7 +17,7 @@ Per-Segment analyzer. Focuses on the **`description` field** of Skills — what 
 - `segment`: a Segment from `segments.json` (Goal, Outcome, turn_range)
 - `segment_turns`: the raw turns within `segment.meta.turn_range` from `main.jsonl` (needed to identify Skill tool calls and the moments where one *should* have fired)
 - `available_skills`: the list of Skills that were available in the session (and their descriptions). The system-reminder messages in the JSONL list them
-- `philosophy_skills`: `references/philosophy-on-skills.md`
+- `philosophy_skills`: the `philosophy-on-skills` reference
 
 ## Output
 
@@ -41,7 +41,7 @@ Per-Segment analyzer. Focuses on the **`description` field** of Skills — what 
   - **delete** — only if the Skill is so consistently misfiring that the team philosophy says retire it
 - [ ] For false negatives, recommend:
   - **modify** — broaden or sharpen the `description` so this kind of moment matches; cite the moment as a triggering example to add
-- [ ] Cross-check every recommendation against `philosophy-on-skills.md`. If a recommendation conflicts with the philosophy, drop it or note the conflict explicitly
+- [ ] Cross-check every recommendation against the `philosophy-on-skills` reference. If a recommendation conflicts with the philosophy, drop it or note the conflict explicitly
 
 ## Notes
 

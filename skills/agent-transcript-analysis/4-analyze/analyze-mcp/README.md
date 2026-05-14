@@ -18,5 +18,5 @@ Note: Skills frequently wrap MCP tools. A Skill that was supposed to call an MCP
 
 - **Symmetric with Skills, intentionally.** Trigger / action / gaps gives the same precision benefit for MCP as it does for Skills. We accept the parallel folder structure.
 - **Verbose responses are a flagged failure mode.** A correct-but-verbose tool can cost more than no tool at all (compaction thrashing). Action-performance flags tool responses >~3k tokens that the agent didn't need in full.
-- **MCP vs Skill is a real choice.** Gaps analyzers must consider whether a CLI-wrapping Skill would do the job before proposing a new MCP server. `references/philosophy-on-mcp.md` is the tiebreaker.
+- **MCP vs Skill is a real choice.** Gaps analyzers must consider whether a CLI-wrapping Skill would do the job before proposing a new MCP server. The `philosophy-on-mcp` reference is the tiebreaker.
 - **Server reuse beats proliferation.** New tools land on existing servers when possible.

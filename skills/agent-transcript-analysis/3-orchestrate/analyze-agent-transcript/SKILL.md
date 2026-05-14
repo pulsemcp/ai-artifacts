@@ -17,14 +17,14 @@ user-invocable: true
 
 The orchestrator. Turns a transcript into an actionable list of changes — to the user's prompting habits, to the Skill portfolio, and to the MCP server portfolio.
 
-The Transcript Segment is the analysis primitive. See [`references/transcript-segment.md`](../../../../references/transcript-segment.md) for the data model. This skill does not walk raw JSONL — it asks `decompose-into-transcript-segments` for `segments.json` and reads only from there.
+The Transcript Segment is the analysis primitive. See the `transcript-segment` reference for the data model. This skill does not walk raw JSONL — it asks `decompose-into-transcript-segments` for `segments.json` and reads only from there.
 
 ## Inputs
 
 - `tmp_dir` (required): output of `get-one-claude-code-transcript`. Must contain `manifest.json`, `main.jsonl`, and an optional `subagents/` directory.
-- `philosophy_skills` (optional): path to `references/philosophy-on-skills.md`. Defaults to the bundled copy.
-- `philosophy_mcp` (optional): path to `references/philosophy-on-mcp.md`. Defaults to the bundled copy.
-- `transcript_segment_spec` (optional): path to `references/transcript-segment.md`. Defaults to the bundled copy.
+- `philosophy_skills` (optional): the `philosophy-on-skills` reference. Defaults to the bundled copy.
+- `philosophy_mcp` (optional): the `philosophy-on-mcp` reference. Defaults to the bundled copy.
+- `transcript_segment_spec` (optional): the `transcript-segment` reference. Defaults to the bundled copy.
 
 ## Output
 
@@ -84,7 +84,7 @@ Every recommendation must be specific enough to act on — to open a PR, to rewr
     - [ ] `analyze-mcp-gaps` — seeded by any `recommendation_seed` from this Segment's failure hypothesis and any deterministic-trigger candidate from `analyze-prompt-ambition`
 - [ ] Aggregate per-Segment recommendations across the whole session, deduping similar suggestions
 - [ ] Cross-reference each surviving recommendation against the philosophy docs; drop those that contradict, or note the contradiction so the human reviewer can resolve it
-- [ ] Compute the **distance from ideal end-state** section (counts of Failures; Correction triggers broken out by user-source vs agent-source; deterministic-trigger candidates among user-source New triggers; total wall-clock vs counterfactual sum). Per `references/transcript-segment.md`, this is the north-star metric block
+- [ ] Compute the **distance from ideal end-state** section (counts of Failures; Correction triggers broken out by user-source vs agent-source; deterministic-trigger candidates among user-source New triggers; total wall-clock vs counterfactual sum). Per the `transcript-segment` reference, this is the north-star metric block
 - [ ] Emit the Markdown report and the JSON sidecar. Reference `segments.json` and `flamegraph.html` paths but do not re-emit their contents
 
 ## Out of scope

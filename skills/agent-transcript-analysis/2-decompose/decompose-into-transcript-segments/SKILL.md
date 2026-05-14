@@ -3,8 +3,8 @@ name: decompose-into-transcript-segments
 description: >
   Given the tmp folder produced by get-one-claude-code-transcript (containing
   transcript.json — an OpenTranscripts Transcript document), decompose the
-  transcript into a recursive tree of Transcript Segments (see
-  references/open-transcripts/schemas/transcript-segment.md). Each Segment
+  transcript into a recursive tree of Transcript Segments (see the
+  transcript-segment reference). Each Segment
   carries a Trigger (kind: New | Correction × source: user | agent |
   subagent), a Goal (Plan | Action), an Outcome (Success | Failure), child
   sub-segments, and a meta block (event range, wall-clock, tokens, model).
@@ -17,7 +17,7 @@ user-invocable: false
 
 # Decompose into transcript segments
 
-The Transcript Segment primitive ([`references/open-transcripts/schemas/transcript-segment.md`](../../../../references/open-transcripts/schemas/transcript-segment.md)) is the spine of every downstream analyzer. This skill is the only thing that produces it.
+The Transcript Segment primitive (defined in the `transcript-segment` reference) is the spine of every downstream analyzer. This skill is the only thing that produces it.
 
 ## Inputs
 
@@ -27,7 +27,7 @@ The Transcript Segment primitive ([`references/open-transcripts/schemas/transcri
 
 Two files written into `tmp_dir`:
 
-- **`segments.json`** — the structured tree. **Schema and a worked example live in [`references/open-transcripts/schemas/transcript-segment.md`](../../../../references/open-transcripts/schemas/transcript-segment.md) under "`segments.json` schema" and "Example"** — they are the contract this skill must hit. Validate against the rules listed there (exactly one Trigger/Goal/Outcome per Segment; `trigger.event_id` points at a real event id when `source ∈ {user, subagent}`; children cover the parent's `event_range` with no gaps or overlaps; deterministic `id`s).
+- **`segments.json`** — the structured tree. **Schema and a worked example live in the `transcript-segment` reference under "`segments.json` schema" and "Example"** — they are the contract this skill must hit. Validate against the rules listed there (exactly one Trigger/Goal/Outcome per Segment; `trigger.event_id` points at a real event id when `source ∈ {user, subagent}`; children cover the parent's `event_range` with no gaps or overlaps; deterministic `id`s).
 - **`flamegraph.html`** — annotated flamegraph. X = wall-clock, Y = Segment depth. Color = Outcome (green Success, red Failure). Badge = Correction trigger at head, with the badge variant indicating `source: user` vs `source: agent`. Hover/click reveals Goal text and meta.
 
 Both must agree. Downstream skills read `segments.json`; humans look at `flamegraph.html`.
@@ -35,7 +35,7 @@ Both must agree. Downstream skills read `segments.json`; humans look at `flamegr
 ## Sequencing checklist
 
 - [ ] Load `transcript.json` from `tmp_dir`. Walk the recursive structure: the root Transcript's `events[]` plus every `subagents[*].events[]` (recursively)
-- [ ] **Identify segment boundaries** by following the `## Segmentation methodology` section of [`references/open-transcripts/schemas/transcript-segment.md`](../../../../references/open-transcripts/schemas/transcript-segment.md). That section is the source of truth — boundary triggers (new `UserMessage` event, `SubagentSpawn` event, within-run topic/file shift), the leaf-stop rule, and what a Segment is *not* all live there
+- [ ] **Identify segment boundaries** by following the `## Segmentation methodology` section of the `transcript-segment` reference. That section is the source of truth — boundary triggers (new `UserMessage` event, `SubagentSpawn` event, within-run topic/file shift), the leaf-stop rule, and what a Segment is *not* all live there
 - [ ] **Label each segment's Goal** in one sentence and classify it as **Plan** (figuring out) or **Action** (doing/changing state). When ambiguous, default to Plan
 - [ ] **Label each segment's Outcome** as **Success** or **Failure** against its own Goal — not against a higher Goal. A successful sub-step under a failed parent is Success
 - [ ] Recurse: every segment's children must collectively cover its `event_range`
@@ -67,4 +67,4 @@ Both must agree. Downstream skills read `segments.json`; humans look at `flamegr
 
 - The flamegraph is a humanizing artifact — the analyzers don't read it. Prioritize correctness of `segments.json` over flamegraph polish.
 - Token cost matters; this skill is the only place we walk every event, so do it once and let downstream skills consume the structured output.
-- **`segments.json` is a draft.** Decomposition is the most interpretive step in the pipeline, so its output is meant to be reviewed: `review-transcript-segments` lets a human audit and correct the tree into `segments.reviewed.json`, and `learn-from-segment-corrections` feeds those corrections back here. Emit your best draft, but don't treat it as final.
+- **`segments.json` is a draft.** Decomposition is the most interpretive step in the pipeline, so its output is meant to be reviewed: `review-transcript-segments` lets a human audit and correct the tree into `segments.reviewed.json`, and `learn-from-segment-corrections` reads those corrections to flag improvement opportunities for this skill's heuristics. Emit your best draft, but don't treat it as final.

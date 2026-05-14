@@ -13,4 +13,4 @@ Downstream: the `recommendation_seed` is handed to the matching gap analyzer (`a
 - **Both Correction sources count, but user-source is stronger.** A user-source Correction means the user had to intervene; agent-source Correction means the agent recovered on its own. Both produce a hypothesis; the user-source variant deserves a more forceful one.
 - **Hypothesis, not verdict.** The output is explicitly an *improvement hypothesis*. The human reviewer (or the orchestrator's aggregation step) decides whether to accept it.
 - **No artifact drafting here.** This skill points at a bucket and writes a seed; the actual Skill-body / MCP-tool draft lives in the gap analyzers. Keeps responsibility narrow.
-- **Default-blame the artifacts, not the user.** Per `references/transcript-segment.md`, the default root cause for a Correction is missing or non-triggering Skill / MCP, not user error.
+- **Default-blame the artifacts, not the user.** Per the `transcript-segment` reference, the default root cause for a Correction is missing or non-triggering Skill / MCP, not user error.

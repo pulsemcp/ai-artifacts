@@ -16,7 +16,7 @@ Per-Segment analyzer. Focuses on the **body** of Skills that ran — their check
 
 - `segment`: a Segment from `segments.json` (Goal, Outcome, turn_range)
 - `segment_turns`: the raw turns within `segment.meta.turn_range` from `main.jsonl`
-- `philosophy_skills`: `references/philosophy-on-skills.md`
+- `philosophy_skills`: the `philosophy-on-skills` reference
 
 ## Output
 
@@ -48,7 +48,7 @@ Per-Segment analyzer. Focuses on the **body** of Skills that ran — their check
 - [ ] Recommendations:
   - **modify** — fix the specific instruction in the body that misled the agent, or trim the Skill if it's too verbose for what it delivers
   - **delete** — only if the Skill is consistently hurtful and modification can't save it (per the philosophy doc)
-- [ ] Cross-check against `philosophy-on-skills.md`
+- [ ] Cross-check against the `philosophy-on-skills` reference
 
 ## Notes
 

@@ -17,7 +17,7 @@ Per-Segment analyzer. Focuses on **the behavior of MCP tools that ran** — thei
 
 - `segment`: a Segment from `segments.json` (Goal, Outcome, turn_range)
 - `segment_turns`: the raw turns within `segment.meta.turn_range` from `main.jsonl`
-- `philosophy_mcp`: `references/philosophy-on-mcp.md`
+- `philosophy_mcp`: the `philosophy-on-mcp` reference
 
 ## Output
 
@@ -47,7 +47,7 @@ Per-Segment analyzer. Focuses on **the behavior of MCP tools that ran** — thei
   - **modify_response** — change what the tool returns (shape, brevity, error messages) without changing the underlying capability
   - **modify_implementation** — the tool's *behavior* is wrong, not just its shape (e.g. needs caching, needs better filtering args)
   - **remove_tool** — the tool is net-negative and should be retired (per the philosophy doc)
-- [ ] Cross-check against `philosophy-on-mcp.md`
+- [ ] Cross-check against the `philosophy-on-mcp` reference
 
 ## Notes
 

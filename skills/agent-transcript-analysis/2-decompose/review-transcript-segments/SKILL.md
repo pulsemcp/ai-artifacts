@@ -16,7 +16,7 @@ user-invocable: true
 
 # Review transcript segments
 
-`decompose-into-transcript-segments` emits `segments.json` — an **AI draft**. Decomposition is the most interpretive step in the whole pipeline: deciding where a Goal changes, whether a Segment was a Failure, and what its Trigger was are all judgment calls. This skill puts that draft in front of a human in an editable UI so they can correct it, and records every correction with enough provenance that [`learn-from-segment-corrections`](../learn-from-segment-corrections/SKILL.md) can feed the fixes back into the decompose skill.
+`decompose-into-transcript-segments` emits `segments.json` — an **AI draft**. Decomposition is the most interpretive step in the whole pipeline: deciding where a Goal changes, whether a Segment was a Failure, and what its Trigger was are all judgment calls. This skill puts that draft in front of a human in an editable UI so they can correct it, and records every correction with enough provenance that `learn-from-segment-corrections` can turn the fixes into flagged improvement opportunities for the decompose skill.
 
 This is the **review checkpoint** for tier 2. It is optional — analyzers read `segments.json` fine on their own — but every correction captured here makes the next decomposition better.
 
@@ -28,7 +28,7 @@ This is the **review checkpoint** for tier 2. It is optional — analyzers read 
 
 One file written into `tmp_dir`:
 
-- **`segments.reviewed.json`** — the human-blessed Segment tree. **Same schema as `segments.json`** (see [`references/open-transcripts/schemas/transcript-segment.md`](../../../../references/open-transcripts/schemas/transcript-segment.md), section "`segments.reviewed.json` — the reviewed sibling"), so every downstream analyzer reads it transparently. It adds:
+- **`segments.reviewed.json`** — the human-blessed Segment tree. **Same schema as `segments.json`** (see the `transcript-segment` reference, section "`segments.reviewed.json` — the reviewed sibling"), so every downstream analyzer reads it transparently. It adds:
   - a `review: {edited, corrections}` block on every Segment the user touched
   - a `review: {reviewed_at, reviewer, base, log, warnings}` block on the root Segment carrying file-level provenance and the full append-only correction log
 
@@ -37,8 +37,7 @@ One file written into `tmp_dir`:
 ## Invocation
 
 ```
-python skills/agent-transcript-analysis/2-decompose/review-transcript-segments/main.py \
-    --tmp-dir /path/to/transcript-tmp-dir [--port 9850] [--no-browser]
+python main.py --tmp-dir /path/to/transcript-tmp-dir [--port 9850] [--no-browser]
 ```
 
 `main.py` starts an HTTP server on `127.0.0.1:<port>` (default `9850`) and serves `ui.html`. Pass `--no-browser` to skip the auto-open (useful on remote / headless hosts).
@@ -68,12 +67,12 @@ python skills/agent-transcript-analysis/2-decompose/review-transcript-segments/m
 3. Every edit appends an entry to an in-memory **correction log** (`field` / `split` / `merge` / `note`). The log is append-only and replayable.
 4. On Save, `POST /api/save` hands the edited tree + full log to `_lib/segment_review.py::write_reviewed`, which strips any stale `review` stamps, re-derives them from the log, validates the tree, attaches file-level provenance, redacts every string, and atomically writes `segments.reviewed.json`.
 
-The correction-provenance contract lives in [`_lib/segment_review.py`](../../_lib/segment_review.py) and is shared with `learn-from-segment-corrections`.
+The correction-provenance contract lives in `_lib/segment_review.py` and is shared with `learn-from-segment-corrections`.
 
 ## Out of scope
 
 - Producing the draft — that's `decompose-into-transcript-segments`.
-- Acting on the corrections to improve the decompose skill — that's the sibling skill `learn-from-segment-corrections`.
+- Turning the corrections into improvement opportunities for the decompose skill — that's the sibling skill `learn-from-segment-corrections`.
 - Any analysis or recommendation — every `analyze-*` skill is downstream of this.
 
 ## Privacy

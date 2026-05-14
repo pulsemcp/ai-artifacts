@@ -20,7 +20,7 @@ Per-Segment analyzer. The "what's missing" analyzer for the Skill portfolio. Com
 - `segment_turns`: the raw turns within `segment.meta.turn_range` from `main.jsonl`
 - `available_skills`: list of Skills that were available (so we don't re-propose existing ones)
 - `failure_hypothesis_seed` (optional): the `recommendation_seed` from `analyze-failure-hypothesis` for this Segment, if its `recommendation_route` was `skills` or `multi`
-- `philosophy_skills`: `references/philosophy-on-skills.md`
+- `philosophy_skills`: the `philosophy-on-skills` reference
 
 ## Output
 

@@ -25,8 +25,7 @@ If the user already has a session id in hand, **skip this skill** and go straigh
 ## Invocation
 
 ```
-python skills/agent-transcript-analysis/1-acquire/find-all-claude-code-transcripts/main.py \
-    [--port 9849] [--no-browser]
+python main.py [--port 9849] [--no-browser]
 ```
 
 `main.py` starts an HTTP server on `127.0.0.1:<port>` (default `9849`) and serves `ui.html`. The UI shows every session under `~/.claude/projects/`, sortable / filterable. Clicking "Analyze" POSTs to `/api/analyze`, which runs `get-one-claude-code-transcript` and surfaces the resulting `transcript.json` path.

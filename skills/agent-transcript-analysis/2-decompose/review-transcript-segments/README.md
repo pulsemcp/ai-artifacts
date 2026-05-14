@@ -16,7 +16,7 @@ So `segments.json` is treated as a **draft**, not an answer. This skill is where
 | `ui.html` | Single static page: editable Segment-tree outline, event-preview index, split/merge, per-Segment context notes, Save. No build step, no CDN. |
 | `SKILL.md` | The skill contract. |
 
-The provenance contract — load, validate, stamp, atomic-write — lives in [`../../_lib/segment_review.py`](../../_lib/segment_review.py), shared with `learn-from-segment-corrections`.
+The provenance contract — load, validate, stamp, atomic-write — lives in `_lib/segment_review.py`, shared with `learn-from-segment-corrections`.
 
 ## The reviewed sibling
 
@@ -32,7 +32,7 @@ tmp_dir/
 - every edited Segment carries `review: {edited: true, corrections: [...]}`
 - the root Segment additionally carries `review: {reviewed_at, reviewer, base, log, warnings}` — file-level provenance plus the full append-only correction log
 
-See [`references/open-transcripts/schemas/transcript-segment.md`](../../../../references/open-transcripts/schemas/transcript-segment.md) for the schema.
+See the `transcript-segment` reference for the schema.
 
 ## Correction log entry types
 

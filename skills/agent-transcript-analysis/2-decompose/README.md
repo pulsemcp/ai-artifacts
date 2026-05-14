@@ -6,7 +6,7 @@ Decomposition layer. Turns an OpenTranscripts `transcript.json` (produced by tie
 
 - `decompose-into-transcript-segments/` — emits `segments.json` (structured) and `flamegraph.html` (annotated viz). Sole producer of the Segment primitive.
 - `review-transcript-segments/` — **optional human review checkpoint.** Opens a localhost UI to audit and correct the AI-drafted tree; writes `segments.reviewed.json` next to the draft with full correction provenance. The draft is never overwritten.
-- `learn-from-segment-corrections/` — **optional feedback loop.** Reads the corrections captured by `review-transcript-segments`, clusters them into patterns, and proposes concrete improvements to `decompose-into-transcript-segments`.
+- `learn-from-segment-corrections/` — **optional feedback loop.** Reads the corrections captured by `review-transcript-segments`, clusters them into patterns, and flags concrete improvement opportunities for `decompose-into-transcript-segments` — it does not edit any skill.
 
 ## How this tier plugs into the rest
 
@@ -19,16 +19,16 @@ The review subsystem is its own loop:
 ```
 decompose-into-transcript-segments  →  segments.json (AI draft)
 review-transcript-segments          →  segments.reviewed.json + append-only correction log
-learn-from-segment-corrections      →  proposed edits to decompose-into-transcript-segments
+learn-from-segment-corrections      →  flagged opportunities for decompose-into-transcript-segments
        └──────────────── close the loop ───────────────┘
 ```
 
 ## Design decisions
 
-- **The Segment is a first-class primitive, not an implementation detail of the orchestrator.** Promoting it out makes the data model explicit ([`references/open-transcripts/schemas/transcript-segment.md`](../../../references/open-transcripts/schemas/transcript-segment.md)) and lets the analyzers compose on top of it.
+- **The Segment is a first-class primitive, not an implementation detail of the orchestrator.** Promoting it out makes the data model explicit (the `transcript-segment` reference) and lets the analyzers compose on top of it.
 - **Reads OpenTranscripts, not raw vendor JSONL.** Tier 1 owns the vendor coupling; tier 2 is vendor-neutral by construction.
 - **One walker, many readers.** This tier walks every event once; everything downstream reads the structured tree. Cheaper than re-walking events in every analyzer.
 - **Two artifacts, one truth.** `segments.json` is the source of truth; `flamegraph.html` is the humanizing view. If they disagree, fix `segments.json` first and re-render.
 - **Outcome is per-Goal.** A Success sub-step under a Failure parent stays Success. The tree carries enough info for the orchestrator to decide how to aggregate.
 - **Decomposition is a draft, not an answer.** It is the most interpretive step in the whole pipeline, so its output is reviewable: `review-transcript-segments` lets a human correct it, and `segments.json` is kept pristine so the AI-vs-human diff stays inspectable. Tier 1's deterministic steps need no such checkpoint.
-- **Corrections are training signal.** The review UI records *why* a human disagreed, not just *what* they changed — a structured, replayable correction log — so `learn-from-segment-corrections` can feed those disagreements back into the decomposer.
+- **Corrections are signal.** The review UI records *why* a human disagreed, not just *what* they changed — a structured, replayable correction log — so `learn-from-segment-corrections` can turn those disagreements into flagged improvement opportunities for the decomposer.

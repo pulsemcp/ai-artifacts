@@ -60,7 +60,7 @@ Per-Segment analyzer for Failure Outcomes and retro-Failures.
 
 ## Notes
 
-- **The default cause of a Correction is a Skill issue, not a user mistake.** Per `references/transcript-segment.md`, this is the team's prior — only override it with explicit evidence. Applies whether the Correction came from the user or from the agent self-correcting.
+- **The default cause of a Correction is a Skill issue, not a user mistake.** Per the `transcript-segment` reference, this is the team's prior — only override it with explicit evidence. Applies whether the Correction came from the user or from the agent self-correcting.
 - **Weight retro-Failure recommendations by Correction source.** A `retro_failure_via_user_correction` deserves a more forceful hypothesis (user-visible failure mode) than `retro_failure_via_agent_correction` (agent recovered on its own — still worth fixing, but lower urgency).
 - **Don't propagate failure up the tree.** A leaf Failure does not automatically make its parent a Failure; the segmenter already made that call. Analyze the Segment you were handed.
 - **Stay short.** One hypothesis per Segment. If you find yourself listing three independent causes, the Segment was probably under-decomposed — flag it back to tier 2 instead of papering over it here.

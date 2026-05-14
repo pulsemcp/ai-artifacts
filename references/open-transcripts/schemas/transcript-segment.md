@@ -140,7 +140,7 @@ When analyzing a Segment, look for these in order. Anything that fires becomes a
 
 ## Output contract
 
-`2-decompose/decompose-into-transcript-segments` consumes a `Transcript` (the JSON document defined by [`transcript.md`](./transcript.md)) and emits **both**:
+`decompose-into-transcript-segments` consumes a `Transcript` (the JSON document defined by [`transcript.md`](./transcript.md)) and emits **both**:
 
 1. **`segments.json`** — the structured tree. Every analyzer in tier 4 reads this and dereferences event ids into the Transcript as needed. Schema and example below.
 2. **`flamegraph.html`** — annotated visualization. The X axis is wall-clock time; the Y axis is Segment depth. Each block is color-coded by Outcome (green = Success, red = Failure) with a badge for any Correction trigger at the Segment's head (badge variant indicates `source: user` vs `source: agent`). Hover/click reveals the Goal text and meta.
@@ -312,7 +312,7 @@ What this example demonstrates:
 
 ### Reader rule
 
-Downstream skills go through `_lib/segment_review.py::load_bundle`, which **prefers `segments.reviewed.json` when it exists** and falls back to `segments.json`. Analyzers never need to branch on whether a tree was reviewed — they just read the resolved tree. `2-decompose/learn-from-segment-corrections` is the one consumer that reads `review.log` specifically, to feed corrections back into the decompose skill.
+Downstream skills go through `_lib/segment_review.py::load_bundle`, which **prefers `segments.reviewed.json` when it exists** and falls back to `segments.json`. Analyzers never need to branch on whether a tree was reviewed — they just read the resolved tree. `learn-from-segment-corrections` is the one consumer that reads `review.log` specifically, to cluster corrections into flagged improvement opportunities for the decomposer.
 
 ## Notes for analyzer authors
 

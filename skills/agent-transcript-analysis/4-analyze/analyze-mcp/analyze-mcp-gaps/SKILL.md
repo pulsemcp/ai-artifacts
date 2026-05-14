@@ -23,7 +23,7 @@ Per-Segment analyzer. The "what's missing" analyzer for MCP servers. Companion t
 - `available_mcp_tools`: existing tools (so we don't re-propose them)
 - `failure_hypothesis_seed` (optional): the `recommendation_seed` from `analyze-failure-hypothesis` for this Segment, when its `recommendation_route` was `mcp` or `multi`
 - `trigger_proposal_seed` (optional): the `trigger_proposal` from `analyze-prompt-ambition` for this Segment, when it flagged a deterministic-trigger candidate that implies an MCP server (e.g. listening to GitHub events, watching an alert stream)
-- `philosophy_mcp`: `references/philosophy-on-mcp.md`
+- `philosophy_mcp`: the `philosophy-on-mcp` reference
 
 ## Output
 

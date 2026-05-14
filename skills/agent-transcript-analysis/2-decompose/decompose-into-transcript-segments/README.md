@@ -1,6 +1,6 @@
 # `decompose-into-transcript-segments`
 
-The skill that produces the Transcript Segment tree. Sole gatekeeper of the data model in [`references/open-transcripts/schemas/transcript-segment.md`](../../../../references/open-transcripts/schemas/transcript-segment.md).
+The skill that produces the Transcript Segment tree. Sole gatekeeper of the data model in the `transcript-segment` reference.
 
 ## How it plugs in
 

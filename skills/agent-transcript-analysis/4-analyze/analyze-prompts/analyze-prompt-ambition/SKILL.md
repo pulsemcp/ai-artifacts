@@ -44,7 +44,7 @@ Per-Segment ambition check. Runs only on Segments with `trigger.kind == "New" &&
 - [ ] Confirm `segment.trigger.kind == "New" && segment.trigger.source == "user"`. If not, return early — this skill only applies to user-typed New Triggers.
 - [ ] Pull the Segment's wall-clock from `meta`. If short (< a few minutes by default) **and** the next user-source New Trigger fires soon after **and** that next prompt's Goal overlaps this one's, flag as `unambitious`.
 - [ ] If `unambitious`, draft a `prompting_recommendation`: what one combined prompt would have set both Goals up front?
-- [ ] Independently, ask: **does this user-typed New Trigger look like an ad-hoc reaction to an external event** (alert, ticket, schedule, PR opening, build break)? If yes, set `deterministic_trigger_candidate = true` and draft a `trigger_proposal` naming the system that should have fired the prompt instead. This is the north-star case per `references/transcript-segment.md`.
+- [ ] Independently, ask: **does this user-typed New Trigger look like an ad-hoc reaction to an external event** (alert, ticket, schedule, PR opening, build break)? If yes, set `deterministic_trigger_candidate = true` and draft a `trigger_proposal` naming the system that should have fired the prompt instead. This is the north-star case per the `transcript-segment` reference.
 - [ ] For `appropriately_scoped` and `ambitious`, set the recommendation fields to null. Producing no finding is a real outcome.
 
 ## Notes

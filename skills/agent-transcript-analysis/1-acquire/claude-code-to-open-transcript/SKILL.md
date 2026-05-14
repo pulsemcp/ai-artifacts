@@ -5,8 +5,8 @@ description: >
   (and the project directory it lives in), produce a single OpenTranscripts
   `Transcript` JSON document — the main session plus every subagent linked
   via the canonical tool_use → tool_result → agentId chain. No LLM calls,
-  no heuristics; pure field mapping per
-  references/open-transcripts/mappings/claude-code.md. Use this skill from
+  no heuristics; pure field mapping per the open-transcripts-claude-code-mapping
+  reference. Use this skill from
   inside `get-one-claude-code-transcript`, or directly when you already have
   a JSONL path and want an OT Transcript out.
 user-invocable: false
@@ -19,8 +19,7 @@ The deterministic CC → OT transformation. This skill owns the canonical mappin
 ## Invocation
 
 ```
-python skills/agent-transcript-analysis/1-acquire/claude-code-to-open-transcript/main.py \
-    <path-to-session.jsonl> [--out <output.json>] [--pretty]
+python main.py <path-to-session.jsonl> [--out <output.json>] [--pretty]
 ```
 
 `main.py` is the reference implementation. It writes one OT `Transcript` document to `--out` (defaults to `transcript.json` next to the source JSONL). Subagents are auto-resolved from `<session-uuid>/subagents/agent-<id>.jsonl` (with legacy sibling-file fallback). Secret-redaction runs inline; no upload, no LLM.
@@ -34,8 +33,8 @@ python skills/agent-transcript-analysis/1-acquire/claude-code-to-open-transcript
 
 A single OpenTranscripts `Transcript` JSON object printed to stdout (or written to a path if the caller provides one). The output conforms to:
 
-- [`references/open-transcripts/schemas/transcript.md`](../../../../references/open-transcripts/schemas/transcript.md) — the wrapper.
-- [`references/open-transcripts/schemas/events.md`](../../../../references/open-transcripts/schemas/events.md) — the event types.
+- the `open-transcripts-transcript` reference — the wrapper.
+- the `open-transcripts-events` reference — the event types.
 
 Subagents are embedded recursively under `subagents[]`; their `parent` field is populated with `{ transcript_id, spawn_event_id }` pointing back to the `SubagentSpawn` event in the parent's `events[]`.
 
@@ -51,7 +50,7 @@ The transformation has four passes:
 
 ### 2. Map each line to an OT Event
 
-Per the line-by-line mapping in [`references/open-transcripts/mappings/claude-code.md`](../../../../references/open-transcripts/mappings/claude-code.md):
+Per the line-by-line mapping in the `open-transcripts-claude-code-mapping` reference:
 
 - `user` + text content blocks → `UserMessage` event.
 - `user` + `tool_result` block → `ToolResult` event.
@@ -98,7 +97,7 @@ Subagents may themselves spawn subagents; the same recursion applies. No depth l
 - [ ] Pass 2: map each line to one or more OT events. Preserve original `uuid` as `id`, `parentUuid` as `parent_id`, `timestamp` as `ts`.
 - [ ] Pass 3: build the `tool_use.id → agentId` map. For each spawn, recursively transform the child JSONL and link via `parent` + `SubagentSpawn.spawned_transcript_id`.
 - [ ] Pass 4: assemble the wrapper, compute `final_metrics`, attach `provider`.
-- [ ] Validate against the invariants in `transcript.md` ("Invariants a Transcript must satisfy"):
+- [ ] Validate against the invariants in the `open-transcripts-transcript` reference ("Invariants a Transcript must satisfy"):
   - `events[]` sorted by `ts`.
   - Every `SubagentSpawn` has a matching entry in `subagents[]` (same level) and vice versa.
   - No `undefined`; optional fields are omitted or `null`.
@@ -106,7 +105,7 @@ Subagents may themselves spawn subagents; the same recursion applies. No depth l
 
 ## Implementation notes
 
-- **No LLM, no heuristics.** This skill is deterministic. If the mapping is ambiguous, fix [`mappings/claude-code.md`](../../../../references/open-transcripts/mappings/claude-code.md) first, then this skill.
+- **No LLM, no heuristics.** This skill is deterministic. If the mapping is ambiguous, that's a gap in the `open-transcripts-claude-code-mapping` reference — flag it so the reference can be clarified at its source, rather than papering over it here.
 - **Recursion shares one redaction pass.** Read each JSONL once; don't re-redact per pass.
 - **Streaming vs in-memory.** For session files under ~50 MB, build the whole event array in memory. Above that, stream the JSONL but still emit a single JSON document at the end — the wrapper composes better that way.
 - **Reuse prior art.** The JSONL parser and redaction regexes come from `pulsemcp/agentic-engineering-infra`'s `transcript-export.py`; don't reinvent them.
@@ -117,11 +116,14 @@ Subagents may themselves spawn subagents; the same recursion applies. No depth l
 - Decomposing the Transcript into Segments — that's tier 2 (`decompose-into-transcript-segments`).
 - Any analysis or scoring — all `analyze-*` skills are downstream of tier 2.
 
-## Mapping maintenance contract
+## When the Claude Code format drifts
 
-When Claude Code adds, renames, or removes a JSONL field:
+This skill is deterministic, so a CC JSONL field it doesn't recognize doesn't crash it — the field surfaces as a `SystemEvent` with `subtype = "unmapped"` and the raw line lands in `provider.raw.unmapped_lines[]`. That's the signal that the format has drifted.
 
-1. Update [`references/open-transcripts/mappings/claude-code.md`](../../../../references/open-transcripts/mappings/claude-code.md) **first** to reflect the new shape.
-2. Update this skill's transformation logic to match.
-3. Update the example fixtures in [`references/open-transcripts/examples/`](../../../../references/open-transcripts/examples/) if a documented field shape changed.
-4. If a CC field shape change forces a breaking change to OT itself, bump `schema_version` per the policy in [`references/open-transcripts/README.md`](../../../../references/open-transcripts/README.md).
+When you see unmapped lines, **flag it** — don't quietly absorb it. Surface for the user that:
+
+- The `open-transcripts-claude-code-mapping` reference is the source of truth for the CC → OT shape, and it appears to have drifted — it's the first thing that should be reconciled.
+- This skill's transformation logic, and the `open-transcripts` example fixtures, would then follow the reference.
+- If a CC field-shape change forces a breaking change to OpenTranscripts itself, that's a `schema_version` bump per the policy in the `open-transcripts` reference.
+
+The fixes themselves belong at each artifact's source of truth, behind the normal PR gate — this skill's job at runtime is to **detect the drift and make the user aware of it**, precisely (which fields, which lines), not to patch anything in place.

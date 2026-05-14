@@ -2,12 +2,12 @@
 name: learn-from-segment-corrections
 description: >
   Read the human corrections captured in one or more segments.reviewed.json
-  files (produced by review-transcript-segments) and turn them into concrete,
-  proposed improvements to the decompose-into-transcript-segments skill — so
-  the decomposer makes the same mistake less often next time. Consumes the
+  files (produced by review-transcript-segments) and surface them as flagged
+  improvement opportunities for the decomposition heuristics. Consumes the
   append-only correction log (field edits, splits, merges, context notes),
-  clusters it into recurring patterns, and emits a proposal of specific
-  heuristic / wording changes for human review. Use this skill after a few
+  clusters it into recurring patterns, diagnoses which heuristic misfired and
+  in which direction, and writes that up for a human to act on. It flags
+  opportunities — it does not edit any skill. Use this skill after a few
   transcripts have been reviewed, or whenever you want to close the loop
   between human review and the draft generator. Optional sibling of
   review-transcript-segments.
@@ -16,9 +16,11 @@ user-invocable: true
 
 # Learn from segment corrections
 
-`review-transcript-segments` captures, in structured form, every place a human disagreed with the decomposer's draft. This skill is the **other half of that loop**: it reads those corrections and proposes how to change `decompose-into-transcript-segments` so the decomposer drifts toward what the human would have done.
+`review-transcript-segments` captures, in structured form, every place a human disagreed with the decomposer's draft. This skill is the **other half of that loop**: it reads those corrections, finds the patterns in them, and **flags concrete improvement opportunities** for the `decompose-into-transcript-segments` heuristics — so a human knows exactly where the decomposer is drifting from what they'd have done.
 
-Without this skill, review is a one-shot cleanup. With it, every review makes the next decomposition measurably better.
+It **flags opportunities; it does not apply them.** This skill never edits `decompose-into-transcript-segments` (or any other skill). The skill files visible at runtime are a deployed copy — their source of truth lives elsewhere — so the right move is always to *surface* the opportunity for a human, not to patch the copy in place.
+
+Without this skill, review is a one-shot cleanup. With it, every review tells you something actionable about the draft generator.
 
 ## Inputs
 
@@ -26,21 +28,21 @@ Without this skill, review is a one-shot cleanup. With it, every review makes th
 
 ## Outputs
 
-- **`segment-correction-learnings.md`** — written to the first `tmp_dir` (or a path the caller specifies). A proposal, not an applied change. It contains:
+- **`segment-correction-learnings.md`** — written to the first `tmp_dir` (or a path the caller specifies). A write-up of flagged opportunities for a human, not an applied change. It contains:
   - **Correction patterns** — the corrections clustered by what they have in common (e.g. "the decomposer keeps marking agent-source pivots as `New` when the human reclassifies them `Correction`").
-  - **Proposed skill changes** — for each pattern, a specific, quotable edit to `decompose-into-transcript-segments/SKILL.md` (usually its "Heuristics for labeling" section) or to the methodology in `references/open-transcripts/schemas/transcript-segment.md`. Each proposal cites the corrections that motivate it.
+  - **Flagged opportunities** — for each pattern, which `decompose-into-transcript-segments` heuristic appears to be misfiring and **in which direction** (too aggressive / too conservative / missing entirely), with the corrections that motivate it cited as evidence. Describe the opportunity precisely enough that a human can act on it — but stop there: don't write a ready-to-paste edit, and don't point at skill files by path.
   - **Open questions** — corrections that don't generalize yet, or that conflict with each other, flagged for a human to weigh in.
 
-Applying the proposal is a **separate, human-gated step** — this skill proposes; a human (or a follow-up edit) decides.
+This skill **flags; it does not apply.** Whoever picks up the write-up decides whether and how to change the decomposer, and makes that change at its source of truth through the normal PR gate.
 
 ## Sequencing checklist
 
 - [ ] Load every `segments.reviewed.json` and pull its `review.log` (the append-only correction log) plus the per-Segment `review.corrections` stamps
 - [ ] Bucket each log entry by type — `field`, `split`, `merge`, `note` — and, for `field` edits, by the dotted `field` path (`trigger.kind`, `goal.kind`, `outcome.kind`, `meta.event_range.*`, …)
 - [ ] **Cluster within buckets**: a `before → after` direction that repeats is a pattern. Read the attached `note` entries — they are the human's own explanation of *why* the draft was wrong, and are the highest-signal input
-- [ ] For each cluster, **trace it back to a rule** in `decompose-into-transcript-segments/SKILL.md` or `transcript-segment.md` — which heuristic produced the wrong draft? Was a heuristic missing entirely?
-- [ ] Draft a **specific, quotable change** to that rule. Vague advice ("be more careful about Triggers") is useless; "in 'Heuristics for labeling', add: a `UserMessage` that only adds a fact without changing the ask is *not* a Correction" is actionable
-- [ ] Separate **generalizable** corrections from **one-offs** — a correction that fired once, or that contradicts another correction, goes in "Open questions", not "Proposed skill changes"
+- [ ] For each cluster, **trace it back to a heuristic** in `decompose-into-transcript-segments` (or to the segmentation methodology in the `transcript-segment` reference) — which heuristic produced the wrong draft? Was a heuristic missing entirely?
+- [ ] Describe the opportunity **specifically and directionally**. Vague advice ("be more careful about Triggers") is useless; "the decomposer's Correction-vs-New heuristic is too broad — it's flagging `UserMessage`s that only add a fact without changing the ask" is actionable. Cite the corrections; don't write the patch
+- [ ] Separate **generalizable** corrections from **one-offs** — a correction that fired once, or that contradicts another correction, goes in "Open questions", not "Flagged opportunities"
 - [ ] Write `segment-correction-learnings.md` and print its path to stdout
 
 ## How to read the correction log
@@ -62,10 +64,10 @@ Each `segments.reviewed.json` carries `review.log` — a flat, time-ordered list
 ## Out of scope
 
 - Capturing corrections — that's `review-transcript-segments`.
-- Actually editing `decompose-into-transcript-segments` — this skill *proposes*; applying the proposal is a separate human-gated step (a normal code change, reviewed via PR).
-- Cross-transcript *analysis* findings — that's tier 5. This skill is narrowly about improving the decomposer from its own review history.
+- Editing `decompose-into-transcript-segments` or any other skill — this skill **flags opportunities for a human**; it never patches a skill. The deployed skill files are a copy; changes belong at the source of truth, behind the normal PR gate.
+- Cross-transcript *analysis* findings — that's tier 5. This skill is narrowly about surfacing what the decomposer's own review history reveals.
 
 ## Notes
 
 - This skill is **only as good as the review volume**. Run it after several transcripts have been through `review-transcript-segments`, not after one.
-- Conflicting corrections are signal too: if one reviewer merges what another splits, the methodology itself is ambiguous — that belongs in "Open questions" and may warrant a `transcript-segment.md` clarification rather than a heuristic tweak.
+- Conflicting corrections are signal too: if one reviewer merges what another splits, the methodology itself is ambiguous — that belongs in "Open questions", and is worth flagging as a possible gap in the `transcript-segment` segmentation methodology rather than a decomposer heuristic.

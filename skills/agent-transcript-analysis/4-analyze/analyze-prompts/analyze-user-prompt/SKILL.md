@@ -55,7 +55,7 @@ Per-user-Trigger analyzer. Invoked once per Segment whose `trigger.source == "us
 
 ## Notes
 
-- **New vs Correction comes from Tier 2.** Don't re-derive it from message text; use `segment.trigger.kind`. Per `references/transcript-segment.md`, the segmenter's heuristics (Correction phrasing at the head of the next Segment, etc.) are authoritative.
+- **New vs Correction comes from Tier 2.** Don't re-derive it from message text; use `segment.trigger.kind`. Per the `transcript-segment` reference, the segmenter's heuristics (Correction phrasing at the head of the next Segment, etc.) are authoritative.
 - **A user-source Correction trigger is the single strongest signal in this whole pipeline.** Any Segment immediately followed by a user-source Correction is a candidate for either a prompting fix, a Skill, or an MCP server. Even when the local Outcome is Success. (Agent-source Correction is softer — flag it but don't escalate as aggressively.)
 - **Don't draft Skill or MCP artifacts here.** That's the job of `analyze-skill-gaps` / `analyze-mcp-gaps`. Set `recommendation_route` and let the orchestrator forward.
 - **Ambition checks are a separate skill.** "Was this user-source New trigger scoped right?" lives in `analyze-prompt-ambition` — don't duplicate it here.
