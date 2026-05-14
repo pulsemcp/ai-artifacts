@@ -26,13 +26,15 @@ agent-transcript-analysis/
     decompose-agent-transcript-into-transcript-segments/
   3-orchestrate/          # tier 3: drive fan-out and aggregation (single skill)
     analyze-agent-transcript/
-  4-analyze/              # tier 4: per-Segment analyzers (4 buckets) + cross-transcript
+  4-analyze/              # tier 4: per-Segment analyzers (4 buckets) + cross-transcript + review loop
     analyze-outcomes/         { analyze-failure-hypothesis, analyze-segment-efficiency }
     analyze-prompts/          { analyze-user-prompt, analyze-prompt-ambition,
                                 pull-together-goal-context }
     analyze-skills/           { trigger, action, gaps }
     analyze-mcp/              { trigger, action, gaps }
     analyze-cross-transcript/ { analyze-cross-transcript-patterns }
+    review-analysis/                  # human-review UI over any findings.<kind>.json draft
+    learn-from-analysis-corrections/  # cluster review corrections; flag tier-4 analyzer fixes
 ```
 
 Tier 1 → 2 → 3 → 4. The `analyze-cross-transcript` bucket in tier 4 runs separately from the per-Segment buckets, consuming the consolidated outputs of many Tier 3 reports at once.
@@ -85,6 +87,8 @@ flowchart TD
         subgraph T4X["analyze-cross-transcript"]
             XT["<b>analyze-cross-transcript-patterns</b><br/>many consolidated reports to patterns no single transcript reveals"]
         end
+        RA["<b>review-analysis</b><br/>optional human-review UI over any findings draft; writes findings.kind.reviewed.json"]
+        LAC["<b>learn-from-analysis-corrections</b><br/>cluster review corrections; flag tier-4 analyzer heuristic fixes"]
     end
 
     FA -->|pick session id| GET
@@ -105,6 +109,10 @@ flowchart TD
     T4S --> ORCH
     T4M --> ORCH
     ORCH -->|consolidated report, one per transcript| XT
+    ORCH -.->|findings drafts: outcomes / prompts / skills / mcp| RA
+    XT -.->|findings.cross-transcript.json| RA
+    RA -->|reviewed findings + correction log| LAC
+    LAC -.->|flags heuristic fixes| T4O & T4P & T4S & T4M & T4X
 ```
 
 ## Design decisions

@@ -24,7 +24,9 @@
       "analyze-mcp-trigger-performance",
       "analyze-mcp-action-performance",
       "analyze-mcp-gaps",
-      "analyze-cross-transcript-patterns"
+      "analyze-cross-transcript-patterns",
+      "review-analysis",
+      "learn-from-analysis-corrections"
     ],
     "mcp_servers": [],
     "hooks": [],

@@ -54,6 +54,18 @@ A Markdown + JSON report with these sections:
   would close the gap.
 ```
 
+### Reviewable intermediate: `findings.cross-transcript.json`
+
+Alongside the report, write the flat list of cross-cutting conclusions to the
+first input report's `tmp_dir` as `findings.cross-transcript.json`, in the
+envelope `{kind: "cross-transcript", items: [{id, …}]}` — one item per finding
+across all five sections. This is the **reviewable intermediate**: it is the
+`cross-transcript` bucket `review-analysis` opens in a human-correction UI, and
+`learn-from-analysis-corrections` turns those corrections into flagged
+improvement opportunities for this analyzer. Emitting it is best-effort — the
+report stands on its own — but it is what plugs cross-transcript analysis into
+the tier-4 review loop.
+
 ## Sequencing checklist
 
 - [ ] Load every input report's `segments.json` and aggregated recommendations
@@ -64,6 +76,7 @@ A Markdown + JSON report with these sections:
 - [ ] **Cross-session gaps**: deduplicate the Skill-gap and MCP-gap proposals across reports; a proposal that surfaces in ≥ 2 reports gets promoted with a stronger rationale
 - [ ] **Time-spend patterns**: estimate a human counterfactual for each Segment cluster; flag those where the median agent time is ≥ 5× the estimate
 - [ ] Cross-check every recommendation against the philosophy docs before emitting
+- [ ] Write the flat list of findings to the first input report's `tmp_dir` as `findings.cross-transcript.json` — the reviewable intermediate `review-analysis` consumes
 
 ## Notes
 

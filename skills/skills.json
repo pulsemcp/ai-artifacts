@@ -116,5 +116,15 @@
     "description": "Cross-cutting analyzer. Given the consolidated reports of several already-analyzed transcripts, surface patterns no single transcript reveals: hindsight-as-foresight Segment patterns, recurring user prompts, deduped Skill/MCP gaps, and time-spend patterns.",
     "path": "agent-transcript-analysis/4-analyze/analyze-cross-transcript/analyze-cross-transcript-patterns",
     "references": ["philosophy-on-skills", "philosophy-on-mcp", "transcript-segment"]
+  },
+  "review-analysis": {
+    "title": "Review Analysis",
+    "description": "Open a localhost UI to audit and correct the AI-drafted findings a tier-4 analyzer produced — findings.<kind>.json, one flat list of conclusions per bucket (outcomes, prompts, skills, mcp, cross-transcript). Thumbs-up, correct, or reject each finding; saving writes findings.<kind>.reviewed.json next to the draft with full correction provenance. Optional human review checkpoint for tier 4.",
+    "path": "agent-transcript-analysis/4-analyze/review-analysis"
+  },
+  "learn-from-analysis-corrections": {
+    "title": "Learn From Analysis Corrections",
+    "description": "Read the human corrections captured in findings.<kind>.reviewed.json files, cluster them into recurring patterns, and surface flagged improvement opportunities for the tier-4 analyzers that drafted the findings. Flags opportunities; never edits a skill. The tier-4 twin of learn-from-segment-corrections.",
+    "path": "agent-transcript-analysis/4-analyze/learn-from-analysis-corrections"
   }
 }

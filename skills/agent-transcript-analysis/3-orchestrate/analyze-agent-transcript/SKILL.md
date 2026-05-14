@@ -64,6 +64,10 @@ A structured report (Markdown + JSON sidecar) with this shape:
 
 Every recommendation must be specific enough to act on — to open a PR, to rewrite a prompt, or to file an issue.
 
+### Reviewable intermediate: `findings.<kind>.json`
+
+As it aggregates, the orchestrator also writes each bucket's findings to `tmp_dir` as `findings.outcomes.json`, `findings.prompts.json`, `findings.skills.json`, and `findings.mcp.json` — flat lists of the conclusions that fed the report, one file per bucket, in the envelope `{kind, items: [{id, …}]}`. These are the **reviewable intermediate**: `review-analysis` opens any of them in a human-correction UI, and `learn-from-analysis-corrections` turns those corrections into flagged improvement opportunities for the analyzers. Emitting them is best-effort — the report stands on its own — but it is what makes the tier-4 review loop possible.
+
 ## Sequencing checklist
 
 - [ ] **Pick up external context if it exists.** Check `tmp_dir` for `external-context.json` (prefer `external-context.reviewed.json`). If present, hold it as shared context for tier 2 and every tier-4 analyzer. If absent, proceed — it is best-effort, never required.
@@ -85,6 +89,7 @@ Every recommendation must be specific enough to act on — to open a PR, to rewr
     - [ ] `analyze-mcp-action-performance`
     - [ ] `analyze-mcp-gaps` — seeded by any `recommendation_seed` from this Segment's failure hypothesis and any deterministic-trigger candidate from `analyze-prompt-ambition`
 - [ ] Aggregate per-Segment recommendations across the whole session, deduping similar suggestions
+- [ ] Write each bucket's findings to `tmp_dir` as `findings.<kind>.json` (`outcomes` / `prompts` / `skills` / `mcp`) — the reviewable intermediate `review-analysis` consumes
 - [ ] Cross-reference each surviving recommendation against the philosophy docs; drop those that contradict, or note the contradiction so the human reviewer can resolve it
 - [ ] Compute the **distance from ideal end-state** section (counts of Failures; Correction triggers broken out by user-source vs agent-source; deterministic-trigger candidates among user-source New triggers; total wall-clock vs counterfactual sum). Per the `transcript-segment` reference, this is the north-star metric block
 - [ ] Emit the Markdown report and the JSON sidecar. Reference `segments.json` and `flamegraph.html` paths but do not re-emit their contents
@@ -94,4 +99,5 @@ Every recommendation must be specific enough to act on — to open a PR, to rewr
 - Acquiring the transcript — that's `get-claude-code-transcript-from-local`.
 - Producing `segments.json` — that's `decompose-agent-transcript-into-transcript-segments`.
 - The actual per-Segment scoring — that's the tier-4 analyzers below this orchestrator.
+- Human review of the findings — that's `review-analysis`, the optional tier-4 checkpoint over the `findings.<kind>.json` files this skill emits.
 - Cross-session patterns — that's `analyze-cross-transcript-patterns`, in tier 4's `analyze-cross-transcript` bucket.
