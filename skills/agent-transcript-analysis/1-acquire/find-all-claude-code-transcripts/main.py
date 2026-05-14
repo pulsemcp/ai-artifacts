@@ -58,6 +58,10 @@ CACHE_FILE = CACHE_DIR / f"preview-index-v{CACHE_VERSION}.json"
 INDEX_LOCK = threading.Lock()
 INDEX: dict[str, dict[str, Any]] = {}
 INDEX_DIRTY = 0
+# Set once the on-disk cache has been read in. Until then a flush would write
+# an incomplete (often empty) snapshot over a good cache — e.g. if the process
+# dies during startup before bootstrap finishes ``json.load``-ing the file.
+INDEX_LOADED = False
 INDEX_STATE: dict[str, Any] = {
     "indexed": 0,
     "total": 0,
@@ -191,37 +195,52 @@ def _build_preview(jsonl_path: Path) -> dict[str, Any]:
 
 def _load_disk_cache() -> None:
     """Hydrate ``INDEX`` from the on-disk cache. Tolerates a corrupt/missing file."""
-    if not CACHE_FILE.exists():
-        return
+    global INDEX_LOADED
     try:
-        with CACHE_FILE.open("r", encoding="utf-8") as f:
-            data = json.load(f)
-    except (OSError, json.JSONDecodeError) as e:
-        print(f"[index] cache load failed, starting clean: {e}", flush=True)
-        return
-    if not isinstance(data, dict):
-        return
-    with INDEX_LOCK:
-        for k, v in data.items():
-            if not (isinstance(k, str) and isinstance(v, dict)):
-                continue
-            INDEX[k] = v
-            path, _, mtime_str = k.rpartition(":")
-            try:
-                mt = float(mtime_str)
-            except ValueError:
-                continue
-            prev = INDEX_LATEST_BY_PATH.get(path)
-            if prev is None or mt > prev[0]:
-                INDEX_LATEST_BY_PATH[path] = (mt, k)
-    print(f"[index] loaded {len(INDEX)} cached previews from {CACHE_FILE}", flush=True)
+        if not CACHE_FILE.exists():
+            return
+        try:
+            with CACHE_FILE.open("r", encoding="utf-8") as f:
+                data = json.load(f)
+        except (OSError, json.JSONDecodeError) as e:
+            print(f"[index] cache load failed, starting clean: {e}", flush=True)
+            return
+        if not isinstance(data, dict):
+            return
+        with INDEX_LOCK:
+            for k, v in data.items():
+                if not (isinstance(k, str) and isinstance(v, dict)):
+                    continue
+                INDEX[k] = v
+                path, _, mtime_str = k.rpartition(":")
+                try:
+                    mt = float(mtime_str)
+                except ValueError:
+                    continue
+                prev = INDEX_LATEST_BY_PATH.get(path)
+                if prev is None or mt > prev[0]:
+                    INDEX_LATEST_BY_PATH[path] = (mt, k)
+        print(f"[index] loaded {len(INDEX)} cached previews from {CACHE_FILE}", flush=True)
+    finally:
+        # Mark loaded even on the early-return paths (missing/corrupt file):
+        # the load *attempt* is complete, so a subsequent flush is now safe.
+        INDEX_LOADED = True
 
 
 def _flush_disk_cache() -> None:
-    """Atomically rewrite the on-disk cache from the current ``INDEX`` snapshot."""
-    CACHE_DIR.mkdir(parents=True, exist_ok=True)
+    """Atomically rewrite the on-disk cache from the current ``INDEX`` snapshot.
+
+    Refuses to run before the on-disk cache has been read in, and refuses to
+    write an empty snapshot — either case would clobber a good cache with
+    nothing if the process exits during startup (port-bind failure, SIGTERM).
+    """
+    if not INDEX_LOADED:
+        return
     with INDEX_LOCK:
         snapshot = dict(INDEX)
+    if not snapshot:
+        return
+    CACHE_DIR.mkdir(parents=True, exist_ok=True)
     tmp = CACHE_FILE.with_suffix(CACHE_FILE.suffix + ".tmp")
     try:
         with tmp.open("w", encoding="utf-8") as f:
@@ -509,11 +528,18 @@ def main(argv: list[str] | None = None) -> int:
     threading.Thread(
         target=_start_indexing, args=(args.workers,), name="index-bootstrap", daemon=True
     ).start()
-    atexit.register(_flush_disk_cache)
+
+    # allow_reuse_address must be set on the class before construction —
+    # ThreadingTCPServer.__init__ calls server_bind() inline. Setting it on the
+    # instance afterward is a no-op and leaves quick restarts hitting TIME_WAIT.
+    class _Server(socketserver.ThreadingTCPServer):
+        allow_reuse_address = True
 
     addr = ("127.0.0.1", args.port)
-    httpd = socketserver.ThreadingTCPServer(addr, Handler)
-    httpd.allow_reuse_address = True
+    httpd = _Server(addr, Handler)
+    # Register the cache flush only once the server is actually up: a flush
+    # triggered by a failed bind would race the still-loading bootstrap thread.
+    atexit.register(_flush_disk_cache)
     url = f"http://127.0.0.1:{args.port}/"
     print(f"listing UI on {url}", flush=True)
     print(

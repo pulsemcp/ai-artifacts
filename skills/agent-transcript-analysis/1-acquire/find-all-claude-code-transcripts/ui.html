@@ -65,19 +65,22 @@
   th.sort-active .arrow { opacity: 1; }
 
   th.col-check, td.check { width: 28px; padding-right: 0; }
-  th.col-id, td.session { width: 110px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; white-space: nowrap; }
-  th.col-project, td.project { width: 180px; color: var(--muted);
-                               overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  th.col-project, td.project { width: 260px; color: var(--muted); overflow: hidden; }
+  /* Project slugs and branch names matter most at their tail end, so clip the
+     FRONT: direction:rtl moves the ellipsis to the start of the line while the
+     ASCII content itself still renders left-to-right. */
+  td.project .plabel { display: block; overflow: hidden; text-overflow: ellipsis;
+                       white-space: nowrap; direction: rtl; text-align: left; }
   td.project .branch { display: block; font-size: 11px; color: var(--accent);
                        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-                       overflow: hidden; text-overflow: ellipsis; }
+                       overflow: hidden; text-overflow: ellipsis;
+                       white-space: nowrap; direction: rtl; text-align: left; }
   td.snippet .first { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   td.snippet .last { display: block; color: var(--muted); font-style: italic; margin-top: 2px;
                      overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   td.snippet .placeholder { color: var(--muted); opacity: .5; }
   th.col-turns, td.turns { width: 70px; text-align: right; font-variant-numeric: tabular-nums; }
   th.col-tokens, td.tokens { width: 88px; text-align: right; font-variant-numeric: tabular-nums; }
-  th.col-size, td.size { width: 80px; text-align: right; font-variant-numeric: tabular-nums; color: var(--muted); }
   th.col-when, td.when { width: 100px; white-space: nowrap; color: var(--muted); font-size: 12px; }
   th.col-actions, td.actions { width: 84px; white-space: nowrap; text-align: right; }
   td.turns.dim, td.tokens.dim { color: var(--muted); opacity: .55; }
@@ -123,7 +126,7 @@
 <div class="banner">
   <strong>This UI just picks transcripts.</strong> The actual analysis runs inside Claude Code (Skills can't be invoked from a browser). To analyze:
   <ol>
-    <li>Filter / sort to find the sessions you care about (column headers sort; the bar below filters). <em>Defaults to the last 7 days with ≥10k tokens — hit Reset to see everything.</em></li>
+    <li>Filter / sort to find the sessions you care about (column headers sort; the bar below filters). <em>Defaults to the last 7 days with ≥200k tokens — hit Reset to see everything.</em></li>
     <li>Tick the boxes (or click rows) for the transcripts you want.</li>
     <li>Copy the prompt from the bar at the bottom and paste it into a Claude Code session with this plugin installed.</li>
   </ol>
@@ -161,12 +164,10 @@
   <thead>
     <tr>
       <th class="col-check"><input type="checkbox" class="checkbox" id="check-all" title="select all visible"></th>
-      <th class="col-id sortable" data-sort="session_id">Session<span class="arrow"></span></th>
       <th class="col-project sortable" data-sort="project">Project / Branch<span class="arrow"></span></th>
       <th class="col-snippet">Snippet</th>
       <th class="col-turns sortable" data-sort="turns" title="user + assistant turns">Turns<span class="arrow"></span></th>
       <th class="col-tokens sortable" data-sort="tokens" title="input + output + cache tokens">Tokens<span class="arrow"></span></th>
-      <th class="col-size sortable" data-sort="size">Size<span class="arrow"></span></th>
       <th class="col-when sortable sort-active" data-sort="when">When<span class="arrow">↓</span></th>
       <th class="col-actions"></th>
     </tr>
@@ -216,7 +217,7 @@ const RENDER_LIMIT = 500;
 // token floor (the cached system prompt), so the meaningful "real work" cut is
 // well above that — 50k. The Reset button restores these defaults.
 const DEFAULT_SINCE_DAYS = 7;
-const DEFAULT_MIN_TOKENS = 50000;
+const DEFAULT_MIN_TOKENS = 200000;
 
 let SORT = { key: 'when', dir: 'desc' };
 
@@ -246,7 +247,6 @@ function fmtWhen(iso, fallbackEpoch) {
   if (diff < 86400*7) return Math.floor(diff/86400) + 'd ago';
   return d.toISOString().slice(0,10);
 }
-function shortId(id) { return id.length > 13 ? id.slice(0,8) + '…' + id.slice(-4) : id; }
 function escapeHTML(s) {
   return String(s).replace(/[&<>"']/g, c => ({
     '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
@@ -334,11 +334,9 @@ function sortRows(rows) {
     return 0;
   };
   const accessor = {
-    session_id: (s) => s.session_id,
     project: (s) => (s.project_label || s.project_slug || '').toLowerCase(),
     turns: (s) => s._turns,
     tokens: (s) => s._tokens,
-    size: (s) => s.size_bytes,
     when: (s) => s._whenEpoch,
   }[key] || ((s) => s.mtime);
   rows.sort((a, b) => cmp(accessor(a), accessor(b)));
@@ -420,18 +418,17 @@ function patchRow(tr, s) {
     ? `in ${fmtNumLong(p.input_tokens)} / out ${fmtNumLong(p.output_tokens)} / cache_c ${fmtNumLong(p.cache_creation_tokens)} / cache_r ${fmtNumLong(p.cache_read_tokens)}${p.model ? ` • ${p.model}` : ''}`
     : '';
 
+  const projLabel = escapeHTML(s.project_label || s.project_slug);
   tr.innerHTML = `
     <td class="check"><input type="checkbox" class="checkbox row-check" ${SELECTED.has(s.session_id) ? 'checked' : ''}></td>
-    <td class="session" title="${escapeHTML(s.session_id)}">${shortId(s.session_id)}</td>
-    <td class="project" title="${escapeHTML(s.project_label || s.project_slug)}">
-      ${escapeHTML(s.project_label || s.project_slug)}${branchPill}
+    <td class="project" title="${projLabel}">
+      <span class="plabel">${projLabel}</span>${branchPill}
     </td>
     <td class="snippet">${snippetHTML}</td>
     <td class="turns ${turns == null ? 'dim' : ''}" title="${turnsTitle}">${fmtNum(turns)}</td>
     <td class="tokens ${tokens == null ? 'dim' : ''}" title="${tokensTitle}">${fmtNum(tokens)}</td>
-    <td class="size" title="${s.size_bytes} bytes">${fmtSize(s.size_bytes)}</td>
     <td class="when" title="${p && p.started_at ? p.started_at : new Date(s.mtime*1000).toISOString()}">${whenStr}</td>
-    <td class="actions"><button class="copy-id">Copy ID</button></td>
+    <td class="actions"><button class="copy-id" title="${escapeHTML(s.session_id)}">Copy ID</button></td>
   `;
 }
 
@@ -552,7 +549,7 @@ document.querySelectorAll('th.sortable').forEach(th => {
       SORT.dir = SORT.dir === 'asc' ? 'desc' : 'asc';
     } else {
       SORT.key = key;
-      SORT.dir = (key === 'session_id' || key === 'project') ? 'asc' : 'desc';
+      SORT.dir = key === 'project' ? 'asc' : 'desc';
     }
     render();
   });
