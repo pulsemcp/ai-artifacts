@@ -39,6 +39,73 @@ Tier 1 → 2 → 3 → 4. Tier 5 sits above all of them, consuming the outputs o
 
 Numbered prefixes only land on grouping folders, never on Skill folders themselves — the Skills spec requires a Skill's folder name to match its `name`.
 
+## Skill flow
+
+How a transcript moves through the skills — every node is a registered Skill with a one-line description; edge labels are what flows between them.
+
+```mermaid
+flowchart TD
+    subgraph T1["Tier 1 · acquire"]
+        FA["<b>find-all-claude-code-transcripts</b><br/>list every local session; browser picker UI"]
+        GO["<b>get-one-claude-code-transcript</b><br/>session id to one transcript.json, subagents embedded"]
+        CC["<b>claude-code-to-open-transcript</b><br/>deterministic CC JSONL to OpenTranscripts mapping"]
+    end
+
+    subgraph T2["Tier 2 · decompose"]
+        DEC["<b>decompose-into-transcript-segments</b><br/>transcript.json to recursive Segment tree + flamegraph"]
+        REV["<b>review-transcript-segments</b><br/>optional human-review UI; writes segments.reviewed.json"]
+        LEARN["<b>learn-from-segment-corrections</b><br/>cluster human corrections; flag decomposer heuristic fixes"]
+    end
+
+    subgraph T3["Tier 3 · orchestrate"]
+        ORCH["<b>analyze-agent-transcript</b><br/>entry point; drives tiers 2 + 4 into one consolidated report"]
+    end
+
+    subgraph T4["Tier 4 · analyze — per-Segment analyzers"]
+        subgraph T4O["analyze-outcomes"]
+            FH["<b>analyze-failure-hypothesis</b><br/>improvement hypothesis per Failure / retro-Failure"]
+            SE["<b>analyze-segment-efficiency</b><br/>flag wasteful branches + model-tier mismatch"]
+        end
+        subgraph T4P["analyze-prompts"]
+            UP["<b>analyze-user-prompt</b><br/>classify the prompt; judge whether the Goal closed the loop"]
+            PA["<b>analyze-prompt-ambition</b><br/>flag under-scoped / should-be-deterministic prompts"]
+            GC["<b>pull-together-goal-context</b><br/>pull git + external context when the Goal isn't self-evident"]
+        end
+        subgraph T4S["analyze-skills"]
+            STP["<b>analyze-skill-trigger-performance</b><br/>Skill false positives / false negatives"]
+            SAP["<b>analyze-skill-action-performance</b><br/>Skills that ran: helpfulness, token cost, closed-loop"]
+            SG["<b>analyze-skill-gaps</b><br/>flag moments a missing Skill would have helped"]
+        end
+        subgraph T4M["analyze-mcp"]
+            MTP["<b>analyze-mcp-trigger-performance</b><br/>MCP tool false positives / false negatives"]
+            MAP["<b>analyze-mcp-action-performance</b><br/>MCP calls that ran: response shape, token cost, closed-loop"]
+            MG["<b>analyze-mcp-gaps</b><br/>flag missing MCP servers / tools"]
+        end
+    end
+
+    subgraph T5["Tier 5 · cross-transcript"]
+        XT["<b>analyze-cross-transcript-patterns</b><br/>many reports to patterns no single transcript reveals"]
+    end
+
+    FA -->|pick session id| GO
+    GO -->|main + each subagent| CC
+    CC -->|transcript.json| ORCH
+    ORCH -->|invokes| DEC
+    DEC -->|segments.json| ORCH
+    DEC -.->|optional checkpoint| REV
+    REV -->|correction logs| LEARN
+    LEARN -.->|flags heuristic fixes| DEC
+    ORCH -->|fans out per Segment| T4O
+    ORCH --> T4P
+    ORCH --> T4S
+    ORCH --> T4M
+    T4O -->|findings| ORCH
+    T4P --> ORCH
+    T4S --> ORCH
+    T4M --> ORCH
+    ORCH -->|consolidated report, one per transcript| XT
+```
+
 ## Design decisions
 
 - **Two data primitives, one downstream contract.** `Transcript` (tier 1 output) carries vendor-coupled detail; `TranscriptSegment` (tier 2 output) is the analysis tree. Tiers 3-5 read only `segments.json` and dereference event ids back into `transcript.json` for evidence. If either is wrong, fix the producing tier and re-run — don't patch around it downstream.
