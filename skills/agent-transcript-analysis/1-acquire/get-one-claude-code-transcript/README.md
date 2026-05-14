@@ -1,15 +1,18 @@
 # `get-one-claude-code-transcript`
 
-Given a session id, gathers the main transcript **plus every subagent transcript spawned from it** into a single self-contained tmp folder. Use this immediately before any `analyze-*` skill.
+Given a session id, produces a single OpenTranscripts `transcript.json` containing the main session plus every subagent it spawned. The output is self-contained — every downstream skill reads from this one file.
 
 ## How it plugs in
 
 Upstream: usually `find-all-claude-code-transcripts`, sometimes a session id the user already has.
-Downstream: every `analyze-*` skill reads from the tmp folder this produces. The folder is the single source of truth — no analyzer should reach back into `~/.claude/projects/` directly.
+
+Downstream: tier 2 (`decompose-into-transcript-segments`) reads `transcript.json` and builds the Segment tree. All tier-4 analyzers read the Segment tree plus dereference event ids back into the same `transcript.json` for evidence.
+
+This skill is a thin orchestrator. The CC→OT deterministic transformation lives in [`claude-code-to-open-transcript/`](../claude-code-to-open-transcript/).
 
 ## Design decisions
 
-- **Subagents are first-class.** A meaningful chunk of recent agent work happens in subagent transcripts; pulling only the parent JSONL would miss it.
-- **One tmp folder per run.** All downstream skills consume `manifest.json` + `main.jsonl` + `subagents/*.jsonl` from the same directory. Keeps the contract simple.
-- **Redact on the way in.** Secret patterns are applied before files are written, so nothing downstream needs to know about redaction.
-- **Reuse prior-art parsers.** Subagent linkage and redaction patterns come from `pulsemcp/agentic-engineering-infra`; we don't reinvent them.
+- **One self-contained JSON document.** Subagents are embedded under `subagents[]` rather than left as sibling files; downstream consumers don't have to re-link anything.
+- **Transformation is a separate skill.** `claude-code-to-open-transcript/` owns the CC→OT mapping so the contract can be tested in isolation and reused by other entry points.
+- **Redact on the way in.** Secret patterns are applied during transformation, before `transcript.json` is written. Nothing downstream needs to know about redaction.
+- **OpenTranscripts as the contract.** The output shape is governed by [`references/open-transcripts/`](../../../../references/open-transcripts/), not by Claude Code's JSONL format. When CC changes, only the mapping doc + transformation skill change; the wire format readers see is stable.

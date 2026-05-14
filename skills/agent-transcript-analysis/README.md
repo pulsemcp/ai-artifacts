@@ -2,9 +2,14 @@
 
 The full set of Skills bundled by the `agent-transcript-analysis` plugin. Used when someone wants a Claude Code session (or many of them) analyzed for what could have gone better — and what change to Skills / MCP servers / prompting habits would prevent it next time.
 
-## The Transcript Segment is the data primitive
+## Two layers: Transcript and Transcript Segment
 
-Everything in this plugin operates on the recursive **Transcript Segment** tree, not on raw JSONL. The data model — Trigger (kind × source), Goal, Outcome, children — and the ideal end-state lives in [`references/transcript-segment.md`](../../references/transcript-segment.md). Tier 2 produces it; every other tier consumes it.
+Everything in this plugin operates on two layered data primitives, both defined under [`references/open-transcripts/`](../../references/open-transcripts/):
+
+- **`Transcript`** — the OpenTranscripts wrapper. One JSON document per session, with `events[]`, recursive `subagents[]`, and metadata. Vendor-neutral. Tier 1 produces it from Claude Code's JSONL (see [`mappings/claude-code.md`](../../references/open-transcripts/mappings/claude-code.md)).
+- **`TranscriptSegment`** — the analysis tree built over a Transcript. Trigger (kind × source), Goal, Outcome, children. Tier 2 produces it from a Transcript; tiers 3+ consume only Segments.
+
+The split means: a new vendor (Codex, Pi, Cursor) only needs a new mapping doc + transformation skill; the Segment tree and every analyzer downstream work unchanged.
 
 ## How the skills interplay
 
@@ -12,9 +17,10 @@ The folder layout is numbered to mirror the orchestration tiers — `tree` outpu
 
 ```
 agent-transcript-analysis/
-  1-acquire/              # tier 1: pull a session + its subagents into one tmp folder
+  1-acquire/              # tier 1: pull a session + its subagents into one transcript.json
     find-all-claude-code-transcripts/
-    get-one-claude-code-transcript/
+    get-one-claude-code-transcript/        # orchestrator
+    claude-code-to-open-transcript/        # deterministic CC → OpenTranscripts mapping
   2-decompose/            # tier 2: produce the Segment tree (segments.json + flamegraph)
     decompose-into-transcript-segments/
   3-orchestrate/          # tier 3: drive fan-out and aggregation (single skill)
@@ -35,7 +41,8 @@ Numbered prefixes only land on grouping folders, never on Skill folders themselv
 
 ## Design decisions
 
-- **The Transcript Segment is a first-class primitive.** Tier 2 walks raw JSONL once and produces `segments.json` plus a flamegraph; tiers 3-5 read only from `segments.json` and the analyzer outputs. If `segments.json` is wrong, fix tier 2 and re-run — don't patch around it downstream.
+- **Two data primitives, one downstream contract.** `Transcript` (tier 1 output) carries vendor-coupled detail; `TranscriptSegment` (tier 2 output) is the analysis tree. Tiers 3-5 read only `segments.json` and dereference event ids back into `transcript.json` for evidence. If either is wrong, fix the producing tier and re-run — don't patch around it downstream.
+- **OpenTranscripts is the cross-vendor contract.** Tier 1's output shape is governed by [`references/open-transcripts/`](../../references/open-transcripts/), not by any one vendor's JSONL. When CC changes its format, only the mapping doc + the transformation skill change.
 - **Numbered tiers, not flat buckets.** The execution layers (acquire → decompose → orchestrate → analyze → cross-transcript) are visible in the directory tree.
 - **Grouping folders are never Skills.** `1-acquire/`, `2-decompose/`, `3-orchestrate/`, `4-analyze/`, `5-cross-transcript/`, and the per-domain buckets under tier 4 contain no `SKILL.md` of their own. That keeps the spec's "everything under a skill folder belongs to that skill" model intact.
 - **Four tier-4 buckets, three output buckets.** `analyze-outcomes/` is Segment-shaped (failure hypotheses, efficiency); its findings *route* into the three artifact buckets (Prompting / Skills / MCP) via `recommendation_route`. The final report keeps a clean three-bucket structure.

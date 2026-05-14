@@ -18,7 +18,11 @@ The repo is a single [pulsemcp/AIR](https://github.com/pulsemcp/air) catalog: an
 │   ├── references.json            # AIR references index
 │   ├── philosophy-on-skills.md
 │   ├── philosophy-on-mcp.md
-│   └── transcript-segment.md      # data primitive for transcript analysis
+│   └── open-transcripts/          # vendor-neutral data model for coding-agent transcripts
+│       ├── README.md
+│       ├── schemas/               # Transcript wrapper, events, Transcript Segment
+│       ├── mappings/              # e.g. Claude Code JSONL → Transcript
+│       └── examples/              # minimal Transcript / Segment instances
 ├── plugins/
 │   └── plugins.json               # AIR plugin index
 └── hooks/

@@ -7,14 +7,21 @@
   },
   "get-one-claude-code-transcript": {
     "title": "Get One Claude Code Transcript",
-    "description": "Given a session id, materialize the main transcript plus any subagent transcripts into a single tmp folder, ready for analysis.",
-    "path": "agent-transcript-analysis/1-acquire/get-one-claude-code-transcript"
+    "description": "Given a session id, produce a single OpenTranscripts transcript.json — the main session plus every subagent it spawned, linked and embedded in one self-contained document. Thin orchestrator over claude-code-to-open-transcript.",
+    "path": "agent-transcript-analysis/1-acquire/get-one-claude-code-transcript",
+    "references": ["open-transcripts-transcript", "open-transcripts-events", "open-transcripts-claude-code-mapping"]
+  },
+  "claude-code-to-open-transcript": {
+    "title": "Claude Code to OpenTranscripts",
+    "description": "Deterministic transformation: given a Claude Code session JSONL, produce a single OpenTranscripts Transcript JSON — main session plus every subagent linked via the canonical tool_use → tool_result → agentId chain. No LLM, no heuristics; pure field mapping. Owns the canonical CC→OT mapping.",
+    "path": "agent-transcript-analysis/1-acquire/claude-code-to-open-transcript",
+    "references": ["open-transcripts-transcript", "open-transcripts-events", "open-transcripts-claude-code-mapping"]
   },
   "decompose-into-transcript-segments": {
     "title": "Decompose Into Transcript Segments",
-    "description": "Walk a transcript's raw JSONL once and produce the recursive Transcript Segment tree (segments.json) plus an annotated flamegraph. Sole producer of the Segment primitive consumed by every downstream analyzer.",
+    "description": "Walk an OpenTranscripts transcript.json once and produce the recursive Transcript Segment tree (segments.json) plus an annotated flamegraph. Sole producer of the Segment primitive consumed by every downstream analyzer.",
     "path": "agent-transcript-analysis/2-decompose/decompose-into-transcript-segments",
-    "references": ["transcript-segment"]
+    "references": ["transcript-segment", "open-transcripts-transcript", "open-transcripts-events"]
   },
   "analyze-agent-transcript": {
     "title": "Analyze Agent Transcript",
