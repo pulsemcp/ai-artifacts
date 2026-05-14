@@ -10,7 +10,7 @@ So `external-context.json` is treated as a **draft**, not an answer — the same
 
 ## Status
 
-`SKILL.md` and this README are the **design contract**. The localhost server (`main.py` + `ui.html`) is not yet implemented — build it following the `review-transcript-segments` pattern, reusing the correction-provenance approach in `_lib/segment_review.py` (generalized from the Segment tree to the context bundle).
+`SKILL.md` and this README are the **design contract**. The localhost server (`main.py` + `ui.html`) is not yet implemented — build it following the `review-transcript-segments` pattern, reusing the correction-provenance approach from that skill's bundled `segment_review.py` (generalized from the Segment tree to the context bundle). Bundle a self-contained copy of whatever it needs into this skill folder, the same way `review-transcript-segments` and `review-analysis` carry their own modules.
 
 ## Files
 
@@ -40,4 +40,4 @@ tmp_dir/
 - **Same schema, so readers don't care.** Downstream code prefers `external-context.reviewed.json` when present and falls back to the draft — no analyzer needs to know whether a human touched it.
 - **Audit against evidence, not from scratch.** The UI shows each block's `how_found` next to it, so the reviewer is confirming or rejecting a specific inference rather than re-researching the session.
 - **Corrections are signal, but flagged — not applied.** The corrections show where `gather-external-context` mis-inferred; surfacing that as an improvement opportunity for the user is in scope, editing the gatherer is not.
-- **Redact on the way in and the way out.** The evidence preview shipped to the browser and every string written to `external-context.reviewed.json` go through `_lib/redaction.py`.
+- **Trust upstream redaction.** Secret-redaction runs once, at acquire time: `gather-external-context` redacts `external-context.json` as it writes it. The evidence preview and `external-context.reviewed.json` are built from that already-redacted draft, so this skill writes them as-is — no second redaction pass.

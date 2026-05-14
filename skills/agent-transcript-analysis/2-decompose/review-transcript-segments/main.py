@@ -11,11 +11,12 @@ server lets a human audit and correct that draft in a browser:
 - serves a single static ``ui.html`` for editing every field, splitting a leaf
   Segment, merging adjacent siblings, and attaching context notes
 - on Save, writes ``segments.reviewed.json`` next to the draft — the draft is
-  never overwritten — with full correction provenance (see
-  ``_lib/segment_review.py``)
+  never overwritten — with full correction provenance (see the bundled
+  ``segment_review.py``)
 
 Privacy contract (identical to the picker): localhost binding only, no upload
-endpoint, every string is secret-redacted before it reaches the browser or disk.
+endpoint. The ``transcript.json`` and ``segments.json`` this serves were already
+secret-redacted upstream at acquire time, so this server trusts them as-is.
 
 Usage:
     python main.py --tmp-dir /path/to/transcript-tmp-dir
@@ -37,9 +38,7 @@ import webbrowser
 from pathlib import Path
 from typing import Any
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
-
-from _lib.segment_review import (  # noqa: E402
+from segment_review import (
     load_bundle,
     validate_tree,
     write_reviewed,

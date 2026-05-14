@@ -70,6 +70,6 @@ python main.py --tmp-dir /path/to/transcript-tmp-dir [--port 9851] [--no-browser
 
 ## Privacy
 
-- The inference-evidence preview and every string in `external-context.reviewed.json` are secret-redacted (`_lib/redaction.py`) before they reach the browser or disk.
+- Secret-redaction runs once, at acquire time: `gather-external-context` redacts `external-context.json` as it writes it. The inference-evidence preview and `external-context.reviewed.json` are built from that already-redacted draft, so this skill writes them as-is — no second redaction pass.
 - The localhost server has no public binding and no upload endpoint.
 - `external-context.json` and `transcript.json` are never modified.

@@ -21,8 +21,10 @@ This module owns the correction-provenance contract shared by the review UI
   `before`/`after` and an optional context `note`. `learn-from-segment-corrections`
   consumes this log to improve the decompose skill over time.
 
-Privacy contract (same as the rest of the plugin): every string in the
-reviewed document is run through `redact()` before it touches disk.
+Privacy contract (same as the rest of the plugin): the `transcript.json` and
+`segments.json` this operates on were already secret-redacted upstream at
+acquire time, so the reviewed document is written as-is — there is no second
+redaction pass here.
 """
 
 from __future__ import annotations
@@ -34,8 +36,6 @@ import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Iterator
-
-from .redaction import redact, redact_string
 
 # --- enums (mirror references/open-transcripts/schemas/transcript-segment.md) ---
 TRIGGER_KINDS = {"New", "Correction"}
@@ -85,7 +85,7 @@ def _text_from_content(content: Any) -> str:
 
 
 def summarize_event(ev: dict[str, Any]) -> dict[str, Any]:
-    """One redacted, single-line summary of an OT event: ``{id, type, ts, preview}``.
+    """One single-line summary of an OT event: ``{id, type, ts, preview}``.
 
     The preview is type-aware (a ToolCall shows tool name + key argument, a
     UserMessage shows its text, etc.) and capped at ``PREVIEW_MAX_CHARS``.
@@ -133,9 +133,9 @@ def summarize_event(ev: dict[str, Any]) -> dict[str, Any]:
         "id": ev.get("id"),
         "type": etype,
         "ts": ev.get("ts"),
-        # transcript.json is already redacted at build time; redact again here
-        # as defense-in-depth before anything reaches the browser.
-        "preview": redact_string(preview),
+        # transcript.json was already secret-redacted upstream at acquire time,
+        # so the preview is shipped to the browser as-is.
+        "preview": preview,
     }
 
 
@@ -420,7 +420,8 @@ def write_reviewed(
          (``review.edited = true`` + appended to ``review.corrections``).
       3. Validate (warnings only — never blocks the write).
       4. Attach file-level provenance to the root Segment's ``review`` block.
-      5. Redact every string, then atomically replace ``segments.reviewed.json``.
+      5. Atomically replace ``segments.reviewed.json`` (the inputs were already
+         secret-redacted upstream, so no second redaction pass runs here).
 
     Returns ``{path, warnings, log_size}``.
     """
@@ -474,8 +475,9 @@ def write_reviewed(
     root_review["log"] = entries
     root_review["warnings"] = warnings
 
-    # (5) redact, then atomically write
-    doc = redact(root)
+    # (5) atomically write — the transcript.json and segments.json this was
+    #     built from were already secret-redacted upstream at acquire time
+    doc = root
     tmp.mkdir(parents=True, exist_ok=True)
     dest = tmp / REVIEWED_FILENAME
     fd, tmp_name = tempfile.mkstemp(

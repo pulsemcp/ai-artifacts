@@ -69,7 +69,7 @@ One file written into `tmp_dir`:
 - [ ] **Pull request** — resolve the PR the session led to (a PR URL in the transcript, or the branch matched against recent PRs on the repo). Record metadata and a short `diff_summary` — do not inline the full diff
 - [ ] **User context** — gather what's reasonably available about the user's role / team / project. This source set is intentionally thin today; extend this step (and the schema) as new resolvers appear rather than forcing a guess
 - [ ] Consolidate into `external-context.json`. Anything expected-but-missing goes in `unresolved` with a reason — never fabricate a ticket or PR to fill a slot
-- [ ] Redact every fetched string through `_lib/redaction.py` before writing — ticket bodies and PR descriptions routinely carry secrets
+- [ ] Redact every fetched string through the bundled `redaction.py` before writing — ticket bodies and PR descriptions routinely carry secrets. This is a genuine ingress point, so redaction runs here; downstream tiers trust the redacted artifacts and never re-redact
 - [ ] Point the user at `review-external-context` so low-confidence inferences get a human check before tier 2
 
 ## Out of scope

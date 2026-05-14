@@ -14,7 +14,7 @@ Review without this skill: a one-shot cleanup. Review with it: a standing read o
 |---|---|
 | `SKILL.md` | The skill contract — an LLM-driven analysis skill (no server, no UI). |
 
-It has no `main.py`: the work is reading correction logs and writing a proposal, which the agent does directly. The correction-provenance contract it reads is defined in `_lib/review.py`, shared with `review-analysis`.
+It has no `main.py`: the work is reading correction logs and writing a proposal, which the agent does directly. The correction-provenance contract it reads is the one `review-analysis` writes — defined in that skill's bundled `review.py`.
 
 ## Input → output
 

@@ -14,7 +14,7 @@ Tier 1 → Tier 2 → Tier 3. The orchestrator and every per-segment analyzer in
 
 When tier 1's `gather-external-context` has run, `external-context.json` (or its reviewed sibling) sits in the same `tmp_dir`. Decomposition may read it to ground a Segment's Trigger and Goal in the ticket and PR behind the work, but it is best-effort context, not a required input — the tree is built from `transcript.json` alone when it is absent.
 
-Downstream readers go through `_lib/segment_review.py::load_bundle`, which **prefers `segments.reviewed.json` when it exists** and falls back to `segments.json`. Because the reviewed file is schema-compatible with the draft, no analyzer needs to know whether a human touched the tree.
+Downstream readers go through the `load_bundle` helper in `review-transcript-segments`'s bundled `segment_review.py`, which **prefers `segments.reviewed.json` when it exists** and falls back to `segments.json`. Because the reviewed file is schema-compatible with the draft, no analyzer needs to know whether a human touched the tree.
 
 The review subsystem is its own loop:
 

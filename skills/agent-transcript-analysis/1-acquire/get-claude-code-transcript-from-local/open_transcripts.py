@@ -16,8 +16,8 @@ from __future__ import annotations
 
 from typing import Any
 
-from .cc_jsonl import ParsedSession, ParsedSubagent
-from .redaction import redact
+from cc_jsonl import ParsedSession, ParsedSubagent
+from redaction import redact
 
 SCHEMA_VERSION = "0.1"
 
@@ -413,7 +413,7 @@ def _build_nested_session_from_subagent(sub: ParsedSubagent) -> ParsedSession:
     )
     # Nested subagents: if the subagent JSONL contains Task tool_uses with matching
     # subagent files on disk, walk them. For v0.1 we keep this best-effort.
-    from .cc_jsonl import discover_subagents, iter_jsonl
+    from cc_jsonl import discover_subagents, iter_jsonl
 
     try:
         for ref in discover_subagents(sub.ref.jsonl_path):

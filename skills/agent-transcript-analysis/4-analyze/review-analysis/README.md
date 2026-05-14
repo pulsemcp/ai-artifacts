@@ -12,10 +12,13 @@ Every tier-4 analyzer emits conclusions — "this Segment failed because…", "t
 
 | File | Role |
 |---|---|
-| `main.py` | Thin wrapper. `--tmp-dir` (required), `--kind` (required), `--port` (default 9852), `--no-browser`. Picks a `tmp_dir` + `kind` and calls `_lib/review_server.py`'s `serve()`. |
+| `main.py` | Thin wrapper. `--tmp-dir` (required), `--kind` (required), `--port` (default 9852), `--no-browser`. Picks a `tmp_dir` + `kind` and calls `review_server.py`'s `serve()`. |
+| `review_server.py` | The localhost HTTP server — loads a draft, serves the UI, handles save. |
+| `review_ui.html` | The single static review UI, served by `review_server.py`. |
+| `review.py` | The correction-provenance contract — load, validate, stamp, atomic-write. |
 | `SKILL.md` | The skill contract. |
 
-The server, the static UI, and the provenance contract are **shared** and live in `_lib/` — `review_server.py`, `review_ui.html`, and `review.py` — not in this skill folder. A new reviewable `kind` is a one-line change, not a new server and UI.
+The server, the static UI, and the provenance contract are **bundled in this skill folder** (`review_server.py`, `review_ui.html`, `review.py`) and parametrised only by `kind` — so a new reviewable `kind` is a one-line change, not a new server and UI. They are self-contained copies: the skill carries everything it needs to run from a deployed `.claude/skills/review-analysis/` directory.
 
 ## One engine, every findings bucket
 
@@ -57,7 +60,8 @@ The per-item `verdict` is derived from the log: a reject beats a correction beat
 ## Design decisions
 
 - **The draft is immutable; the review is a sibling.** Keeping `findings.<kind>.json` pristine means the analyzer-vs-human diff is always inspectable, and a bad review can be thrown away by deleting one file.
-- **One engine, every bucket.** Findings are flat lists of independent items regardless of which analyzer produced them — so the server, UI, and provenance contract are shared in `_lib/` and parametrised only by `kind`. Contrast `review-transcript-segments`, whose subject is a recursive tree and so carries its own server and UI.
+- **One engine, every bucket.** Findings are flat lists of independent items regardless of which analyzer produced them — so the server, UI, and provenance contract (`review_server.py`, `review_ui.html`, `review.py`) are bundled in this skill folder and parametrised only by `kind`. Contrast `review-transcript-segments`, whose subject is a recursive tree and so carries its own server and UI.
+- **Self-contained, not DRY.** `review_server.py`, `review_ui.html`, and `review.py` are bundled copies, not a shared library import. A skill that runs from a deployed `.claude/skills/` copy can't reach a sibling's files, so each skill carries its own — portability beats deduplication here.
 - **Per-item verdicts, not tree surgery.** A findings list has no structure to split or merge — you judge each conclusion independently. The contract is deliberately the simpler of the two review subsystems.
 - **Warnings never block a save.** The validator checks the envelope (a `kind`, an `items` list, unique ids) but the reviewer can always save anyway.
-- **Redact on the way out.** Every string written to `findings.<kind>.reviewed.json` goes through `_lib/redaction.py`.
+- **Trust upstream redaction.** Secret-redaction runs once at acquire time (tier 1). The `findings.<kind>.json` drafts this skill reviews were built from already-redacted Segments, so the reviewed sibling is written as-is — no second redaction pass here.

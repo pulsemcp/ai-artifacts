@@ -14,9 +14,10 @@ So `segments.json` is treated as a **draft**, not an answer. This skill is where
 |---|---|
 | `main.py` | Localhost HTTP server. `--tmp-dir` (required), `--port` (default 9850), `--no-browser`. Routes: `GET /` → `ui.html`, `GET /api/bundle`, `POST /api/save`. |
 | `ui.html` | Single static page: editable Segment-tree outline, event-preview index, split/merge, per-Segment context notes, Save. No build step, no CDN. |
+| `segment_review.py` | The provenance contract — load, validate, stamp, atomic-write. |
 | `SKILL.md` | The skill contract. |
 
-The provenance contract — load, validate, stamp, atomic-write — lives in `_lib/segment_review.py`, shared with `learn-from-segment-corrections`.
+`segment_review.py` is a bundled self-contained module in this skill folder (not a shared library import) so the skill runs from a deployed `.claude/skills/` directory. It defines the correction-provenance contract that `learn-from-segment-corrections` also reads.
 
 ## The reviewed sibling
 
@@ -49,4 +50,5 @@ Every edit appends one replayable entry to the log:
 - **Same schema, so analyzers don't care.** Downstream code calls `load_bundle`, which prefers `segments.reviewed.json` when present and falls back to `segments.json`. No analyzer needs to know whether a tree was reviewed.
 - **The log is the source of truth for provenance.** `write_reviewed` strips stale `review` stamps and re-derives them from the log on every save — so the stamps can never drift from the log, and the log alone is enough for `learn-from-segment-corrections` to work.
 - **Warnings never block a save.** The validator surfaces structural problems (bad enums, dangling event ids, duplicate ids), but the reviewer can save anyway. A human who knows the tree is right beats a validator that thinks it isn't.
-- **Redact on the way in and the way out.** The event index shipped to the browser and every string written to `segments.reviewed.json` go through `_lib/redaction.py`.
+- **Trust upstream redaction.** Secret-redaction runs once, at acquire time (tier 1): `transcript.json` and the `segments.json` decomposed from it are already redacted. The event index shipped to the browser and `segments.reviewed.json` are built from those, so this skill writes them as-is — no second redaction pass.
+- **Self-contained, not DRY.** `segment_review.py` is a bundled copy, not a shared library import. A skill that runs from a deployed `.claude/skills/` copy can't reach a sibling's files, so each skill carries its own — portability beats deduplication here.

@@ -41,13 +41,13 @@ A `findings.<kind>.json` is a thin envelope the review subsystem is deliberately
 }
 ```
 
-The only guarantees the reviewer (and `_lib/review.py`) rely on: a `kind`, an `items` list, and a unique non-empty `id` on every item. Anything else is the analyzer's business — the UI renders each item's fields generically.
+The only guarantees the reviewer (and the bundled `review.py`) rely on: a `kind`, an `items` list, and a unique non-empty `id` on every item. Anything else is the analyzer's business — the UI renders each item's fields generically.
 
 ## Outputs
 
 One file written into `tmp_dir`:
 
-- **`findings.<kind>.reviewed.json`** — the human-blessed findings list. **Same schema as `findings.<kind>.json`**, so every downstream reader consumes it transparently (the `_lib/review.py` loader prefers the reviewed sibling). It adds:
+- **`findings.<kind>.reviewed.json`** — the human-blessed findings list. **Same schema as `findings.<kind>.json`**, so every downstream reader consumes it transparently (the bundled `review.py` loader prefers the reviewed sibling). It adds:
   - a `review: {verdict, corrections}` block on every item — `verdict` is one of `approved` / `corrected` / `rejected` / `unreviewed`
   - a document-level `review: {reviewed_at, reviewer, base, log, warnings}` block carrying file-level provenance and the full append-only correction log
 
@@ -59,7 +59,7 @@ One file written into `tmp_dir`:
 python main.py --tmp-dir /path/to/transcript-tmp-dir --kind skills [--port 9852] [--no-browser]
 ```
 
-`main.py` is a thin wrapper over the shared review engine in `_lib/` — it picks a `tmp_dir` and a `kind` and calls `_lib/review_server.py::serve()`. The server binds `127.0.0.1:<port>` (default `9852`) and serves `_lib/review_ui.html`. Pass `--no-browser` to skip the auto-open on remote / headless hosts.
+`main.py` is a thin wrapper over the review engine bundled alongside it — it picks a `tmp_dir` and a `kind` and calls `review_server.py::serve()`. The server binds `127.0.0.1:<port>` (default `9852`) and serves `review_ui.html`. Pass `--no-browser` to skip the auto-open on remote / headless hosts. `review_server.py`, `review_ui.html`, and `review.py` are bundled self-contained copies in this skill folder so it runs from a deployed `.claude/skills/` directory.
 
 ## Sequencing checklist
 
@@ -68,7 +68,7 @@ python main.py --tmp-dir /path/to/transcript-tmp-dir --kind skills [--port 9852]
 - [ ] The user audits each finding: every scalar field is editable; complex (nested) fields are shown read-only
 - [ ] For each finding the user **Approves** it (thumbs-up), **corrects** the fields that are wrong, or **Rejects** the whole finding — and can attach a "why / context" note explaining a rejection or a correction
 - [ ] The user clicks **Save**, which writes `findings.<kind>.reviewed.json` and surfaces any envelope warnings (warnings never block a save — the reviewer's judgment wins)
-- [ ] Downstream skills prefer `findings.<kind>.reviewed.json` when it exists (the `_lib/review.py` loader does this automatically)
+- [ ] Downstream skills prefer `findings.<kind>.reviewed.json` when it exists (the bundled `review.py` loader does this automatically)
 
 ## What the user can do per finding
 
@@ -80,12 +80,12 @@ python main.py --tmp-dir /path/to/transcript-tmp-dir --kind skills [--port 9852]
 
 ## How it works
 
-1. `main.py` calls `serve(tmp_dir, kind)`. `_lib/review_server.py` loads the draft (or the reviewed sibling) via `_lib/review.py`'s `load_review_bundle`.
-2. It serves the single static `_lib/review_ui.html` from a localhost HTTP server. No external requests, no CDN.
+1. `main.py` calls `serve(tmp_dir, kind)`. The bundled `review_server.py` loads the draft (or the reviewed sibling) via `review.py`'s `load_review_bundle`.
+2. It serves the single static `review_ui.html` from a localhost HTTP server. No external requests, no CDN.
 3. Every action appends an entry to an in-memory **correction log** — `approve` / `field` / `reject` / `note`. The log is append-only and replayable.
-4. On Save, `POST /api/save` hands the edited document + full log to `_lib/review.py`'s `write_reviewed`, which strips any stale `review` stamps, re-derives them from the log, validates the envelope, attaches file-level provenance, redacts every string, and atomically writes `findings.<kind>.reviewed.json`.
+4. On Save, `POST /api/save` hands the edited document + full log to `review.py`'s `write_reviewed`, which strips any stale `review` stamps, re-derives them from the log, validates the envelope, attaches file-level provenance, and atomically writes `findings.<kind>.reviewed.json`.
 
-The correction-provenance contract lives in `_lib/review.py` and is shared with `learn-from-analysis-corrections`. The server and UI in `_lib/` are shared across every findings bucket — a new reviewable `kind` needs no new code.
+The correction-provenance contract lives in the bundled `review.py`, the same contract `learn-from-analysis-corrections` reads. `review_server.py`, `review_ui.html`, and `review.py` are bundled self-contained copies in this skill folder — parametrised only by `kind`, so a new reviewable `kind` needs no new code.
 
 ## Out of scope
 
@@ -96,6 +96,6 @@ The correction-provenance contract lives in `_lib/review.py` and is shared with 
 
 ## Privacy
 
-- Every string in `findings.<kind>.reviewed.json` is secret-redacted (`_lib/redaction.py`) before it touches disk; the drafts read here were already redacted at produce time.
+- Secret-redaction runs once, at acquire time (tier 1). The `findings.<kind>.json` drafts this skill reviews were built from already-redacted Segments, so `findings.<kind>.reviewed.json` is written as-is — no second redaction pass here.
 - The localhost server has no public binding and no upload endpoint.
 - `findings.<kind>.json` is never modified.

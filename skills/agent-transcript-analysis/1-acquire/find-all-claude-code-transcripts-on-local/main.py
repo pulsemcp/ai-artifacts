@@ -40,10 +40,8 @@ from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import Any
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
-
-from _lib.cc_jsonl import iter_jsonl, list_sessions  # noqa: E402
-from _lib.redaction import redact_string  # noqa: E402
+from cc_jsonl import iter_jsonl, list_sessions
+from redaction import redact_string
 
 UI_HTML = Path(__file__).with_name("ui.html")
 

@@ -1,0 +1,5 @@
+# Each code-bearing skill bundles its own modules and is run directly with
+# `python main.py`, which produces __pycache__/ next to the sources. Those are
+# build artifacts, never source — keep them out of the repo.
+__pycache__/
+*.pyc

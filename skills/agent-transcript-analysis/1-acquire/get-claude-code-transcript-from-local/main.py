@@ -31,16 +31,8 @@ import sys
 import tempfile
 from pathlib import Path
 
-# Make _lib importable when this script is run directly. Walk up until the
-# package root is found, so the script keeps working regardless of how deep
-# the skill folder is nested.
-for _ancestor in Path(__file__).resolve().parents:
-    if (_ancestor / "_lib" / "__init__.py").exists():
-        sys.path.insert(0, str(_ancestor))
-        break
-
-from _lib.cc_jsonl import list_sessions, parse_session  # noqa: E402
-from _lib.open_transcripts import session_to_transcript  # noqa: E402
+from cc_jsonl import list_sessions, parse_session
+from open_transcripts import session_to_transcript
 
 
 def _default_tmp_root() -> Path:

@@ -49,7 +49,7 @@ python main.py --tmp-dir /path/to/transcript-tmp-dir [--port 9850] [--no-browser
 - [ ] The user audits the tree: every Trigger / Goal / Outcome field is editable; the event-preview index next to each Segment lets them sanity-check boundaries and evidence
 - [ ] The user fixes what's wrong — edit fields, **Split** a leaf into sub-segments, **Merge ↓** a Segment into its next sibling, and add a **Why / context** note explaining each correction
 - [ ] The user clicks **Save**, which writes `segments.reviewed.json` and surfaces any validation warnings (warnings never block a save — the reviewer's judgment wins)
-- [ ] Downstream skills (tier 3/4) should now prefer `segments.reviewed.json` when it exists (the `_lib/segment_review.py` `load_bundle` helper does this automatically)
+- [ ] Downstream skills (tier 3/4) should now prefer `segments.reviewed.json` when it exists (the bundled `segment_review.py` `load_bundle` helper does this automatically)
 
 ## What the user can edit
 
@@ -62,12 +62,12 @@ python main.py --tmp-dir /path/to/transcript-tmp-dir [--port 9850] [--no-browser
 
 ## How it works
 
-1. `main.py` loads `segments.json` (or `segments.reviewed.json`) and builds a compact, **redacted** event index from `transcript.json` — `{id, type, ts, preview}` per event, never the full event bodies.
+1. `main.py` loads `segments.json` (or `segments.reviewed.json`) and builds a compact event index from `transcript.json` — `{id, type, ts, preview}` per event, never the full event bodies. `transcript.json` was already secret-redacted upstream at acquire time, so the index inherits that redaction.
 2. Serves a single static `ui.html` from a localhost HTTP server. No external requests, no CDN.
 3. Every edit appends an entry to an in-memory **correction log** (`field` / `split` / `merge` / `note`). The log is append-only and replayable.
-4. On Save, `POST /api/save` hands the edited tree + full log to `_lib/segment_review.py::write_reviewed`, which strips any stale `review` stamps, re-derives them from the log, validates the tree, attaches file-level provenance, redacts every string, and atomically writes `segments.reviewed.json`.
+4. On Save, `POST /api/save` hands the edited tree + full log to `segment_review.py::write_reviewed`, which strips any stale `review` stamps, re-derives them from the log, validates the tree, attaches file-level provenance, and atomically writes `segments.reviewed.json`.
 
-The correction-provenance contract lives in `_lib/segment_review.py` and is shared with `learn-from-segment-corrections`.
+The correction-provenance contract lives in the bundled `segment_review.py`, the same contract `learn-from-segment-corrections` reads. It is a self-contained copy in this skill folder, not a shared library import, so the skill runs from a deployed `.claude/skills/` directory.
 
 ## Out of scope
 
@@ -77,6 +77,6 @@ The correction-provenance contract lives in `_lib/segment_review.py` and is shar
 
 ## Privacy
 
-- The event index and every string in `segments.reviewed.json` are secret-redacted (`_lib/redaction.py`) before they reach the browser or disk.
+- Secret-redaction runs once, at acquire time (tier 1). The event index and `segments.reviewed.json` are built from the already-redacted `transcript.json` and `segments.json`, so this skill writes them as-is — no second redaction pass.
 - The localhost server has no public binding and no upload endpoint.
 - `segments.json` and `transcript.json` are never modified.

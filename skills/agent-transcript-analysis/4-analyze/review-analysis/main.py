@@ -1,21 +1,21 @@
 #!/usr/bin/env python3
 """Localhost review UI for AI-drafted tier-4 analyzer findings.
 
-Thin wrapper over the shared review engine in `_lib/`. The tier-4 analyzers
-emit `findings.<kind>.json` — flat lists of conclusions, one file per bucket
-(outcomes, prompts, skills, mcp, cross-transcript). This skill puts one of
-those drafts in front of a human in a browser: thumbs-up each finding, correct
-the fields the analyzer got wrong, or reject the whole finding. Saving writes
-`findings.<kind>.reviewed.json` next to the draft — the draft is never touched.
+Thin wrapper over the review engine bundled alongside this skill. The tier-4
+analyzers emit `findings.<kind>.json` — flat lists of conclusions, one file per
+bucket (outcomes, prompts, skills, mcp, cross-transcript). This skill puts one
+of those drafts in front of a human in a browser: thumbs-up each finding,
+correct the fields the analyzer got wrong, or reject the whole finding. Saving
+writes `findings.<kind>.reviewed.json` next to the draft — the draft is never
+touched.
 
 All the machinery — the HTTP server, the static UI, the correction-provenance
-contract — lives in `_lib/review_server.py`, `_lib/review_ui.html`, and
-`_lib/review.py`, shared with every other findings reviewer. This file only
-picks a `tmp_dir` and a `kind` and calls `serve()`.
+contract — lives in the bundled `review_server.py`, `review_ui.html`, and
+`review.py`. This file only picks a `tmp_dir` and a `kind` and calls `serve()`.
 
 Privacy contract (identical to the rest of the plugin): localhost binding only,
-no upload endpoint, every string secret-redacted before it reaches the browser
-or disk.
+no upload endpoint. The `findings.<kind>.json` this serves was drafted from
+already-redacted Segments, so this server trusts the draft as-is.
 
 Usage:
     python main.py --tmp-dir /path/to/transcript-tmp-dir --kind skills
@@ -27,13 +27,9 @@ from __future__ import annotations
 
 import argparse
 import sys
-from pathlib import Path
 
-# main.py lives at 4-analyze/review-analysis/; _lib/ is two levels up.
-sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
-
-from _lib.review import FINDINGS_KINDS  # noqa: E402
-from _lib.review_server import DEFAULT_PORT, serve  # noqa: E402
+from review import FINDINGS_KINDS
+from review_server import DEFAULT_PORT, serve
 
 
 def main(argv: list[str] | None = None) -> int:

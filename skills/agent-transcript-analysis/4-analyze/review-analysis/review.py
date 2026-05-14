@@ -1,6 +1,7 @@
 """Human-in-the-loop review contract for tier-4 *findings*.
 
-`_lib/segment_review.py` is the review contract for the recursive Segment tree.
+`segment_review.py` (bundled with the `review-transcript-segments` skill) is the
+review contract for the recursive Segment tree.
 This module is its sibling for everything *downstream* of decomposition: the
 flat lists of conclusions the tier-4 analyzers produce. A Segment tree is
 recursive and structural — you split and merge it. A findings list is flat and
@@ -9,8 +10,9 @@ deliberately the *simpler* of the two: no split, no merge, no tree walk — just
 per-item verdicts.
 
 It owns the correction-provenance contract shared by the review UI
-(`_lib/review_server.py` + `_lib/review_ui.html`, driven by `review-analysis`)
-and the learning skill (`learn-from-analysis-corrections`). The contract is
+(`review_server.py` + `review_ui.html`, bundled here and driven by
+`review-analysis`) and the learning skill (`learn-from-analysis-corrections`).
+The contract is
 deliberately `kind`-parametrised, so a future tier-5 report reviewer can reuse
 it unchanged — see `REPORT_KIND` below — but today the only consumers are the
 tier-4 review skills:
@@ -28,8 +30,9 @@ tier-4 review skills:
   context) — with a `before`/`after` where it applies. The `learn-from-*`
   skills consume this log to improve the analyzers over time.
 
-Privacy contract (same as the rest of the plugin): every string in the reviewed
-document is run through `redact()` before it touches disk.
+Privacy contract (same as the rest of the plugin): the findings this reviews
+were drafted from already-redacted Segments, so the reviewed document is written
+as-is — there is no second redaction pass here.
 """
 
 from __future__ import annotations
@@ -41,8 +44,6 @@ import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Iterator
-
-from .redaction import redact
 
 # --- the findings buckets a tier-4 analyzer set can produce ---------------
 # Each maps to one `findings.<kind>.json` draft in a transcript tmp_dir.
@@ -257,7 +258,8 @@ def write_reviewed(
          ``review.corrections`` — and derive that item's ``review.verdict``.
       3. Validate (warnings only — never blocks the write).
       4. Attach document-level provenance under the top-level ``review`` block.
-      5. Redact every string, then atomically replace the reviewed file.
+      5. Atomically replace the reviewed file (the findings were drafted from
+         already-redacted Segments, so no second redaction pass runs here).
 
     Returns ``{path, warnings, log_size, verdict_counts}``.
     """
@@ -309,8 +311,9 @@ def write_reviewed(
         "warnings": warnings,
     }
 
-    # (5) redact, then atomically write
-    payload = redact(root)
+    # (5) atomically write — the findings were drafted from already-redacted
+    #     Segments upstream, so there is no second redaction pass here
+    payload = root
     tmp.mkdir(parents=True, exist_ok=True)
     dest = tmp / reviewed_filename(kind)
     fd, tmp_name = tempfile.mkstemp(

@@ -8,9 +8,8 @@ a new reviewable category (a future tier-5 report reviewer, say) needs *no new
 server code and no new UI*, only a `kind` string.
 
 Privacy contract (identical to the rest of the plugin): localhost binding only,
-no upload endpoint, every string secret-redacted before it reaches the browser
-or disk (the redaction on disk happens in `review.write_reviewed`; drafts read
-here are already redacted at produce time).
+no upload endpoint. The `findings.<kind>.json` drafts this serves were produced
+from already-redacted Segments upstream, so the server trusts them as-is.
 
 Endpoints:
 - ``GET  /``            → ``review_ui.html``
@@ -33,13 +32,7 @@ import webbrowser
 from pathlib import Path
 from typing import Any
 
-# review_server.py lives in _lib/; importable whether the caller put _lib's
-# parent on sys.path as a package root or imports `_lib.review` directly.
-try:
-    from .review import load_review_bundle, validate_findings, write_reviewed
-except ImportError:  # pragma: no cover - direct-script fallback
-    sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-    from _lib.review import load_review_bundle, validate_findings, write_reviewed
+from review import load_review_bundle, validate_findings, write_reviewed
 
 UI_HTML = Path(__file__).with_name("review_ui.html")
 
@@ -151,7 +144,7 @@ def serve(
     if not tmp.is_dir():
         print(f"error: tmp_dir {tmp} is not a directory", file=sys.stderr)
         return 2
-    from .review import draft_filename, reviewed_filename
+    from review import draft_filename, reviewed_filename
 
     if not (tmp / draft_filename(kind)).exists() and not (
         tmp / reviewed_filename(kind)

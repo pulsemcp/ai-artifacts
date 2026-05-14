@@ -30,4 +30,4 @@ It runs after acquisition and before decomposition. It is **best-effort**: a ses
 - **Best-effort, with honest gaps.** Missing sources are recorded in `unresolved`, never fabricated. A confident-but-wrong ticket would poison every downstream analyzer.
 - **Provenance over trust.** `confidence` + `how_found` on every block make the bundle reviewable — which is the whole point of the sibling `review-external-context`.
 - **The source set grows.** Ticket + PR + light user context is the starting point, not the ceiling. New resolvers get added here as the systems become reachable.
-- **Redact on the way in.** Ticket and PR bodies go through `_lib/redaction.py` before they touch disk, exactly like the transcript itself.
+- **Redact on the way in.** This is a genuine ingress point — ticket and PR bodies arrive un-redacted — so they go through the bundled `redaction.py` before they touch disk, exactly like the transcript itself. Secret-redaction runs once, here at acquire time; downstream tiers trust the redacted artifacts and never re-redact.
