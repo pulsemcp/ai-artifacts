@@ -3,29 +3,20 @@ import * as fs from "fs";
 import * as path from "path";
 import { loadConfig } from "../src/config";
 
-/**
- * Config resolution is relative to __dirname (compiled dist/).
- * To test loadConfig() without mocking, we write a HOOK.json file to the
- * location it expects: one directory up from __dirname at import time.
- *
- * Since we're running via vitest (ts source, not compiled), __dirname in
- * config.ts points to src/. So the config path resolves to the hook root,
- * which is where HOOK.json should live.
- *
- * We use a temp copy approach: save/restore any existing HOOK.json file.
- */
-
 const hookRoot = path.resolve(__dirname, "..");
 const hookJsonPath = path.join(hookRoot, "HOOK.json");
 
 let savedHookJson: Buffer | null = null;
+let savedEnvKey: string | undefined;
+
+const GOOD_KEY = "secret-do-not-share-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
 
 beforeEach(() => {
-  if (fs.existsSync(hookJsonPath)) {
-    savedHookJson = fs.readFileSync(hookJsonPath);
-  } else {
-    savedHookJson = null;
-  }
+  savedHookJson = fs.existsSync(hookJsonPath)
+    ? fs.readFileSync(hookJsonPath)
+    : null;
+  savedEnvKey = process.env.STORAGE_NAMESPACE_KEY;
+  delete process.env.STORAGE_NAMESPACE_KEY;
 });
 
 afterEach(() => {
@@ -34,20 +25,28 @@ afterEach(() => {
   } else if (fs.existsSync(hookJsonPath)) {
     fs.unlinkSync(hookJsonPath);
   }
+  if (savedEnvKey !== undefined) {
+    process.env.STORAGE_NAMESPACE_KEY = savedEnvKey;
+  } else {
+    delete process.env.STORAGE_NAMESPACE_KEY;
+  }
 });
 
 function writeHookJson(xConfig: unknown): void {
-  const hookJson = {
-    event: "Stop",
-    command: "node",
-    args: ["dist/capture.js"],
-    "x-config": xConfig,
-  };
-  fs.writeFileSync(hookJsonPath, JSON.stringify(hookJson, null, 2), "utf-8");
-}
-
-function writeRawHookJson(content: string): void {
-  fs.writeFileSync(hookJsonPath, content, "utf-8");
+  fs.writeFileSync(
+    hookJsonPath,
+    JSON.stringify(
+      {
+        event: "Stop",
+        command: "node",
+        args: ["dist/capture.js"],
+        "x-config": xConfig,
+      },
+      null,
+      2
+    ),
+    "utf-8"
+  );
 }
 
 describe("loadConfig", () => {
@@ -65,106 +64,166 @@ describe("loadConfig", () => {
     expect(loadConfig()).toBeNull();
   });
 
-  it("loads a valid full-mode config", () => {
+  it("loads a valid GCS no-auth config", () => {
     writeHookJson({
-      backend: { type: "gcs", bucket: "my-bucket", prefix: "traces/" },
-      privacy: { mode: "full", org_salt: "" },
-    });
-    const config = loadConfig();
-    expect(config).not.toBeNull();
-    expect(config!.backend.type).toBe("gcs");
-    expect(config!.backend.bucket).toBe("my-bucket");
-    expect(config!.backend.prefix).toBe("traces/");
-    expect(config!.privacy.mode).toBe("full");
-  });
-
-  it("loads a valid redacted-mode config without identity hashing", () => {
-    writeHookJson({
-      backend: { type: "gcs", bucket: "bucket" },
+      mode: "no-auth",
+      no_auth: {
+        provider: "gcs",
+        bucket: "my-bucket",
+        namespace_key: GOOD_KEY,
+      },
       privacy: { mode: "redacted" },
     });
     const config = loadConfig();
     expect(config).not.toBeNull();
+    expect(config!.mode).toBe("no-auth");
+    expect(config!.no_auth.provider).toBe("gcs");
+    expect(config!.no_auth.bucket).toBe("my-bucket");
+    expect(config!.no_auth.namespace_key).toBe(GOOD_KEY);
     expect(config!.privacy.mode).toBe("redacted");
-    expect(config!.privacy.hash_user_identity).toBe(false);
-    expect(config!.backend.prefix).toBe(""); // default
   });
 
-  it("loads a valid redacted-mode config with identity hashing", () => {
+  it("loads a valid S3 no-auth config", () => {
     writeHookJson({
-      backend: { type: "gcs", bucket: "bucket" },
-      privacy: { mode: "redacted", hash_user_identity: true, org_salt: "my-salt" },
+      mode: "no-auth",
+      no_auth: {
+        provider: "s3",
+        bucket: "my-s3-bucket",
+        namespace_key: GOOD_KEY,
+        region: "us-east-1",
+      },
+      privacy: { mode: "full" },
     });
     const config = loadConfig();
-    expect(config).not.toBeNull();
-    expect(config!.privacy.hash_user_identity).toBe(true);
-    expect(config!.privacy.org_salt).toBe("my-salt");
+    expect(config!.no_auth.provider).toBe("s3");
+    expect(config!.no_auth.region).toBe("us-east-1");
+    expect(config!.privacy.mode).toBe("full");
   });
 
-  it("throws on invalid JSON", () => {
-    writeRawHookJson("not json{{{");
-    expect(() => loadConfig()).toThrow("not valid JSON");
-  });
-
-  it("throws when backend is missing", () => {
-    writeHookJson({ privacy: { mode: "full" } });
-    expect(() => loadConfig()).toThrow("'backend' is required");
-  });
-
-  it("throws when backend.type is missing", () => {
+  it("sources namespace_key from STORAGE_NAMESPACE_KEY env when set", () => {
+    process.env.STORAGE_NAMESPACE_KEY = GOOD_KEY;
     writeHookJson({
-      backend: { bucket: "b" },
+      mode: "no-auth",
+      no_auth: {
+        provider: "gcs",
+        bucket: "b",
+        namespace_key: "placeholder",
+      },
+      privacy: { mode: "redacted" },
+    });
+    const config = loadConfig();
+    expect(config!.no_auth.namespace_key).toBe(GOOD_KEY);
+  });
+
+  it("throws when mode is not 'no-auth'", () => {
+    writeHookJson({
+      mode: "managed",
+      no_auth: {},
       privacy: { mode: "full" },
     });
-    expect(() => loadConfig()).toThrow("'backend.type' is required");
+    expect(() => loadConfig()).toThrow("'mode' must be 'no-auth'");
   });
 
-  it("throws when backend.bucket is a gs:// URI", () => {
+  it("throws when no_auth.provider is invalid", () => {
     writeHookJson({
-      backend: { type: "gcs", bucket: "gs://my-bucket" },
+      mode: "no-auth",
+      no_auth: { provider: "azure", bucket: "b", namespace_key: GOOD_KEY },
       privacy: { mode: "full" },
     });
-    expect(() => loadConfig()).toThrow("not a gs:// URI");
+    expect(() => loadConfig()).toThrow("'no_auth.provider' must be 'gcs' or 's3'");
   });
 
-  it("throws when privacy.mode is invalid", () => {
+  it("throws when bucket is missing", () => {
     writeHookJson({
-      backend: { type: "gcs", bucket: "b" },
+      mode: "no-auth",
+      no_auth: { provider: "gcs", namespace_key: GOOD_KEY },
+      privacy: { mode: "full" },
+    });
+    expect(() => loadConfig()).toThrow("'no_auth.bucket' is required");
+  });
+
+  it("throws when bucket is a gs:// URI", () => {
+    writeHookJson({
+      mode: "no-auth",
+      no_auth: {
+        provider: "gcs",
+        bucket: "gs://my-bucket",
+        namespace_key: GOOD_KEY,
+      },
+      privacy: { mode: "full" },
+    });
+    expect(() => loadConfig()).toThrow("bare bucket name");
+  });
+
+  it("throws when namespace_key has wrong format", () => {
+    writeHookJson({
+      mode: "no-auth",
+      no_auth: {
+        provider: "gcs",
+        bucket: "b",
+        namespace_key: "not-a-real-key",
+      },
+      privacy: { mode: "full" },
+    });
+    expect(() => loadConfig()).toThrow(/namespace_key.*must match/);
+  });
+
+  it("throws when namespace_key is missing entirely", () => {
+    writeHookJson({
+      mode: "no-auth",
+      no_auth: { provider: "gcs", bucket: "b" },
+      privacy: { mode: "full" },
+    });
+    expect(() => loadConfig()).toThrow(/namespace_key.*required/);
+  });
+
+  it("throws when region is missing for s3", () => {
+    writeHookJson({
+      mode: "no-auth",
+      no_auth: {
+        provider: "s3",
+        bucket: "b",
+        namespace_key: GOOD_KEY,
+      },
+      privacy: { mode: "full" },
+    });
+    expect(() => loadConfig()).toThrow("'no_auth.region' is required");
+  });
+
+  it("throws on invalid privacy.mode", () => {
+    writeHookJson({
+      mode: "no-auth",
+      no_auth: { provider: "gcs", bucket: "b", namespace_key: GOOD_KEY },
       privacy: { mode: "summary" },
     });
     expect(() => loadConfig()).toThrow("'privacy.mode' must be");
   });
 
-  it("throws when hash_user_identity is true but org_salt is missing", () => {
-    writeHookJson({
-      backend: { type: "gcs", bucket: "b" },
-      privacy: { mode: "redacted", hash_user_identity: true },
-    });
-    expect(() => loadConfig()).toThrow("'privacy.org_salt' is required");
-  });
-
-  it("does not require org_salt when hash_user_identity is false", () => {
-    writeHookJson({
-      backend: { type: "gcs", bucket: "b" },
-      privacy: { mode: "redacted" },
-    });
-    const config = loadConfig();
-    expect(config).not.toBeNull();
-    expect(config!.privacy.hash_user_identity).toBe(false);
-  });
-
   it("parses extra_patterns", () => {
     writeHookJson({
-      backend: { type: "gcs", bucket: "b" },
+      mode: "no-auth",
+      no_auth: { provider: "gcs", bucket: "b", namespace_key: GOOD_KEY },
       privacy: {
         mode: "redacted",
-        extra_patterns: [
-          { name: "custom", pattern: "CUSTOM-[0-9]+" },
-        ],
+        extra_patterns: [{ name: "custom", pattern: "CUSTOM-[0-9]+" }],
       },
     });
     const config = loadConfig();
     expect(config!.privacy.extra_patterns).toHaveLength(1);
     expect(config!.privacy.extra_patterns![0].name).toBe("custom");
+  });
+
+  it("validates max_archive_bytes", () => {
+    writeHookJson({
+      mode: "no-auth",
+      no_auth: {
+        provider: "gcs",
+        bucket: "b",
+        namespace_key: GOOD_KEY,
+        max_archive_bytes: -1,
+      },
+      privacy: { mode: "full" },
+    });
+    expect(() => loadConfig()).toThrow("'no_auth.max_archive_bytes' must be a positive number");
   });
 });

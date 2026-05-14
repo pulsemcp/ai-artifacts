@@ -8,35 +8,36 @@ import { spawn } from "child_process";
 // ---------------------------------------------------------------------------
 
 const REMEDIATION: Record<string, string> = {
-  // SDK backend (gcs) errors
-  auth_failure: `
-    <ol>
-      <li>Set <code>GOOGLE_APPLICATION_CREDENTIALS</code> to a service account key JSON file</li>
-      <li>Or run <code>gcloud auth application-default login</code> for local development</li>
-      <li>Restart your Claude Code session</li>
-    </ol>`,
-  bucket_not_found: `
-    <ol>
-      <li>Verify the bucket name in <code>HOOK.json</code></li>
-      <li>Ensure the bucket exists in your GCP project</li>
-      <li>Check your GCP project configuration</li>
-    </ol>`,
   permission_denied: `
     <ol>
-      <li>Ensure your account has <code>roles/storage.objectCreator</code> on the bucket</li>
-      <li>If using a service account, verify its permissions in the GCP console</li>
+      <li>Confirm the bucket policy (S3) or IAM Condition (GCS) grants <code>PutObject</code>+<code>DeleteObject</code> to the public principal, scoped to <code>{namespace_key}/*</code></li>
+      <li>For S3: confirm Block Public Access is disabled at both account and bucket levels (<code>BlockPublicPolicy</code> + <code>RestrictPublicBuckets</code>)</li>
+      <li>Verify the <code>namespace_key</code> in your config matches the one the bucket grants access to</li>
     </ol>`,
-  sdk_error: `
+  not_found: `
     <ol>
-      <li>Ensure <code>@google-cloud/storage</code> is installed: <code>npm install</code> in the hook directory</li>
-      <li>Check the error details below for more information</li>
+      <li>Verify the bucket name in <code>HOOK.json</code></li>
+      <li>Ensure the bucket exists and the region (for S3) is correct</li>
     </ol>`,
-  // CLI backend (gcs-cli) errors
-  gsutil_not_found: `
+  payload_too_large: `
     <ol>
-      <li>Install the Google Cloud SDK: <a href="https://cloud.google.com/sdk/docs/install">https://cloud.google.com/sdk/docs/install</a></li>
-      <li>Or switch to the SDK backend by setting <code>"type": "gcs"</code> in HOOK.json (no CLI required)</li>
-      <li>Restart your Claude Code session</li>
+      <li>The bucket rejected this archive as too large. Reduce <code>no_auth.max_archive_bytes</code> in HOOK.json or shorten the session</li>
+    </ol>`,
+  archive_too_large: `
+    <ol>
+      <li>This archive exceeded the configured client-side cap (<code>no_auth.max_archive_bytes</code>, default 50 MB)</li>
+      <li>Raise the cap, exclude large files from the bundle, or shorten the session</li>
+    </ol>`,
+  network_error: `
+    <ol>
+      <li>Check your network connection</li>
+      <li>If you're behind a proxy, ensure HTTPS access to <code>storage.googleapis.com</code> (GCS) or <code>*.amazonaws.com</code> (S3) is permitted</li>
+    </ol>`,
+  http_error: `
+    <ol>
+      <li>Inspect the HTTP status and response body below</li>
+      <li>If 4xx: the bucket or namespace_key configuration is off — see permission_denied remediation</li>
+      <li>If 5xx: cloud-provider transient error, the next session will retry</li>
     </ol>`,
 };
 
@@ -62,7 +63,7 @@ function generateErrorHTML(
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <title>Trace Capture Error</title>
+  <title>Agent Transcript Capture Error</title>
   <style>
     body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; max-width: 700px; margin: 40px auto; padding: 0 20px; color: #1a1a1a; background: #fafafa; }
     h1 { color: #c0392b; font-size: 1.4em; }
@@ -76,7 +77,7 @@ function generateErrorHTML(
   </style>
 </head>
 <body>
-  <h1>Trace Capture Failed</h1>
+  <h1>Agent Transcript Capture Failed</h1>
   <div class="error-box">
     <strong>Error:</strong> ${error.replace(/_/g, " ")}
   </div>
@@ -101,29 +102,43 @@ function generateErrorHTML(
 // ---------------------------------------------------------------------------
 
 /**
- * Write an HTML error page to /tmp and open it in the default browser.
+ * Whether to actually launch a browser. CI and other non-TTY environments
+ * just write the HTML and leave it on disk; opening a browser is awful in
+ * those contexts. Override with AGENT_TRANSCRIPT_CAPTURE_OPEN_BROWSER=1.
+ */
+function shouldOpenBrowser(): boolean {
+  if (process.env.AGENT_TRANSCRIPT_CAPTURE_OPEN_BROWSER === "1") return true;
+  if (process.env.AGENT_TRANSCRIPT_CAPTURE_OPEN_BROWSER === "0") return false;
+  return Boolean(process.stdout.isTTY);
+}
+
+/**
+ * Write an HTML error page to /tmp. If running interactively, open it in
+ * the default browser. Returns the path to the HTML file.
  */
 export function showError(
   error: string,
   details: string,
   sessionId: string
-): void {
+): string {
   const html = generateErrorHTML(error, details, sessionId);
-  const filename = `trace-capture-error-${Date.now()}.html`;
+  const filename = `agent-transcript-capture-error-${Date.now()}.html`;
   const filePath = path.join(os.tmpdir(), filename);
 
   fs.writeFileSync(filePath, html, "utf-8");
 
-  // Open in default browser (best-effort, non-blocking).
-  const opener = process.platform === "darwin" ? "open" : "xdg-open";
-  try {
-    const child = spawn(opener, [filePath], {
-      detached: true,
-      stdio: "ignore",
-    });
-    child.unref();
-  } catch {
-    // If opening fails (e.g., headless server), the user still gets the
-    // stderr message from the main flow. The HTML file remains in /tmp.
+  if (shouldOpenBrowser()) {
+    const opener = process.platform === "darwin" ? "open" : "xdg-open";
+    try {
+      const child = spawn(opener, [filePath], {
+        detached: true,
+        stdio: "ignore",
+      });
+      child.unref();
+    } catch {
+      // If opening fails, the HTML file path is still returned for diagnostics.
+    }
   }
+
+  return filePath;
 }

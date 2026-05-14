@@ -1,5 +1,4 @@
 {
-  "$schema": "https://raw.githubusercontent.com/pulsemcp/air/main/schemas/hooks.schema.json",
   "agent-transcript-capture": {
     "title": "Agent Transcript Capture",
     "description": "Captures complete agent session archives (transcripts, subagents, tool results) to cloud storage on task completion.",

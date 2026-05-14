@@ -1,40 +1,49 @@
-import * as crypto from "crypto";
 import * as os from "os";
+import { execFileSync } from "child_process";
 
-/** Return the current system username. */
+/**
+ * Best-effort lookup of the Claude account email via `claude auth status`.
+ * Returns null if the binary is missing, auth lookup fails, or the user
+ * isn't logged in via an account method (e.g., raw API key with no email).
+ */
+export function getClaudeAuthEmail(): string | null {
+  try {
+    const out = execFileSync("claude", ["auth", "status"], {
+      stdio: ["ignore", "pipe", "ignore"],
+      encoding: "utf-8",
+      timeout: 5_000,
+    });
+    const parsed = JSON.parse(out) as { loggedIn?: boolean; email?: string };
+    if (parsed.loggedIn && typeof parsed.email === "string" && parsed.email) {
+      return parsed.email;
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Identity used for the {user_id} segment of the object key. Prefers the
+ * Claude account email (so transcripts from one person on multiple machines
+ * cluster together) and falls back to the OS username when no account email
+ * is available.
+ *
+ * Without auth, per-user hashing is theatre — the user_id is organizational,
+ * not a security boundary.
+ */
 export function getUsername(): string {
-  return os.userInfo().username;
+  return getClaudeAuthEmail() || os.userInfo().username || "unknown";
 }
 
 /**
- * Compute a pseudonymised user identifier.
- * sha256(orgSalt + username) truncated to 12 hex characters.
+ * Sanitize a username for use as a path segment.
+ *
+ * Replaces anything that isn't a safe path character with a dash, and
+ * lower-cases the result. Defends against pathological usernames containing
+ * slashes, dots, or whitespace.
  */
-export function hashUser(orgSalt: string): string {
-  return crypto
-    .createHash("sha256")
-    .update(orgSalt + getUsername())
-    .digest("hex")
-    .slice(0, 12);
-}
-
-/**
- * Replace every literal occurrence of the system username in `content` with
- * a pseudonymised placeholder.  Catches paths like /home/username/ and
- * JSON-escaped variants like \\/home\\/username.
- */
-export function scrubUsername(
-  content: string,
-  hashedUser: string
-): string {
-  const username = os.userInfo().username;
-  if (!username) return content;
-
-  const placeholder = `[USER:${hashedUser}]`;
-
-  // Escape for use in a regex (username could contain dots, etc.)
-  const escaped = username.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  const re = new RegExp(escaped, "g");
-
-  return content.replace(re, placeholder);
+export function sanitizeUserId(name: string): string {
+  const safe = name.replace(/[^A-Za-z0-9._-]/g, "-").toLowerCase();
+  return safe || "unknown";
 }

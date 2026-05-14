@@ -4,15 +4,16 @@
   "args": ["dist/capture.js"],
   "timeout_seconds": 120,
   "x-config": {
-    "backend": {
-      "type": "gcs",
-      "bucket": "my-org-claude-traces",
-      "prefix": "traces/{USER}/{YYYY}/{MM}/{DD}/"
+    "mode": "no-auth",
+    "no_auth": {
+      "provider": "gcs",
+      "bucket": "my-org-transcripts",
+      "namespace_key": "secret-do-not-share-REPLACE_WITH_HEX_CHARS",
+      "region": "us-east-1",
+      "max_archive_bytes": 52428800
     },
     "privacy": {
       "mode": "redacted",
-      "hash_user_identity": false,
-      "org_salt": "",
       "extra_patterns": []
     }
   }

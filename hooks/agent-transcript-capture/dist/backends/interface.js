@@ -2,31 +2,24 @@
 /**
  * Storage backend interface.
  *
- * Each backend (GCS, S3, Azure Blob, etc.) implements a single `upload`
- * method. The hook pipes a tar.gz buffer through it.
+ * No-authentication mode uses pure `fetch` against a bucket configured to allow
+ * unauthenticated PUT/DELETE scoped to a namespace_key prefix. No SDK,
+ * no CLI, no auth header.
  */
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.createBackend = createBackend;
 // ---------------------------------------------------------------------------
 // Factory
-//
-// Lazy-require each backend so that unused backends never load their
-// dependencies.  This lets gcs-cli work without @google-cloud/storage
-// installed, and vice versa.
 // ---------------------------------------------------------------------------
+const gcs_no_auth_1 = require("./gcs-no-auth");
+const s3_no_auth_1 = require("./s3-no-auth");
 function createBackend(config) {
-    switch (config.type) {
-        case "gcs": {
-            // eslint-disable-next-line @typescript-eslint/no-var-requires
-            const { GCSSdkBackend } = require("./gcs-sdk");
-            return new GCSSdkBackend(config);
-        }
-        case "gcs-cli": {
-            // eslint-disable-next-line @typescript-eslint/no-var-requires
-            const { GCSCliBackend } = require("./gcs-cli");
-            return new GCSCliBackend(config);
-        }
+    switch (config.provider) {
+        case "gcs":
+            return new gcs_no_auth_1.GcsNoAuthBackend(config);
+        case "s3":
+            return new s3_no_auth_1.S3NoAuthBackend(config);
         default:
-            throw new Error(`Unknown storage backend: "${config.type}". Supported: gcs, gcs-cli`);
+            throw new Error(`Unknown storage provider: "${config.provider}". Supported: gcs, s3`);
     }
 }

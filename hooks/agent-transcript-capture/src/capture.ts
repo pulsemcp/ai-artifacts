@@ -1,16 +1,16 @@
 /**
- * Main entry point for the trace-capture hook.
+ * Main entry point for the agent-transcript-capture hook.
  *
  * Reads the hook payload from stdin, auto-detects the agent, collects session
  * files, optionally redacts sensitive content, builds a tar.gz archive, and
- * uploads it to cloud storage.
+ * uploads it to cloud storage via an unauthenticated PUT.
  */
 
 import { HookInput, detectAgent } from "./adapters/interface";
 import { createBackend } from "./backends/interface";
-import { loadConfig } from "./config";
+import { loadConfig, toBackendConfig } from "./config";
 import { redactContent } from "./redactor";
-import { getUsername, hashUser, scrubUsername } from "./identity";
+import { getUsername, sanitizeUserId } from "./identity";
 import { buildTarGz, ArchiveEntry } from "./archive";
 import { showError } from "./error-page";
 import { appendRecord } from "./manifest";
@@ -64,34 +64,29 @@ async function main(): Promise<void> {
 
   // 4. Redact if configured.
   const isRedacted = config.privacy.mode === "redacted";
-  const hashIdentity = config.privacy.hash_user_identity;
-  const userLabel = hashIdentity
-    ? hashUser(config.privacy.org_salt)
-    : getUsername();
+  const userId = sanitizeUserId(getUsername());
 
   const archiveEntries: ArchiveEntry[] = bundle.files.map((file) => {
     let content = file.content;
 
     if (isRedacted && file.redactable) {
-      let text = content.toString("utf-8");
-      text = redactContent(text, config.privacy.extra_patterns);
-      if (hashIdentity) {
-        text = scrubUsername(text, userLabel);
-      }
-      content = Buffer.from(text, "utf-8");
+      const text = content.toString("utf-8");
+      const redacted = redactContent(text, config.privacy.extra_patterns);
+      content = Buffer.from(redacted, "utf-8");
     }
 
     return { path: file.archivePath, content };
   });
 
   // 5. Build manifest and tar.gz archive.
+  const now = new Date();
   const manifest = {
     version: 1,
-    created: new Date().toISOString(),
+    created: now.toISOString(),
     session_id: bundle.sessionId,
     agent: adapter.name,
     privacy_mode: config.privacy.mode,
-    user: userLabel,
+    user_id: userId,
     files: archiveEntries.map((e) => e.path),
   };
   archiveEntries.unshift({
@@ -101,29 +96,45 @@ async function main(): Promise<void> {
 
   const archive = await buildTarGz(archiveEntries);
 
-  // 6. Compute storage key (interpolate template tokens in prefix).
-  const now = new Date();
-  const prefix = config.backend.prefix
-    .replace(/\{YYYY\}/g, String(now.getUTCFullYear()))
-    .replace(/\{MM\}/g, String(now.getUTCMonth() + 1).padStart(2, "0"))
-    .replace(/\{DD\}/g, String(now.getUTCDate()).padStart(2, "0"))
-    .replace(/\{USER\}/g, userLabel);
-  const key = `${prefix}${bundle.sessionId}.tar.gz`;
+  // 6. Client-side max archive size enforcement. Defense-in-depth against
+  //    accidental oversized uploads; doesn't help against a malicious actor
+  //    holding the namespace_key, which is the issue's documented hole.
+  const maxBytes =
+    config.no_auth.max_archive_bytes || 50 * 1024 * 1024;
+  if (archive.length > maxBytes) {
+    const details =
+      `Built archive is ${archive.length} bytes; the configured limit is ${maxBytes} bytes ` +
+      `(no_auth.max_archive_bytes in HOOK.json).`;
+    showError("archive_too_large", details, bundle.sessionId);
+    process.stderr.write(
+      `agent-transcript-capture: archive too large (${archive.length} > ${maxBytes})\n`
+    );
+    process.exit(2);
+  }
 
-  // 7. Upload.
-  const backend = createBackend(config.backend);
+  // 7. Compose the object key. The backend decides whether to prepend the
+  //    namespace_key (S3 needs it for bucket-policy scoping; GCS doesn't,
+  //    because the secret is already in the bucket name).
+  const yyyy = String(now.getUTCFullYear());
+  const mm = String(now.getUTCMonth() + 1).padStart(2, "0");
+  const dd = String(now.getUTCDate()).padStart(2, "0");
+  const suffix = `${userId}/${yyyy}/${mm}/${dd}/${bundle.sessionId}.tar.gz`;
+  const backend = createBackend(toBackendConfig(config.no_auth));
+  const key = backend.buildObjectKey(suffix);
+
+  // 8. Upload.
   const result = await backend.upload(key, archive);
 
   if (result.success) {
     // Record the upload locally so the CLI can list/delete it.
     try {
-      const gcsUri = `gs://${config.backend.bucket}/${key}`;
       appendRecord({
         session_id: bundle.sessionId,
         timestamp: now.toISOString(),
-        gcs_key: key,
-        gcs_uri: gcsUri,
-        bucket: config.backend.bucket,
+        provider: backend.provider,
+        bucket: backend.bucket,
+        object_key: key,
+        object_uri: backend.objectUrl(key),
         agent: adapter.name,
         status: "uploaded",
       });
@@ -133,19 +144,19 @@ async function main(): Promise<void> {
 
     // Claude Code shows stdout (not stderr) to the user for exit-0 hooks.
     process.stdout.write(
-      `trace-capture: uploaded session ${bundle.sessionId}\n` +
-        `  Run: node hooks/trace-capture/dist/cli.js list\n`
+      `agent-transcript-capture: uploaded session ${bundle.sessionId} (${backend.objectUrl(key)})\n` +
+        `  Run: node hooks/agent-transcript-capture/dist/cli.js list\n`
     );
     process.exit(0);
   }
 
-  // 8. Loud failure.
+  // 9. Loud failure.
   const errorMsg = result.error || "upload_failed";
   const details = result.details || "No details available.";
 
   showError(errorMsg, details, bundle.sessionId);
   process.stderr.write(
-    `trace-capture: upload failed (${errorMsg}): ${details}\n`
+    `agent-transcript-capture: upload failed (${errorMsg}): ${details}\n`
   );
   process.exit(2);
 }
@@ -153,6 +164,6 @@ async function main(): Promise<void> {
 main().catch((err) => {
   const message = err instanceof Error ? err.message : String(err);
   showError("unexpected_error", message, "unknown");
-  process.stderr.write(`trace-capture: unexpected error: ${message}\n`);
+  process.stderr.write(`agent-transcript-capture: unexpected error: ${message}\n`);
   process.exit(2);
 });

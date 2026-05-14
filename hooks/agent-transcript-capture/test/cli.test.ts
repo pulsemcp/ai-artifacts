@@ -6,19 +6,19 @@ import { formatList, ListOptions, performDelete } from "../src/cli";
 import { appendRecord, UploadRecord } from "../src/manifest";
 
 let tmpDir: string;
-const origEnv = process.env.TRACE_CAPTURE_HOME;
+const origEnv = process.env.AGENT_TRANSCRIPT_CAPTURE_HOME;
 
 beforeEach(() => {
   tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "cli-test-"));
-  process.env.TRACE_CAPTURE_HOME = tmpDir;
+  process.env.AGENT_TRANSCRIPT_CAPTURE_HOME = tmpDir;
 });
 
 afterEach(() => {
   fs.rmSync(tmpDir, { recursive: true, force: true });
   if (origEnv !== undefined) {
-    process.env.TRACE_CAPTURE_HOME = origEnv;
+    process.env.AGENT_TRANSCRIPT_CAPTURE_HOME = origEnv;
   } else {
-    delete process.env.TRACE_CAPTURE_HOME;
+    delete process.env.AGENT_TRANSCRIPT_CAPTURE_HOME;
   }
 });
 
@@ -26,10 +26,13 @@ function makeRecord(overrides: Partial<UploadRecord> = {}): UploadRecord {
   return {
     session_id: "aaaa-bbbb-cccc-dddd",
     timestamp: "2026-04-10T12:00:00.000Z",
-    gcs_key: "traces/alice/2026/04/10/aaaa-bbbb-cccc-dddd.tar.gz",
-    gcs_uri: "gs://bucket/traces/alice/2026/04/10/aaaa-bbbb-cccc-dddd.tar.gz",
+    provider: "gcs",
     bucket: "bucket",
-    agent: "claude-code",
+    object_key:
+      "secret-do-not-share-deadbeef/alice/2026/04/10/aaaa-bbbb-cccc-dddd.tar.gz",
+    object_uri:
+      "gs://bucket/secret-do-not-share-deadbeef/alice/2026/04/10/aaaa-bbbb-cccc-dddd.tar.gz",
+    agent: "claude",
     status: "uploaded",
     ...overrides,
   };
@@ -116,7 +119,6 @@ describe("performDelete", () => {
     expect(result.success).toBe(true);
     expect(result.message).toContain("Deleted session to-delete");
 
-    // Verify manifest was updated.
     const { readRecords } = await import("../src/manifest");
     const records = readRecords();
     const record = records.find((r) => r.session_id === "to-delete");

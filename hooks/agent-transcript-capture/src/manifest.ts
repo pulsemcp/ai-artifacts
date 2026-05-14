@@ -1,7 +1,7 @@
 /**
  * Local JSONL manifest for tracking uploads.
  *
- * Each upload appends a record to ~/.trace-capture/uploads.jsonl.
+ * Each upload appends a record to ~/.agent-transcript-capture/uploads.jsonl.
  * Deletions append a new record with status "deleted" for the same session.
  * The last entry for a given session_id wins (append-only dedup).
  */
@@ -17,9 +17,12 @@ import * as path from "path";
 export interface UploadRecord {
   session_id: string;
   timestamp: string;
-  gcs_key: string;
-  gcs_uri: string;
+  provider: "gcs" | "s3";
   bucket: string;
+  /** Full object key including {namespace_key}/{user_id}/... prefix. */
+  object_key: string;
+  /** Provider-canonical URI, e.g. gs://... or s3://... */
+  object_uri: string;
   agent: string;
   status: "uploaded" | "deleted";
   deleted_at?: string;
@@ -31,7 +34,8 @@ export interface UploadRecord {
 
 export function manifestPath(): string {
   const home =
-    process.env.TRACE_CAPTURE_HOME || path.join(os.homedir(), ".trace-capture");
+    process.env.AGENT_TRANSCRIPT_CAPTURE_HOME ||
+    path.join(os.homedir(), ".agent-transcript-capture");
   return path.join(home, "uploads.jsonl");
 }
 
@@ -88,8 +92,8 @@ export function readRecords(): UploadRecord[] {
 // ---------------------------------------------------------------------------
 
 /**
- * Find a record by session ID prefix.  Throws if the prefix matches multiple
- * sessions (ambiguous).  Returns null if no match.
+ * Find a record by session ID prefix. Throws if the prefix matches multiple
+ * sessions (ambiguous). Returns null if no match.
  */
 export function findBySessionId(prefix: string): UploadRecord | null {
   const records = readRecords();
