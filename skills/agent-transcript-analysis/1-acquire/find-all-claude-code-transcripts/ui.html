@@ -6,127 +6,369 @@
 <style>
   :root {
     color-scheme: light dark;
-    --fg: #111; --bg: #fff; --muted: #666; --accent: #0a6; --border: #e3e3e3;
-    --row-hover: #f4f4f4; --code: #f6f8fa;
+    --fg: #111; --bg: #fff; --muted: #666; --accent: #0a6; --accent-fg: #fff;
+    --border: #e3e3e3; --row-hover: #f4f4f4; --code: #f6f8fa; --warn: #c33;
+    --banner-bg: #f0f7f3;
   }
   @media (prefers-color-scheme: dark) {
     :root { --fg: #eee; --bg: #0e0e0e; --muted: #999; --accent: #5cf;
-            --border: #2a2a2a; --row-hover: #1c1c1c; --code: #1a1a1a; }
+            --accent-fg: #001;
+            --border: #2a2a2a; --row-hover: #1c1c1c; --code: #1a1a1a; --warn: #f88;
+            --banner-bg: #11201a; }
   }
   * { box-sizing: border-box; }
-  body { margin: 0; padding: 1rem 1.5rem; font: 14px/1.45 -apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif;
+  body { margin: 0; padding: 1rem 1.5rem 6rem; font: 14px/1.45 -apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif;
          color: var(--fg); background: var(--bg); }
-  header { display: flex; align-items: baseline; gap: 1rem; margin-bottom: 1rem; }
+  header { display: flex; align-items: baseline; gap: 1rem; margin-bottom: .75rem; }
   h1 { margin: 0; font-size: 1.1rem; font-weight: 600; }
-  .count { color: var(--muted); }
-  .controls { display: flex; gap: .75rem; margin: 0 0 .75rem; align-items: center; }
+  .count { color: var(--muted); font-size: 13px; }
+
+  .banner { background: var(--banner-bg); border: 1px solid var(--border);
+            border-left: 3px solid var(--accent);
+            padding: .7rem 1rem; border-radius: 6px; margin-bottom: 1rem;
+            font-size: 13.5px; line-height: 1.5; }
+  .banner code { background: var(--code); padding: 1px 5px; border-radius: 3px;
+                 font: 12.5px ui-monospace, SFMono-Regular, Menlo, monospace; }
+  .banner ol { margin: .35rem 0 0 1.1rem; padding: 0; }
+  .banner li { margin: .15rem 0; }
+
+  .controls { display: flex; gap: .6rem; margin: 0 0 .75rem; align-items: center; }
   input[type=search] { flex: 1; padding: .45rem .6rem; border: 1px solid var(--border);
-                       background: var(--bg); color: var(--fg); border-radius: 6px; }
-  select { padding: .4rem; border: 1px solid var(--border); background: var(--bg); color: var(--fg); border-radius: 6px; }
+                       background: var(--bg); color: var(--fg); border-radius: 6px; font-size: 13px; }
+  select { padding: .42rem; border: 1px solid var(--border); background: var(--bg); color: var(--fg);
+           border-radius: 6px; font-size: 13px; }
+
   table { width: 100%; border-collapse: collapse; font-size: 13px; }
-  th, td { text-align: left; padding: .4rem .6rem; border-bottom: 1px solid var(--border); }
-  th { font-weight: 600; color: var(--muted); cursor: pointer; user-select: none; }
+  th, td { text-align: left; padding: .5rem .6rem; border-bottom: 1px solid var(--border);
+           vertical-align: top; }
+  th { font-weight: 600; color: var(--muted); user-select: none; font-size: 12px;
+       text-transform: uppercase; letter-spacing: .03em; }
+  tbody tr { cursor: pointer; }
   tbody tr:hover { background: var(--row-hover); }
-  td.session { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
-  td.project { color: var(--muted); }
-  td.size, td.when { white-space: nowrap; color: var(--muted); }
-  button { padding: .3rem .7rem; border: 1px solid var(--border); border-radius: 5px;
-           background: var(--bg); color: var(--fg); cursor: pointer; font-size: 12px; }
+  tbody tr.selected { background: color-mix(in srgb, var(--accent) 12%, transparent); }
+
+  td.check { width: 28px; padding-right: 0; }
+  td.session { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; white-space: nowrap; }
+  td.project { color: var(--muted); max-width: 220px; overflow: hidden; text-overflow: ellipsis;
+               white-space: nowrap; }
+  td.snippet { max-width: 320px; }
+  td.snippet .first { display: block; }
+  td.snippet .last { display: block; color: var(--muted); font-style: italic; margin-top: 2px; }
+  td.snippet .placeholder { color: var(--muted); opacity: .5; }
+  td.when { white-space: nowrap; color: var(--muted); font-size: 12px; }
+  td.actions { white-space: nowrap; text-align: right; }
+
+  button { padding: .3rem .65rem; border: 1px solid var(--border); border-radius: 5px;
+           background: var(--bg); color: var(--fg); cursor: pointer; font-size: 12px;
+           font-family: inherit; }
   button:hover { border-color: var(--accent); color: var(--accent); }
-  button[disabled] { opacity: .55; cursor: wait; }
-  #status { margin-top: 1rem; padding: .75rem 1rem; border: 1px solid var(--border);
-            border-radius: 6px; background: var(--code); font-family: ui-monospace, monospace;
-            font-size: 12.5px; white-space: pre-wrap; word-break: break-all; }
-  #status:empty { display: none; }
-  .ok { color: var(--accent); }
-  .err { color: #c33; }
+  button.primary { background: var(--accent); color: var(--accent-fg); border-color: var(--accent); }
+  button.primary:hover { filter: brightness(1.1); }
+  button.copied { background: var(--accent); color: var(--accent-fg); border-color: var(--accent); }
+
+  .selbar { position: fixed; bottom: 0; left: 0; right: 0; background: var(--bg);
+            border-top: 1px solid var(--border); padding: .7rem 1.5rem;
+            display: flex; gap: .75rem; align-items: center; transform: translateY(100%);
+            transition: transform .18s ease; z-index: 10;
+            box-shadow: 0 -4px 14px rgba(0,0,0,.06); }
+  .selbar.open { transform: translateY(0); }
+  .selbar .count-pill { font-size: 13px; padding: .25rem .55rem; background: var(--accent);
+                        color: var(--accent-fg); border-radius: 999px; font-weight: 600; }
+  .selbar textarea { flex: 1; resize: none; padding: .45rem .6rem; border: 1px solid var(--border);
+                     border-radius: 6px; background: var(--code); color: var(--fg);
+                     font: 12.5px ui-monospace, SFMono-Regular, Menlo, monospace;
+                     height: 2.2rem; min-height: 2.2rem; }
+
+  .checkbox { width: 16px; height: 16px; accent-color: var(--accent); cursor: pointer; }
+
+  #empty { padding: 2rem; text-align: center; color: var(--muted); }
 </style>
 </head>
 <body>
+
 <header>
   <h1>Claude Code transcripts</h1>
   <span class="count" id="count">loading…</span>
 </header>
 
+<div class="banner">
+  <strong>This UI just picks transcripts.</strong> The actual analysis runs inside Claude Code (Skills can't be invoked from a browser). To analyze:
+  <ol>
+    <li>Pick one or more transcripts below (click rows, or use the checkboxes for batch).</li>
+    <li>Copy the prompt that appears in the bar at the bottom.</li>
+    <li>Paste it into a Claude Code session that has this plugin installed.</li>
+  </ol>
+</div>
+
 <div class="controls">
-  <input type="search" id="filter" placeholder="filter by project or session id…" autofocus>
+  <input type="search" id="filter" placeholder="filter by project, session id, or snippet…" autofocus>
   <select id="sort">
-    <option value="mtime">Sort: most recent</option>
-    <option value="size">Sort: largest</option>
-    <option value="project">Sort: project</option>
+    <option value="mtime">Most recent</option>
+    <option value="size">Largest</option>
+    <option value="project">Project A→Z</option>
   </select>
 </div>
 
 <table>
   <thead>
     <tr>
+      <th class="check"><input type="checkbox" class="checkbox" id="check-all" title="select all visible"></th>
       <th>Session</th>
       <th>Project</th>
-      <th>Size</th>
+      <th>Snippet</th>
       <th>When</th>
       <th></th>
     </tr>
   </thead>
   <tbody id="rows"></tbody>
 </table>
+<div id="empty" style="display:none">no sessions match</div>
 
-<div id="status"></div>
+<div class="selbar" id="selbar">
+  <span class="count-pill" id="selcount">0</span>
+  <textarea id="prompt-template" readonly></textarea>
+  <button id="copy-prompt" class="primary">Copy prompt</button>
+  <button id="copy-ids">Copy IDs</button>
+  <button id="clear-sel">Clear</button>
+</div>
 
 <script>
 const $rows = document.getElementById('rows');
 const $count = document.getElementById('count');
 const $filter = document.getElementById('filter');
 const $sort = document.getElementById('sort');
-const $status = document.getElementById('status');
+const $empty = document.getElementById('empty');
+const $selbar = document.getElementById('selbar');
+const $selcount = document.getElementById('selcount');
+const $prompt = document.getElementById('prompt-template');
+const $copyPrompt = document.getElementById('copy-prompt');
+const $copyIds = document.getElementById('copy-ids');
+const $clearSel = document.getElementById('clear-sel');
+const $checkAll = document.getElementById('check-all');
 
 let SESSIONS = [];
+let PREVIEWS = new Map();                 // session_id -> {first_prompt, last_response, started_at, ended_at}
+let SELECTED = new Set();
+let VISIBLE = [];                         // currently rendered session order
+const RENDER_LIMIT = 300;
 
 function fmtSize(n) {
   if (n < 1024) return n + ' B';
   if (n < 1024*1024) return (n/1024).toFixed(1) + ' KiB';
   return (n/1024/1024).toFixed(1) + ' MiB';
 }
-function fmtWhen(epoch) {
-  const d = new Date(epoch * 1000);
-  const now = new Date();
-  const diff = (now - d) / 1000;
+function fmtWhen(iso, fallbackEpoch) {
+  const d = iso ? new Date(iso) : new Date(fallbackEpoch * 1000);
+  if (Number.isNaN(+d)) return '—';
+  const diff = (Date.now() - +d) / 1000;
   if (diff < 60) return Math.floor(diff) + 's ago';
   if (diff < 3600) return Math.floor(diff/60) + 'm ago';
   if (diff < 86400) return Math.floor(diff/3600) + 'h ago';
-  if (diff < 86400*30) return Math.floor(diff/86400) + 'd ago';
+  if (diff < 86400*7) return Math.floor(diff/86400) + 'd ago';
   return d.toISOString().slice(0,10);
+}
+function shortId(id) { return id.length > 13 ? id.slice(0,8) + '…' + id.slice(-4) : id; }
+function escapeHTML(s) {
+  return String(s).replace(/[&<>"']/g, c => ({
+    '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
+  }[c]));
 }
 
 function render() {
-  const q = $filter.value.toLowerCase();
+  const q = $filter.value.toLowerCase().trim();
   const sortKey = $sort.value;
   let rows = SESSIONS.slice();
   if (q) {
-    rows = rows.filter(s =>
-      s.session_id.toLowerCase().includes(q) ||
-      (s.project_label || '').toLowerCase().includes(q) ||
-      s.project_slug.toLowerCase().includes(q)
-    );
+    rows = rows.filter(s => {
+      if (s.session_id.toLowerCase().includes(q)) return true;
+      if ((s.project_label || '').toLowerCase().includes(q)) return true;
+      if (s.project_slug.toLowerCase().includes(q)) return true;
+      const p = PREVIEWS.get(s.session_id);
+      if (p && (
+          (p.first_prompt || '').toLowerCase().includes(q) ||
+          (p.last_response || '').toLowerCase().includes(q))) return true;
+      return false;
+    });
   }
   if (sortKey === 'mtime') rows.sort((a,b) => b.mtime - a.mtime);
   if (sortKey === 'size') rows.sort((a,b) => b.size_bytes - a.size_bytes);
-  if (sortKey === 'project') rows.sort((a,b) => (a.project_label || '').localeCompare(b.project_label || ''));
+  if (sortKey === 'project') rows.sort((a,b) =>
+    (a.project_label || '').localeCompare(b.project_label || ''));
+  VISIBLE = rows.slice(0, RENDER_LIMIT);
 
-  $count.textContent = rows.length + ' of ' + SESSIONS.length;
+  $count.textContent = rows.length + ' of ' + SESSIONS.length +
+    (rows.length > RENDER_LIMIT ? ' (showing first ' + RENDER_LIMIT + ')' : '');
+
   const frag = document.createDocumentFragment();
-  for (const s of rows.slice(0, 500)) {
+  for (const s of VISIBLE) {
     const tr = document.createElement('tr');
+    tr.dataset.id = s.session_id;
+    if (SELECTED.has(s.session_id)) tr.classList.add('selected');
+
+    const preview = PREVIEWS.get(s.session_id);
+    const first = preview ? escapeHTML(preview.first_prompt || '') : '';
+    const last = preview ? escapeHTML(preview.last_response || '') : '';
+    const snippetHTML = preview
+      ? (first ? `<span class="first">${first}</span>` : '<span class="first placeholder">(no user text)</span>') +
+        (last ? `<span class="last">↳ ${last}</span>` : '')
+      : '<span class="placeholder">loading…</span>';
+
+    const whenStr = preview && preview.started_at
+      ? fmtWhen(preview.started_at, s.mtime)
+      : fmtWhen(null, s.mtime);
+
     tr.innerHTML = `
-      <td class="session">${s.session_id.slice(0,8)}…${s.session_id.slice(-4)}</td>
-      <td class="project">${s.project_label || s.project_slug}</td>
-      <td class="size">${fmtSize(s.size_bytes)}</td>
-      <td class="when">${fmtWhen(s.mtime)}</td>
-      <td><button data-id="${s.session_id}">Analyze</button></td>
+      <td class="check"><input type="checkbox" class="checkbox row-check" ${SELECTED.has(s.session_id) ? 'checked' : ''}></td>
+      <td class="session" title="${escapeHTML(s.session_id)}">${shortId(s.session_id)}</td>
+      <td class="project" title="${escapeHTML(s.project_label || s.project_slug)}">${escapeHTML(s.project_label || s.project_slug)}</td>
+      <td class="snippet">${snippetHTML}</td>
+      <td class="when" title="${fmtSize(s.size_bytes)}">${whenStr}</td>
+      <td class="actions"><button class="copy-id">Copy ID</button></td>
     `;
     frag.appendChild(tr);
   }
   $rows.replaceChildren(frag);
+  $empty.style.display = VISIBLE.length === 0 ? '' : 'none';
+
+  fetchPreviewsFor(VISIBLE);
+  updateSelectionBar();
 }
+
+let previewQueue = [];
+let previewInFlight = 0;
+const PREVIEW_PARALLEL = 6;
+
+function fetchPreviewsFor(rows) {
+  const pending = rows.filter(r => !PREVIEWS.has(r.session_id));
+  for (const r of pending) previewQueue.push(r.session_id);
+  pumpPreviewQueue();
+}
+function pumpPreviewQueue() {
+  while (previewInFlight < PREVIEW_PARALLEL && previewQueue.length) {
+    const id = previewQueue.shift();
+    if (PREVIEWS.has(id)) continue;
+    previewInFlight++;
+    fetch('/api/sessions/' + encodeURIComponent(id) + '/preview')
+      .then(r => r.ok ? r.json() : null)
+      .then(p => {
+        if (p) PREVIEWS.set(id, p);
+        // Patch just this row instead of re-rendering everything.
+        const tr = $rows.querySelector(`tr[data-id="${id}"]`);
+        if (tr && p) {
+          const snippet = tr.querySelector('.snippet');
+          const first = escapeHTML(p.first_prompt || '');
+          const last = escapeHTML(p.last_response || '');
+          snippet.innerHTML =
+            (first ? `<span class="first">${first}</span>` : '<span class="first placeholder">(no user text)</span>') +
+            (last ? `<span class="last">↳ ${last}</span>` : '');
+          if (p.started_at) {
+            const sObj = SESSIONS.find(s => s.session_id === id);
+            tr.querySelector('.when').textContent = fmtWhen(p.started_at, sObj ? sObj.mtime : 0);
+          }
+        }
+      })
+      .catch(() => {})
+      .finally(() => { previewInFlight--; pumpPreviewQueue(); });
+  }
+}
+
+function selectedIds() { return [...SELECTED]; }
+
+function updateSelectionBar() {
+  const ids = selectedIds();
+  $selcount.textContent = ids.length;
+  if (ids.length === 0) {
+    $selbar.classList.remove('open');
+    $checkAll.checked = false; $checkAll.indeterminate = false;
+    return;
+  }
+  $selbar.classList.add('open');
+
+  if (ids.length === 1) {
+    $prompt.value =
+      `Run the analyze-agent-transcript skill on session ${ids[0]}`;
+  } else {
+    $prompt.value =
+      `Run the analyze-agent-transcript skill on these sessions: ${ids.join(', ')}` +
+      `. Then run analyze-cross-transcript-patterns over the consolidated reports.`;
+  }
+
+  // Update header checkbox state vs visible rows.
+  const visibleIds = VISIBLE.map(s => s.session_id);
+  const allChecked = visibleIds.length > 0 && visibleIds.every(id => SELECTED.has(id));
+  const someChecked = visibleIds.some(id => SELECTED.has(id));
+  $checkAll.checked = allChecked;
+  $checkAll.indeterminate = !allChecked && someChecked;
+}
+
+function toggle(id) {
+  if (SELECTED.has(id)) SELECTED.delete(id); else SELECTED.add(id);
+  const tr = $rows.querySelector(`tr[data-id="${id}"]`);
+  if (tr) {
+    tr.classList.toggle('selected', SELECTED.has(id));
+    const cb = tr.querySelector('.row-check');
+    if (cb) cb.checked = SELECTED.has(id);
+  }
+  updateSelectionBar();
+}
+
+$rows.addEventListener('click', (e) => {
+  const btn = e.target.closest('button.copy-id');
+  if (btn) {
+    e.stopPropagation();
+    const tr = btn.closest('tr');
+    const id = tr.dataset.id;
+    navigator.clipboard.writeText(id).then(() => {
+      btn.classList.add('copied');
+      const orig = btn.textContent;
+      btn.textContent = 'Copied ✓';
+      setTimeout(() => { btn.classList.remove('copied'); btn.textContent = orig; }, 1100);
+    });
+    return;
+  }
+  const tr = e.target.closest('tr[data-id]');
+  if (!tr) return;
+  if (e.target.matches('input.row-check')) {
+    toggle(tr.dataset.id); return;
+  }
+  toggle(tr.dataset.id);
+});
+
+$checkAll.addEventListener('change', () => {
+  const wantSelect = $checkAll.checked;
+  for (const s of VISIBLE) {
+    if (wantSelect) SELECTED.add(s.session_id);
+    else SELECTED.delete(s.session_id);
+  }
+  render();
+});
+
+$copyPrompt.addEventListener('click', () => {
+  navigator.clipboard.writeText($prompt.value).then(() => {
+    const orig = $copyPrompt.textContent;
+    $copyPrompt.textContent = 'Copied ✓';
+    setTimeout(() => $copyPrompt.textContent = orig, 1100);
+  });
+});
+$copyIds.addEventListener('click', () => {
+  const ids = selectedIds().join(',');
+  navigator.clipboard.writeText(ids).then(() => {
+    const orig = $copyIds.textContent;
+    $copyIds.textContent = 'Copied ✓';
+    setTimeout(() => $copyIds.textContent = orig, 1100);
+  });
+});
+$clearSel.addEventListener('click', () => {
+  SELECTED.clear();
+  render();
+});
+
+let filterTimer = 0;
+$filter.addEventListener('input', () => {
+  clearTimeout(filterTimer);
+  filterTimer = setTimeout(render, 80);
+});
+$sort.addEventListener('change', render);
 
 async function loadSessions() {
   try {
@@ -136,39 +378,8 @@ async function loadSessions() {
     render();
   } catch (e) {
     $count.textContent = 'failed to load';
-    $status.innerHTML = '<span class="err">failed to load sessions: ' + e.message + '</span>';
   }
 }
-
-$rows.addEventListener('click', async (e) => {
-  const btn = e.target.closest('button[data-id]');
-  if (!btn) return;
-  const id = btn.dataset.id;
-  btn.disabled = true;
-  btn.textContent = 'transforming…';
-  $status.innerHTML = 'running get-one-claude-code-transcript on ' + id + '…';
-  try {
-    const r = await fetch('/api/analyze', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ session_id: id }),
-    });
-    const data = await r.json();
-    if (!r.ok) {
-      $status.innerHTML = '<span class="err">error: ' + (data.error || r.statusText) + '\n' + (data.stderr || '') + '</span>';
-    } else {
-      $status.innerHTML = '<span class="ok">transcript.json written:</span>\n' + data.out_dir + '/transcript.json';
-    }
-  } catch (err) {
-    $status.innerHTML = '<span class="err">request failed: ' + err.message + '</span>';
-  } finally {
-    btn.disabled = false;
-    btn.textContent = 'Analyze';
-  }
-});
-
-$filter.addEventListener('input', render);
-$sort.addEventListener('change', render);
 
 loadSessions();
 </script>
