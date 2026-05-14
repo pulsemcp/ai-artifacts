@@ -15,10 +15,19 @@ user-invocable: true
 
 Orchestrates the acquisition step of the analysis pipeline: takes a CC session id, gathers the main JSONL plus every linked subagent JSONL, runs the deterministic CC→OpenTranscripts transformation, and emits a single `transcript.json` ready for tier 2.
 
+## Invocation
+
+```
+python skills/agent-transcript-analysis/1-acquire/get-one-claude-code-transcript/main.py \
+    <session-uuid> [--tmp-root <dir>] [--pretty]
+```
+
+`main.py` is the reference implementation. It scans `~/.claude/projects/*/<session-uuid>.jsonl`, calls `claude-code-to-open-transcript` under the hood, and prints the output directory path on stdout. The output dir defaults to `$TMPDIR/transcript-analysis/<session-uuid>/`.
+
 ## Inputs
 
 - `session_id` (required): the Claude Code session UUID.
-- `project_path` (optional): path used by Claude Code to namespace the session under `~/.claude/projects/`. Auto-detect from `session_id` if not provided.
+- `--tmp-root` (optional): override the tmp output root. Defaults to `$TMPDIR/transcript-analysis/`.
 
 ## Output
 

@@ -22,6 +22,17 @@ The entry point of the analysis workflow. Surfaces every session this machine ha
 
 If the user already has a session id in hand, **skip this skill** and go straight to `get-one-claude-code-transcript`.
 
+## Invocation
+
+```
+python skills/agent-transcript-analysis/1-acquire/find-all-claude-code-transcripts/main.py \
+    [--port 9849] [--no-browser]
+```
+
+`main.py` starts an HTTP server on `127.0.0.1:<port>` (default `9849`) and serves `ui.html`. The UI shows every session under `~/.claude/projects/`, sortable / filterable. Clicking "Analyze" POSTs to `/api/analyze`, which runs `get-one-claude-code-transcript` and surfaces the resulting `transcript.json` path.
+
+Pass `--no-browser` to skip the auto-open (useful on remote / headless hosts where the user opens the URL manually).
+
 ## Sequencing checklist
 
 - [ ] Verify `~/.claude/projects/` exists and has at least one project directory

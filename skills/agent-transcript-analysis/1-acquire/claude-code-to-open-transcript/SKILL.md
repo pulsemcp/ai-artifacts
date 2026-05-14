@@ -16,10 +16,19 @@ user-invocable: false
 
 The deterministic CC → OT transformation. This skill owns the canonical mapping; everything else delegates here.
 
+## Invocation
+
+```
+python skills/agent-transcript-analysis/1-acquire/claude-code-to-open-transcript/main.py \
+    <path-to-session.jsonl> [--out <output.json>] [--pretty]
+```
+
+`main.py` is the reference implementation. It writes one OT `Transcript` document to `--out` (defaults to `transcript.json` next to the source JSONL). Subagents are auto-resolved from `<session-uuid>/subagents/agent-<id>.jsonl` (with legacy sibling-file fallback). Secret-redaction runs inline; no upload, no LLM.
+
 ## Inputs
 
 - `main_jsonl_path` (required): absolute path to the main session JSONL (e.g. `~/.claude/projects/<project>/<session-uuid>.jsonl`).
-- `project_dir` (optional): the parent directory containing sibling subagent JSONL files. Defaults to `dirname(main_jsonl_path)`.
+- The CC sidecar dir at `<session-uuid>/subagents/` is auto-discovered next to the JSONL. No separate `project_dir` arg is needed.
 
 ## Output
 

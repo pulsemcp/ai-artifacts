@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Pick a Claude Code transcript</title>
+<style>
+  :root {
+    color-scheme: light dark;
+    --fg: #111; --bg: #fff; --muted: #666; --accent: #0a6; --border: #e3e3e3;
+    --row-hover: #f4f4f4; --code: #f6f8fa;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --fg: #eee; --bg: #0e0e0e; --muted: #999; --accent: #5cf;
+            --border: #2a2a2a; --row-hover: #1c1c1c; --code: #1a1a1a; }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; padding: 1rem 1.5rem; font: 14px/1.45 -apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif;
+         color: var(--fg); background: var(--bg); }
+  header { display: flex; align-items: baseline; gap: 1rem; margin-bottom: 1rem; }
+  h1 { margin: 0; font-size: 1.1rem; font-weight: 600; }
+  .count { color: var(--muted); }
+  .controls { display: flex; gap: .75rem; margin: 0 0 .75rem; align-items: center; }
+  input[type=search] { flex: 1; padding: .45rem .6rem; border: 1px solid var(--border);
+                       background: var(--bg); color: var(--fg); border-radius: 6px; }
+  select { padding: .4rem; border: 1px solid var(--border); background: var(--bg); color: var(--fg); border-radius: 6px; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th, td { text-align: left; padding: .4rem .6rem; border-bottom: 1px solid var(--border); }
+  th { font-weight: 600; color: var(--muted); cursor: pointer; user-select: none; }
+  tbody tr:hover { background: var(--row-hover); }
+  td.session { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+  td.project { color: var(--muted); }
+  td.size, td.when { white-space: nowrap; color: var(--muted); }
+  button { padding: .3rem .7rem; border: 1px solid var(--border); border-radius: 5px;
+           background: var(--bg); color: var(--fg); cursor: pointer; font-size: 12px; }
+  button:hover { border-color: var(--accent); color: var(--accent); }
+  button[disabled] { opacity: .55; cursor: wait; }
+  #status { margin-top: 1rem; padding: .75rem 1rem; border: 1px solid var(--border);
+            border-radius: 6px; background: var(--code); font-family: ui-monospace, monospace;
+            font-size: 12.5px; white-space: pre-wrap; word-break: break-all; }
+  #status:empty { display: none; }
+  .ok { color: var(--accent); }
+  .err { color: #c33; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Claude Code transcripts</h1>
+  <span class="count" id="count">loading…</span>
+</header>
+
+<div class="controls">
+  <input type="search" id="filter" placeholder="filter by project or session id…" autofocus>
+  <select id="sort">
+    <option value="mtime">Sort: most recent</option>
+    <option value="size">Sort: largest</option>
+    <option value="project">Sort: project</option>
+  </select>
+</div>
+
+<table>
+  <thead>
+    <tr>
+      <th>Session</th>
+      <th>Project</th>
+      <th>Size</th>
+      <th>When</th>
+      <th></th>
+    </tr>
+  </thead>
+  <tbody id="rows"></tbody>
+</table>
+
+<div id="status"></div>
+
+<script>
+const $rows = document.getElementById('rows');
+const $count = document.getElementById('count');
+const $filter = document.getElementById('filter');
+const $sort = document.getElementById('sort');
+const $status = document.getElementById('status');
+
+let SESSIONS = [];
+
+function fmtSize(n) {
+  if (n < 1024) return n + ' B';
+  if (n < 1024*1024) return (n/1024).toFixed(1) + ' KiB';
+  return (n/1024/1024).toFixed(1) + ' MiB';
+}
+function fmtWhen(epoch) {
+  const d = new Date(epoch * 1000);
+  const now = new Date();
+  const diff = (now - d) / 1000;
+  if (diff < 60) return Math.floor(diff) + 's ago';
+  if (diff < 3600) return Math.floor(diff/60) + 'm ago';
+  if (diff < 86400) return Math.floor(diff/3600) + 'h ago';
+  if (diff < 86400*30) return Math.floor(diff/86400) + 'd ago';
+  return d.toISOString().slice(0,10);
+}
+
+function render() {
+  const q = $filter.value.toLowerCase();
+  const sortKey = $sort.value;
+  let rows = SESSIONS.slice();
+  if (q) {
+    rows = rows.filter(s =>
+      s.session_id.toLowerCase().includes(q) ||
+      (s.project_label || '').toLowerCase().includes(q) ||
+      s.project_slug.toLowerCase().includes(q)
+    );
+  }
+  if (sortKey === 'mtime') rows.sort((a,b) => b.mtime - a.mtime);
+  if (sortKey === 'size') rows.sort((a,b) => b.size_bytes - a.size_bytes);
+  if (sortKey === 'project') rows.sort((a,b) => (a.project_label || '').localeCompare(b.project_label || ''));
+
+  $count.textContent = rows.length + ' of ' + SESSIONS.length;
+  const frag = document.createDocumentFragment();
+  for (const s of rows.slice(0, 500)) {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td class="session">${s.session_id.slice(0,8)}…${s.session_id.slice(-4)}</td>
+      <td class="project">${s.project_label || s.project_slug}</td>
+      <td class="size">${fmtSize(s.size_bytes)}</td>
+      <td class="when">${fmtWhen(s.mtime)}</td>
+      <td><button data-id="${s.session_id}">Analyze</button></td>
+    `;
+    frag.appendChild(tr);
+  }
+  $rows.replaceChildren(frag);
+}
+
+async function loadSessions() {
+  try {
+    const r = await fetch('/api/sessions');
+    const data = await r.json();
+    SESSIONS = data.sessions || [];
+    render();
+  } catch (e) {
+    $count.textContent = 'failed to load';
+    $status.innerHTML = '<span class="err">failed to load sessions: ' + e.message + '</span>';
+  }
+}
+
+$rows.addEventListener('click', async (e) => {
+  const btn = e.target.closest('button[data-id]');
+  if (!btn) return;
+  const id = btn.dataset.id;
+  btn.disabled = true;
+  btn.textContent = 'transforming…';
+  $status.innerHTML = 'running get-one-claude-code-transcript on ' + id + '…';
+  try {
+    const r = await fetch('/api/analyze', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ session_id: id }),
+    });
+    const data = await r.json();
+    if (!r.ok) {
+      $status.innerHTML = '<span class="err">error: ' + (data.error || r.statusText) + '\n' + (data.stderr || '') + '</span>';
+    } else {
+      $status.innerHTML = '<span class="ok">transcript.json written:</span>\n' + data.out_dir + '/transcript.json';
+    }
+  } catch (err) {
+    $status.innerHTML = '<span class="err">request failed: ' + err.message + '</span>';
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Analyze';
+  }
+});
+
+$filter.addEventListener('input', render);
+$sort.addEventListener('change', render);
+
+loadSessions();
+</script>
+</body>
+</html>

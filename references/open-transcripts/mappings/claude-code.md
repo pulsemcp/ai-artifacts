@@ -6,17 +6,27 @@ Maintenance contract: whenever CC adds, renames, or removes a JSONL field, updat
 
 ## Source shape (what CC writes)
 
-Claude Code session storage:
+Claude Code session storage (CC ≥ ~2.1.x; older versions wrote subagents as sibling files — see "Legacy layouts" below):
 
 ```
 ~/.claude/projects/<cwd-with-slashes-replaced-by-dashes>/
-  <session-uuid>.jsonl           ← main session
-  <agent-id-1>.jsonl             ← subagent transcripts, one file per spawn
-  <agent-id-2>.jsonl
-  ...
+  <session-uuid>.jsonl                      ← main session transcript
+  <session-uuid>/                           ← session-scoped sidecar dir
+    subagents/
+      agent-<agentId>.jsonl                 ← one file per subagent spawn
+      agent-<agentId>.meta.json             ← { "agentType", "description" }
+    tool-results/
+      <tool_use_id>.txt                     ← long tool_result bodies spilled to disk
 ```
 
-The main file's name is the session UUID (this becomes `Transcript.transcript_id`). Subagent files' names are the `agentId` that the parent's `tool_result.toolUseResult.agentId` references.
+The main file's name is the session UUID (this becomes `Transcript.transcript_id`). Subagent files live one directory deeper — under `<session-uuid>/subagents/` — and are named `agent-<agentId>.jsonl`, where `<agentId>` is what the parent's `tool_result.toolUseResult.agentId` references. The companion `.meta.json` carries the subagent's `agentType` and the spawning `description`; this is the only place the agentType is preserved if the parent transcript is truncated.
+
+The `tool-results/` directory contains text files for tool_result bodies that exceeded CC's inline limit. The parent JSONL line still carries the tool_result block, but its `content` may reference `<tool_use_id>.txt` instead of inlining the full body.
+
+### Legacy layouts
+
+- **CC ≤ ~2.0.x:** subagent JSONLs were written as siblings of the parent file (`~/.claude/projects/<project>/<agentId>.jsonl`) with no `<session-uuid>/` sidecar dir. The transformer should fall back to sibling lookup if `<session-uuid>/subagents/agent-<agentId>.jsonl` doesn't exist.
+- **Orphan sessions:** some projects contain only the sidecar dir (no parent `.jsonl`). These are unrecoverable; tier 1 skips them with a warning.
 
 Each JSONL line is a JSON object with at minimum a `type` field. Empirical line types observed in production CC transcripts:
 
@@ -60,7 +70,7 @@ Each CC JSONL line becomes exactly one OT `Event`. The event's `id` is the line'
 | `{"type":"assistant","message":{"content":[{"type":"text","text":"..."},...],"model":"...","usage":{...},"stop_reason":"..."}}` | `AssistantMessage` (+ optional `Thinking`, `ToolCall`, `SubagentSpawn` siblings) | One CC `assistant` line can contain multiple content blocks. We emit one `AssistantMessage` for the text-only blocks, plus one additional event per `thinking` / `tool_use` block. All share the same `parent_id` (the prior event) and ascending `id`s within the same `ts`. |
 | `{"type":"assistant","message":{"content":[{"type":"thinking","thinking":"...","signature":"..."}]}}` | `Thinking` | `text` ← `thinking`, `signature` ← `signature`, `redacted` ← `false` (or `true` if the block was `redacted_thinking`). |
 | `{"type":"assistant","message":{"content":[{"type":"tool_use","id":"toolu_...","name":"Read","input":{...}}]}}` | `ToolCall` | `tool_call_id` ← `id`, `tool_name` ← `name`, `arguments` ← `input`. |
-| `{"type":"assistant","message":{"content":[{"type":"tool_use","id":"toolu_...","name":"Task","input":{"subagent_type":"...","description":"...","prompt":"..."}}]}}` | `SubagentSpawn` (in addition to a `ToolCall`) | Whenever `tool_use.name == "Task"`, emit *both* a `ToolCall` event (preserving the raw tool_use for symmetry) *and* a `SubagentSpawn` event. The `SubagentSpawn` carries `tool_call_id` ← `id`, `subagent_type` ← `input.subagent_type`, `description` ← `input.description`, `prompt` ← `input.prompt`. The `spawned_transcript_id` is resolved by looking ahead for the matching `tool_result` whose `toolUseResult.agentId` names the child file. |
+| `{"type":"assistant","message":{"content":[{"type":"tool_use","id":"toolu_...","name":"Agent","input":{"subagent_type":"...","description":"...","prompt":"..."}}]}}` | `SubagentSpawn` (in addition to a `ToolCall`) | Whenever `tool_use.name` is `"Agent"` (CC ≥ 2.1.x) **or** `"Task"` (legacy), emit *both* a `ToolCall` event (preserving the raw tool_use for symmetry) *and* a `SubagentSpawn` event. The `SubagentSpawn` carries `tool_call_id` ← `id`, `subagent_type` ← `input.subagent_type`, `description` ← `input.description`, `prompt` ← `input.prompt`. The `spawned_transcript_id` is resolved by looking ahead for the matching `tool_result` whose `toolUseResult.agentId` names the child file. |
 | `{"type":"system",...}` with a recognizable error payload | `Error` | Set `message` from the system text, `code` from any structured error code, `recoverable` from whether the next event is a retry. |
 | `{"type":"attachment",...}` | Inlined into the preceding `UserMessage.attachments[]` if temporally adjacent; otherwise `SystemEvent` with `subtype = "attachment"`. |
 | `{"type":"ai-title", ...}` | `SystemEvent` with `subtype = "ai-title"`. |
@@ -109,11 +119,11 @@ CC's `stop_reason` values pass through unchanged (`end_turn`, `stop_sequence`, `
 Subagent linkage is fully recoverable from CC's JSONL with no heuristics. The canonical chain:
 
 1. **Parent emits the spawn**: an `assistant` line contains a `tool_use` block with `name: "Task"` and an `id`, e.g. `"id": "toolu_01ABC..."`.
-2. **Parent receives the result**: a `user` line contains a `tool_result` block whose `tool_use_id` equals `toolu_01ABC...`. The same line carries `toolUseResult.agentId: "agent_xyz..."`.
-3. **Subagent file name**: there is a sibling JSONL file `agent_xyz....jsonl` in the same project directory.
-4. **Every line of the subagent file** carries `"agentId": "agent_xyz..."`.
+2. **Parent receives the result**: a `user` line contains a `tool_result` block whose `tool_use_id` equals `toolu_01ABC...`. The same line carries `toolUseResult.agentId: "<hex>"` (e.g. `"a22e0309e671971d8"` — note: no `agent_` prefix on the bare id, the prefix is only on the filename).
+3. **Subagent file name**: `<session-uuid>/subagents/agent-<agentId>.jsonl` next to the parent transcript. Companion `agent-<agentId>.meta.json` carries `{ "agentType", "description" }`.
+4. **Every line of the subagent file** carries `"agentId": "<agentId>"` and `"isSidechain": true`.
 
-Tier 1 walks the parent linearly, building a map `toolu_xxx → agent_xyz` as it sees each Task spawn + tool_result pair. For each entry, it recursively loads `agent_xyz.jsonl` and emits a child `Transcript`. The child's `parent.spawn_event_id` is the id of the OT `SubagentSpawn` event emitted from step 1.
+Tier 1 walks the parent linearly, building a map `toolu_xxx → agentId` as it sees each Task spawn + tool_result pair. For each entry, it loads `<session-uuid>/subagents/agent-<agentId>.jsonl` (falling back to the legacy sibling layout if not found) and emits a child `Transcript`. The child's `parent.spawn_event_id` is the id of the OT `SubagentSpawn` event emitted from step 1.
 
 Subagents can themselves spawn subagents; the recursion uses the same chain unchanged.
 
