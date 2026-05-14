@@ -49,87 +49,87 @@ Numbered prefixes only land on grouping folders, never on Skill folders themselv
 
 ## Skill flow
 
-How a transcript moves through the skills — every node is a registered Skill with a one-line description; edge labels are what flows between them.
+How a transcript moves through the skills, top to bottom. **Thick arrows are the main spine** — a transcript flows down them tier by tier, from a picked session to the synthesized report. **Dotted arrows are the side loops** — each tier's optional human-review checkpoint, the `learn-from-*-corrections` edge that feeds corrections back to the draft generator, and the cross-transcript batch pass. Every node is a registered Skill.
 
 ```mermaid
 flowchart TD
     subgraph T1["Tier 1 · acquire"]
-        FA["<b>find-all-claude-code-transcripts-on-local</b><br/>list every local session; browser picker UI"]
-        GET["<b>get-claude-code-transcript-from-local</b><br/>session id to one transcript.json; deterministic CC to OpenTranscripts mapping, subagents embedded"]
-        GEC["<b>gather-external-context</b><br/>pull the ticket, PR, and user context around the session into external-context.json"]
-        REC["<b>review-external-context</b><br/>optional human-review UI; writes external-context.reviewed.json"]
-    end
-
-    subgraph T2["Tier 2 · decompose"]
-        DEC["<b>decompose-agent-transcript-into-transcript-segments</b><br/>transcript.json to recursive Segment tree + flamegraph"]
-        REV["<b>review-transcript-segments</b><br/>optional human-review UI; writes segments.reviewed.json"]
-        LEARN["<b>learn-from-segment-corrections</b><br/>cluster human corrections; flag decomposer heuristic fixes"]
+        FA["<b>find-all-claude-code-transcripts-on-local</b><br/>browse local sessions, pick one"]
+        GET["<b>get-claude-code-transcript-from-local</b><br/>session id → transcript.json"]
+        GEC["<b>gather-external-context</b><br/>+ ticket / PR / user context → external-context.json"]
+        REC["<b>review-external-context</b><br/>optional review UI"]
     end
 
     subgraph T3["Tier 3 · orchestrate"]
-        ORCH["<b>analyze-agent-transcript</b><br/>entry point; drives tiers 2, 4, and 5 — decompose, analyze, then hand findings to synthesis"]
+        ORCH["<b>analyze-agent-transcript</b><br/>entry point; drives tiers 2, 4, 5"]
+    end
+
+    subgraph T2["Tier 2 · decompose"]
+        DEC["<b>decompose-agent-transcript-into-transcript-segments</b><br/>transcript.json → Segment tree"]
+        REV["<b>review-transcript-segments</b><br/>optional review UI"]
+        LSC["<b>learn-from-segment-corrections</b><br/>cluster corrections; flag decomposer fixes"]
     end
 
     subgraph T4["Tier 4 · analyze"]
-        subgraph T4O["analyze-outcomes"]
-            FH["<b>analyze-failure-hypothesis</b><br/>improvement hypothesis per Failure / retro-Failure"]
-            SE["<b>analyze-segment-efficiency</b><br/>flag wasteful branches + model-tier mismatch"]
+        subgraph T4A["per-Segment analyzers — fanned out by the orchestrator"]
+            direction LR
+            subgraph T4O["analyze-outcomes"]
+                FH["analyze-failure-hypothesis"]
+                SE["analyze-segment-efficiency"]
+            end
+            subgraph T4P["analyze-prompts"]
+                UP["analyze-user-prompt"]
+                PA["analyze-prompt-ambition"]
+                GC["pull-together-goal-context"]
+            end
+            subgraph T4S["analyze-skills"]
+                STP["analyze-skill-trigger-performance"]
+                SAP["analyze-skill-action-performance"]
+                SG["analyze-skill-gaps"]
+            end
+            subgraph T4M["analyze-mcp"]
+                MTP["analyze-mcp-trigger-performance"]
+                MAP["analyze-mcp-action-performance"]
+                MG["analyze-mcp-gaps"]
+            end
         end
-        subgraph T4P["analyze-prompts"]
-            UP["<b>analyze-user-prompt</b><br/>classify the prompt; judge whether the Goal closed the loop"]
-            PA["<b>analyze-prompt-ambition</b><br/>flag under-scoped / should-be-deterministic prompts"]
-            GC["<b>pull-together-goal-context</b><br/>pull git + external context when the Goal isn't self-evident"]
-        end
-        subgraph T4S["analyze-skills"]
-            STP["<b>analyze-skill-trigger-performance</b><br/>Skill false positives / false negatives"]
-            SAP["<b>analyze-skill-action-performance</b><br/>Skills that ran: helpfulness, token cost, closed-loop"]
-            SG["<b>analyze-skill-gaps</b><br/>flag moments a missing Skill would have helped"]
-        end
-        subgraph T4M["analyze-mcp"]
-            MTP["<b>analyze-mcp-trigger-performance</b><br/>MCP tool false positives / false negatives"]
-            MAP["<b>analyze-mcp-action-performance</b><br/>MCP calls that ran: response shape, token cost, closed-loop"]
-            MG["<b>analyze-mcp-gaps</b><br/>flag missing MCP servers / tools"]
-        end
-        subgraph T4X["analyze-cross-transcript"]
-            XT["<b>analyze-cross-transcript-patterns</b><br/>many consolidated reports to patterns no single transcript reveals"]
-        end
-        RA["<b>review-analysis</b><br/>optional human-review UI over any findings draft; writes findings.kind.reviewed.json"]
-        LAC["<b>learn-from-analysis-corrections</b><br/>cluster review corrections; flag tier-4 analyzer heuristic fixes"]
+        RA["<b>review-analysis</b><br/>optional review UI"]
+        LAC["<b>learn-from-analysis-corrections</b><br/>cluster corrections; flag analyzer fixes"]
     end
 
     subgraph T5["Tier 5 · report"]
-        SYN["<b>synthesize-report</b><br/>tier-4 findings to one consolidated report; findings.report.json + report.md"]
-        RR["<b>review-report</b><br/>optional human-review UI over the recommendation slate; writes findings.report.reviewed.json"]
-        LRC["<b>learn-from-report-corrections</b><br/>cluster review corrections; flag synthesize-report heuristic fixes"]
+        SYN["<b>synthesize-report</b><br/>findings.*.json → findings.report.json + report.md"]
+        RR["<b>review-report</b><br/>optional review UI"]
+        LRC["<b>learn-from-report-corrections</b><br/>cluster corrections; flag synthesis fixes"]
     end
 
-    FA -->|pick session id| GET
-    GET -->|transcript.json| GEC
-    GEC -.->|optional checkpoint| REC
-    GEC -->|transcript.json + external-context.json| ORCH
-    ORCH -->|invokes| DEC
-    DEC -->|segments.json| ORCH
-    DEC -.->|optional checkpoint| REV
-    REV -->|correction logs| LEARN
-    LEARN -.->|flags heuristic fixes| DEC
-    ORCH -->|fans out per Segment| T4O
-    ORCH --> T4P
-    ORCH --> T4S
-    ORCH --> T4M
-    T4O -->|findings| ORCH
-    T4P --> ORCH
-    T4S --> ORCH
-    T4M --> ORCH
-    ORCH -.->|findings drafts: outcomes / prompts / skills / mcp| RA
-    XT -.->|findings.cross-transcript.json| RA
-    RA -->|reviewed findings + correction log| LAC
-    LAC -.->|flags heuristic fixes| T4O & T4P & T4S & T4M & T4X
-    ORCH -->|findings.kind.json| SYN
-    XT -->|findings.cross-transcript.json| SYN
-    SYN -->|report.md, one per transcript| XT
-    SYN -.->|optional checkpoint| RR
-    RR -->|reviewed report + correction log| LRC
-    LRC -.->|flags heuristic fixes| SYN
+    subgraph XB["Tier 4 · analyze-cross-transcript — batch pass over many transcripts"]
+        XT["<b>analyze-cross-transcript-patterns</b><br/>many report.md → cross-transcript findings"]
+    end
+
+    %% main spine — a transcript flows top to bottom
+    FA ==>|session id| GET
+    GET ==>|transcript.json| GEC
+    GEC ==>|transcript.json + external-context.json| ORCH
+    ORCH ==> DEC
+    DEC ==>|segments.json| T4A
+    T4A ==>|findings.*.json| SYN
+
+    %% review + learn loop — one consistent motif per tier
+    GEC -.->|checkpoint| REC
+    DEC -.->|checkpoint| REV
+    REV -.-> LSC
+    LSC -.->|flags fixes| DEC
+    T4A -.->|checkpoint| RA
+    RA -.-> LAC
+    LAC -.->|flags fixes| T4A
+    SYN -.->|checkpoint| RR
+    RR -.-> LRC
+    LRC -.->|flags fixes| SYN
+
+    %% cross-transcript — a second pass over many finished reports
+    SYN -.->|report.md ×N| XT
+    XT -.->|findings.cross-transcript.json| SYN
 ```
 
 ## Design decisions
