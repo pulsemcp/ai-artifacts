@@ -1,0 +1,702 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Review transcript segments</title>
+<style>
+  :root {
+    color-scheme: light dark;
+    --fg: #111; --bg: #fff; --muted: #666; --accent: #0a6; --accent-fg: #fff;
+    --border: #e3e3e3; --row-hover: #f4f4f4; --code: #f6f8fa; --warn: #c33;
+    --banner-bg: #f0f7f3; --pill-bg: #eef2f1;
+    --ok: #0a6; --fail: #c33; --corr: #c80; --edited: #b78;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --fg: #eee; --bg: #0e0e0e; --muted: #999; --accent: #5cf;
+            --accent-fg: #001; --border: #2a2a2a; --row-hover: #1c1c1c;
+            --code: #1a1a1a; --warn: #f88; --banner-bg: #11201a; --pill-bg: #1a1a1a;
+            --ok: #5c9; --fail: #f88; --corr: #eb6; --edited: #db9; }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; padding: 1rem 1.5rem 6rem;
+         font: 14px/1.45 -apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif;
+         color: var(--fg); background: var(--bg); }
+  a { color: var(--accent); }
+  code { background: var(--code); padding: 1px 5px; border-radius: 3px;
+         font: 12px ui-monospace, SFMono-Regular, Menlo, monospace; }
+
+  header { position: sticky; top: 0; z-index: 20; background: var(--bg);
+           border-bottom: 1px solid var(--border); margin: -1rem -1.5rem 1rem;
+           padding: .7rem 1.5rem; display: flex; align-items: center;
+           gap: 1rem; flex-wrap: wrap; }
+  h1 { margin: 0; font-size: 1.05rem; font-weight: 600; }
+  .meta-line { color: var(--muted); font-size: 12px; }
+  .meta-line code { font-size: 11.5px; }
+  .src-pill { font-size: 11px; padding: .15rem .55rem; border-radius: 999px;
+              background: var(--pill-bg); color: var(--muted); }
+  .src-pill.reviewed { background: color-mix(in srgb, var(--accent) 18%, transparent);
+                       color: var(--accent); }
+  .spacer { flex: 1; }
+  .dirty-dot { color: var(--corr); font-size: 12px; }
+  button { padding: .35rem .7rem; border: 1px solid var(--border); border-radius: 5px;
+           background: var(--bg); color: var(--fg); cursor: pointer; font-size: 12.5px;
+           font-family: inherit; }
+  button:hover { border-color: var(--accent); color: var(--accent); }
+  button.primary { background: var(--accent); color: var(--accent-fg);
+                   border-color: var(--accent); font-weight: 600; }
+  button.primary:hover { filter: brightness(1.1); color: var(--accent-fg); }
+  button:disabled { opacity: .5; cursor: default; }
+  button.tiny { padding: .12rem .4rem; font-size: 11px; }
+
+  .banner { background: var(--banner-bg); border: 1px solid var(--border);
+            border-left: 3px solid var(--accent); padding: .6rem 1rem;
+            border-radius: 6px; margin-bottom: 1rem; font-size: 13px; line-height: 1.5; }
+  .warnings { background: color-mix(in srgb, var(--warn) 10%, transparent);
+              border: 1px solid color-mix(in srgb, var(--warn) 40%, var(--border));
+              border-left: 3px solid var(--warn); padding: .55rem 1rem;
+              border-radius: 6px; margin-bottom: 1rem; font-size: 12.5px; }
+  .warnings ul { margin: .3rem 0 0; padding-left: 1.2rem; }
+  .warnings.empty { background: var(--banner-bg);
+                    border-left-color: var(--accent); }
+
+  .seg { border: 1px solid var(--border); border-radius: 8px; margin: .5rem 0;
+         background: var(--bg); }
+  .seg.is-edited { border-color: color-mix(in srgb, var(--edited) 55%, var(--border)); }
+  .seg-head { display: flex; align-items: center; gap: .5rem; padding: .5rem .7rem;
+              cursor: pointer; }
+  .seg-head:hover { background: var(--row-hover); border-radius: 8px 8px 0 0; }
+  .twist { width: 1rem; color: var(--muted); font-size: 11px; user-select: none; }
+  .seg-id { font: 600 12px ui-monospace, SFMono-Regular, Menlo, monospace;
+            background: var(--pill-bg); padding: .1rem .4rem; border-radius: 4px; }
+  .seg-goal-preview { flex: 1; overflow: hidden; text-overflow: ellipsis;
+                      white-space: nowrap; color: var(--muted); }
+  .seg-goal-preview b { color: var(--fg); font-weight: 500; }
+  .badge { font-size: 10.5px; padding: .1rem .4rem; border-radius: 999px;
+           border: 1px solid var(--border); white-space: nowrap; }
+  .badge.ok { color: var(--ok); border-color: color-mix(in srgb, var(--ok) 45%, var(--border)); }
+  .badge.fail { color: var(--fail); border-color: color-mix(in srgb, var(--fail) 45%, var(--border)); }
+  .badge.corr { color: var(--corr); border-color: color-mix(in srgb, var(--corr) 45%, var(--border)); }
+  .badge.edited { color: var(--edited);
+                  border-color: color-mix(in srgb, var(--edited) 55%, var(--border)); }
+  .seg-actions { display: flex; gap: .3rem; }
+
+  .seg-body { padding: .2rem .7rem .7rem; border-top: 1px solid var(--border); }
+  .seg.collapsed .seg-body, .seg.collapsed .children { display: none; }
+  .children { padding-left: 1.4rem; }
+
+  .grid { display: grid; grid-template-columns: max-content 1fr; gap: .35rem .7rem;
+          align-items: start; margin: .55rem 0; }
+  .grid > label { color: var(--muted); font-size: 11px; text-transform: uppercase;
+                  letter-spacing: .03em; padding-top: .35rem; }
+  .row { display: flex; gap: .4rem; flex-wrap: wrap; align-items: center; }
+  input, select, textarea {
+    padding: .32rem .5rem; border: 1px solid var(--border); border-radius: 5px;
+    background: var(--bg); color: var(--fg); font-size: 13px; font-family: inherit;
+  }
+  input[list], input.ev { font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+                          font-size: 12px; min-width: 14rem; }
+  textarea { width: 100%; resize: vertical; min-height: 2.4rem; line-height: 1.4; }
+  select { cursor: pointer; }
+  .fld-changed { border-color: var(--edited) !important;
+                 background: color-mix(in srgb, var(--edited) 9%, var(--bg)); }
+  .ev-preview { font-size: 11.5px; color: var(--muted); margin-top: .15rem;
+                font-style: italic; }
+  .ev-preview .etype { font-style: normal; font-family: ui-monospace, Menlo, monospace;
+                       color: var(--fg); }
+  .ev-missing { color: var(--warn); font-style: normal; }
+
+  .chips { display: flex; gap: .3rem; flex-wrap: wrap; align-items: center; }
+  .chip { display: inline-flex; align-items: center; gap: .25rem; font-size: 11.5px;
+          background: var(--pill-bg); border: 1px solid var(--border);
+          border-radius: 999px; padding: .1rem .15rem .1rem .5rem;
+          font-family: ui-monospace, Menlo, monospace; }
+  .chip button { border: none; background: none; padding: 0 .25rem; color: var(--muted);
+                 font-size: 13px; line-height: 1; }
+  .chip button:hover { color: var(--fail); }
+
+  .note-box label { display: block; color: var(--muted); font-size: 11px;
+                    text-transform: uppercase; letter-spacing: .03em; margin: .5rem 0 .2rem; }
+  .corrlog { margin-top: .55rem; border-top: 1px dashed var(--border); padding-top: .4rem; }
+  .corrlog summary { cursor: pointer; color: var(--muted); font-size: 11.5px; }
+  .corrlog ul { margin: .3rem 0 0; padding-left: 1.1rem; font-size: 11.5px;
+                color: var(--muted); }
+  .corrlog li { margin: .15rem 0; }
+  .corrlog .lt { font-family: ui-monospace, Menlo, monospace; color: var(--fg); }
+  .corrlog del { color: var(--fail); text-decoration: line-through; }
+  .corrlog ins { color: var(--ok); text-decoration: none; }
+
+  #err { color: var(--warn); padding: 2rem; text-align: center; }
+  #loading { color: var(--muted); padding: 2rem; text-align: center; }
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1>Review transcript segments</h1>
+    <div class="meta-line" id="meta-line">loading…</div>
+  </div>
+  <span class="src-pill" id="src-pill" style="display:none"></span>
+  <span class="spacer"></span>
+  <span class="dirty-dot" id="dirty-dot" style="display:none">● unsaved changes</span>
+  <button id="reload-btn" title="Discard unsaved changes and reload from disk">Reload</button>
+  <button id="save-btn" class="primary" disabled>Save reviewed</button>
+</header>
+
+<div class="banner">
+  <strong>This is the AI's draft decomposition — your edits are the source of truth.</strong>
+  Every field is editable; <em>Split</em> a leaf into sub-segments, <em>Merge ↓</em> a
+  segment into its next sibling. Add a <em>Why / context</em> note to explain a correction.
+  <strong>Save</strong> writes <code>segments.reviewed.json</code> next to the draft —
+  <code>segments.json</code> is never touched — with full provenance, so
+  <code>learn-from-segment-corrections</code> can feed your fixes back into the decompose skill.
+</div>
+
+<div id="warnings" class="warnings" style="display:none"></div>
+<div id="loading">loading bundle…</div>
+<div id="err" style="display:none"></div>
+<div id="tree"></div>
+
+<datalist id="eventlist"></datalist>
+
+<script>
+const $ = (id) => document.getElementById(id);
+
+let ROOT = null;            // working copy of the segment tree
+let LOG = [];               // correction log (seeded from existing_log, appended to)
+let EVENT_INDEX = { order: [], events: {} };
+let SOURCE = "draft";       // "draft" | "reviewed" — becomes `base` of the next save
+let TMP_DIR = "";
+let INDEX = {};             // id -> { seg, parent, index, depth }
+let COLLAPSED = new Set();  // segment ids whose body is collapsed
+let DIRTY = false;
+
+function nowISO() { return new Date().toISOString().replace(/\.\d+Z$/, "Z"); }
+function escapeHTML(s) {
+  return String(s == null ? "" : s).replace(/[&<>"']/g, c => ({
+    "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"
+  }[c]));
+}
+function clone(v) { return JSON.parse(JSON.stringify(v)); }
+
+// --- dotted-path get/set over the segment object -------------------------
+function getPath(obj, path) {
+  return path.split(".").reduce((o, k) => (o == null ? undefined : o[k]), obj);
+}
+function setPath(obj, path, val) {
+  const ks = path.split(".");
+  let o = obj;
+  for (let i = 0; i < ks.length - 1; i++) {
+    if (o[ks[i]] == null) o[ks[i]] = (/^\d+$/.test(ks[i + 1]) ? [] : {});
+    o = o[ks[i]];
+  }
+  o[ks[ks.length - 1]] = val;
+}
+
+// --- index / dirty state -------------------------------------------------
+function rebuildIndex() {
+  INDEX = {};
+  const walk = (seg, parent, idx, depth) => {
+    if (!seg || typeof seg !== "object") return;
+    if (seg.id != null) INDEX[seg.id] = { seg, parent, index: idx, depth };
+    const ch = Array.isArray(seg.children) ? seg.children : [];
+    ch.forEach((c, i) => walk(c, seg, i, depth + 1));
+  };
+  walk(ROOT, null, 0, 0);
+}
+function markDirty() {
+  DIRTY = true;
+  $("dirty-dot").style.display = "";
+  $("save-btn").disabled = false;
+}
+function clearDirty() {
+  DIRTY = false;
+  $("dirty-dot").style.display = "none";
+  $("save-btn").disabled = true;
+}
+
+// --- correction log helpers ---------------------------------------------
+function noteOf(segId) {
+  const e = LOG.find(x => x.type === "note" && x.segment_id === segId);
+  return e ? e.note : "";
+}
+function logEntriesFor(segId) {
+  return LOG.filter(x => {
+    if (x.type === "field" || x.type === "note") return x.segment_id === segId;
+    if (x.type === "split") return x.segment_id === segId || (x.result_ids || []).includes(segId);
+    if (x.type === "merge") return (x.segment_ids || []).includes(segId) || x.result_id === segId;
+    return false;
+  });
+}
+function isEdited(segId) {
+  return LOG.some(x => {
+    if (x.type === "field" || x.type === "note") return x.segment_id === segId;
+    if (x.type === "split") return (x.result_ids || []).includes(segId);
+    if (x.type === "merge") return x.result_id === segId;
+    return false;
+  });
+}
+
+function pushFieldEdit(segId, field, before, after) {
+  if (JSON.stringify(before) === JSON.stringify(after)) return;
+  const last = LOG[LOG.length - 1];
+  if (last && last.type === "field" && last.segment_id === segId
+      && last.field === field && !last.note) {
+    last.after = after; last.at = nowISO();
+    if (JSON.stringify(last.before) === JSON.stringify(last.after)) LOG.pop();
+  } else {
+    LOG.push({ type: "field", segment_id: segId, field, before, after, note: "", at: nowISO() });
+  }
+  markDirty();
+}
+function commitNote(segId, text) {
+  text = (text || "").trim();
+  const e = LOG.find(x => x.type === "note" && x.segment_id === segId);
+  if (e) {
+    if (!text) LOG.splice(LOG.indexOf(e), 1);
+    else { e.note = text; e.at = nowISO(); }
+  } else if (text) {
+    LOG.push({ type: "note", segment_id: segId, note: text, at: nowISO() });
+  }
+  markDirty();
+}
+
+// --- event preview -------------------------------------------------------
+function evSummary(id) { return EVENT_INDEX.events[id] || null; }
+function evPreviewHTML(id) {
+  if (!id) return "";
+  const s = evSummary(id);
+  if (!s) return `<div class="ev-preview ev-missing">⚠ ${escapeHTML(id)} not found in transcript</div>`;
+  return `<div class="ev-preview"><span class="etype">${escapeHTML(s.type)}</span> · ${escapeHTML(s.preview || "")}</div>`;
+}
+
+// --- structural ops ------------------------------------------------------
+function splitSegment(segId) {
+  const info = INDEX[segId];
+  if (!info) return;
+  const seg = info.seg;
+  if (Array.isArray(seg.children) && seg.children.length) {
+    alert("Only leaf segments can be split. Merge its children first if you need to re-cut them.");
+    return;
+  }
+  const order = EVENT_INDEX.order || [];
+  const range = (seg.meta && seg.meta.event_range) || [];
+  let c0r = clone(range), c1r = clone(range);
+  const i0 = order.indexOf(range[0]), i1 = order.indexOf(range[1]);
+  if (i0 >= 0 && i1 > i0) {
+    const m = Math.floor((i0 + i1) / 2);
+    c0r = [order[i0], order[m]];
+    c1r = [order[m + 1], order[i1]];
+  }
+  const mk = (sfx, trigger, rng) => ({
+    id: segId + "." + sfx,
+    trigger,
+    goal: { text: (seg.goal && seg.goal.text) || "", kind: (seg.goal && seg.goal.kind) || "Plan" },
+    outcome: { kind: "Success", evidence_event_ids: [] },
+    meta: Object.assign({}, seg.meta || {}, { event_range: rng }),
+    children: [],
+  });
+  const c0 = mk("0", clone(seg.trigger || { kind: "New", source: "agent", event_id: null, text: null }), c0r);
+  const c1 = mk("1", { kind: "New", source: "agent", event_id: null, text: null }, c1r);
+  seg.children = [c0, c1];
+  LOG.push({ type: "split", segment_id: segId, result_ids: [c0.id, c1.id], note: "", at: nowISO() });
+  rebuildIndex(); markDirty(); render();
+}
+
+function mergeWithNext(segId) {
+  const info = INDEX[segId];
+  if (!info || !info.parent) { alert("The root segment has no sibling to merge with."); return; }
+  const sibs = info.parent.children;
+  const i = info.index;
+  if (i + 1 >= sibs.length) { alert("No next sibling to merge with."); return; }
+  const a = sibs[i], b = sibs[i + 1];
+  const ar = (a.meta && a.meta.event_range) || [];
+  const br = (b.meta && b.meta.event_range) || [];
+  a.meta = Object.assign({}, a.meta || {}, {
+    event_range: [ar[0] != null ? ar[0] : br[0], br[1] != null ? br[1] : ar[1]],
+  });
+  a.children = (a.children || []).concat(b.children || []);
+  a.outcome = a.outcome || { kind: "Success", evidence_event_ids: [] };
+  const evA = a.outcome.evidence_event_ids || [];
+  const evB = (b.outcome && b.outcome.evidence_event_ids) || [];
+  a.outcome.evidence_event_ids = [...new Set([...evA, ...evB])];
+  sibs.splice(i + 1, 1);
+  LOG.push({ type: "merge", segment_ids: [a.id, b.id], result_id: a.id, note: "", at: nowISO() });
+  rebuildIndex(); markDirty(); render();
+}
+
+// --- rendering -----------------------------------------------------------
+function fieldCls(segId, field) {
+  return LOG.some(x => x.type === "field" && x.segment_id === segId && x.field === field)
+    ? "fld-changed" : "";
+}
+function optionList(values, current) {
+  return values.map(v =>
+    `<option value="${escapeHTML(v)}"${v === current ? " selected" : ""}>${escapeHTML(v)}</option>`
+  ).join("");
+}
+
+function renderSegment(seg) {
+  const id = seg.id == null ? "(no id)" : String(seg.id);
+  const t = seg.trigger || {};
+  const g = seg.goal || {};
+  const o = seg.outcome || {};
+  const m = seg.meta || {};
+  const range = m.event_range || [];
+  const evidence = o.evidence_event_ids || [];
+  const agentSrc = t.source === "agent";
+  const collapsed = COLLAPSED.has(id);
+  const edited = isEdited(id);
+  const info = INDEX[id] || {};
+  const isLeaf = !(Array.isArray(seg.children) && seg.children.length);
+  const hasNext = info.parent && info.index + 1 < info.parent.children.length;
+
+  const wrap = document.createElement("div");
+  wrap.className = "seg" + (collapsed ? " collapsed" : "") + (edited ? " is-edited" : "");
+  wrap.dataset.seg = id;
+
+  const outBadge = o.kind === "Failure"
+    ? '<span class="badge fail">Failure</span>'
+    : '<span class="badge ok">Success</span>';
+  const corrBadge = t.kind === "Correction"
+    ? `<span class="badge corr">Correction · ${escapeHTML(t.source || "?")}</span>` : "";
+  const editedBadge = edited ? '<span class="badge edited">✎ edited</span>' : "";
+
+  const evField = (label, field, val) => `
+    <label>${label}</label>
+    <div>
+      <input class="ev ${fieldCls(id, field)}" list="eventlist"
+             data-action="field" data-seg="${escapeHTML(id)}" data-field="${field}"
+             value="${escapeHTML(val == null ? "" : val)}" placeholder="event id">
+      ${evPreviewHTML(val)}
+    </div>`;
+
+  const evidenceChips = evidence.map(eid => `
+    <span class="chip" title="${escapeHTML((evSummary(eid) || {}).preview || "")}">
+      ${escapeHTML(eid)}
+      <button class="tiny" data-action="rm-evidence" data-seg="${escapeHTML(id)}"
+              data-evid="${escapeHTML(eid)}" title="remove">×</button>
+    </span>`).join("");
+
+  const corrEntries = logEntriesFor(id);
+  const corrHTML = corrEntries.length ? `
+    <details class="corrlog">
+      <summary>${corrEntries.length} correction${corrEntries.length === 1 ? "" : "s"} logged on this segment</summary>
+      <ul>${corrEntries.map(fmtLogEntry).join("")}</ul>
+    </details>` : "";
+
+  wrap.innerHTML = `
+    <div class="seg-head" data-action="toggle" data-seg="${escapeHTML(id)}">
+      <span class="twist">${collapsed ? "▶" : "▼"}</span>
+      <span class="seg-id">${escapeHTML(id)}</span>
+      ${corrBadge} ${outBadge} ${editedBadge}
+      <span class="seg-goal-preview"><b>${escapeHTML(g.text || "(no goal)")}</b></span>
+      <span class="seg-actions">
+        ${isLeaf ? `<button class="tiny" data-action="split" data-seg="${escapeHTML(id)}">Split</button>` : ""}
+        ${hasNext ? `<button class="tiny" data-action="merge" data-seg="${escapeHTML(id)}">Merge ↓</button>` : ""}
+      </span>
+    </div>
+    <div class="seg-body">
+      <div class="grid">
+        <label>Trigger</label>
+        <div class="row">
+          <select class="${fieldCls(id, "trigger.kind")}" data-action="field"
+                  data-seg="${escapeHTML(id)}" data-field="trigger.kind">
+            ${optionList(["New", "Correction"], t.kind)}
+          </select>
+          <select class="${fieldCls(id, "trigger.source")}" data-action="field"
+                  data-seg="${escapeHTML(id)}" data-field="trigger.source">
+            ${optionList(["user", "agent", "subagent"], t.source)}
+          </select>
+        </div>
+        ${agentSrc ? "" : evField("Trigger event", "trigger.event_id", t.event_id)}
+        ${agentSrc ? "" : `
+        <label>Trigger text</label>
+        <textarea class="${fieldCls(id, "trigger.text")}" data-action="field"
+                  data-seg="${escapeHTML(id)}" data-field="trigger.text"
+                  placeholder="the user message / spawn prompt that started this goal">${escapeHTML(t.text || "")}</textarea>`}
+
+        <label>Goal</label>
+        <div>
+          <textarea class="${fieldCls(id, "goal.text")}" data-action="field"
+                    data-seg="${escapeHTML(id)}" data-field="goal.text"
+                    placeholder="name the goal in one sentence">${escapeHTML(g.text || "")}</textarea>
+          <div class="row" style="margin-top:.3rem">
+            <select class="${fieldCls(id, "goal.kind")}" data-action="field"
+                    data-seg="${escapeHTML(id)}" data-field="goal.kind">
+              ${optionList(["Plan", "Action"], g.kind)}
+            </select>
+          </div>
+        </div>
+
+        <label>Outcome</label>
+        <div class="row">
+          <select class="${fieldCls(id, "outcome.kind")}" data-action="field"
+                  data-seg="${escapeHTML(id)}" data-field="outcome.kind">
+            ${optionList(["Success", "Failure"], o.kind)}
+          </select>
+        </div>
+
+        <label>Evidence</label>
+        <div>
+          <div class="chips">
+            ${evidenceChips}
+            <input class="ev" list="eventlist" data-action="add-evidence"
+                   data-seg="${escapeHTML(id)}" placeholder="+ add evidence event id">
+          </div>
+        </div>
+
+        <label>Event range</label>
+        <div class="row">
+          ${rangeInput(id, 0, range[0])}
+          <span style="color:var(--muted)">→</span>
+          ${rangeInput(id, 1, range[1])}
+        </div>
+
+        <label>Meta</label>
+        <div class="row">
+          ${metaInput(id, "wall_clock_s", m.wall_clock_s, "wall s")}
+          ${metaInput(id, "tokens_in", m.tokens_in, "tok in")}
+          ${metaInput(id, "tokens_out", m.tokens_out, "tok out")}
+          ${metaInput(id, "model", m.model, "model")}
+          ${metaInput(id, "source_transcript_id", m.source_transcript_id, "src transcript")}
+        </div>
+      </div>
+
+      <div class="note-box">
+        <label>Why / context — saved with your corrections</label>
+        <textarea data-action="note" data-seg="${escapeHTML(id)}"
+                  placeholder="why is the draft wrong here? what should the decomposer have done?">${escapeHTML(noteOf(id))}</textarea>
+      </div>
+      ${corrHTML}
+    </div>
+    <div class="children"></div>
+  `;
+
+  const childWrap = wrap.querySelector(".children");
+  (seg.children || []).forEach(c => childWrap.appendChild(renderSegment(c)));
+  return wrap;
+}
+
+function rangeInput(id, idx, val) {
+  return `<input class="ev ${fieldCls(id, "meta.event_range." + idx)}" list="eventlist"
+            data-action="field" data-seg="${escapeHTML(id)}"
+            data-field="meta.event_range.${idx}"
+            value="${escapeHTML(val == null ? "" : val)}"
+            placeholder="${idx === 0 ? "first" : "last"} event id"
+            style="min-width:11rem">`;
+}
+function metaInput(id, key, val, ph) {
+  return `<input class="${fieldCls(id, "meta." + key)}" data-action="field"
+            data-seg="${escapeHTML(id)}" data-field="meta.${key}"
+            value="${escapeHTML(val == null ? "" : val)}"
+            placeholder="${ph}" style="min-width:7rem; font-size:12px">`;
+}
+
+function fmtLogEntry(e) {
+  if (e.type === "field") {
+    return `<li><span class="lt">field</span> <code>${escapeHTML(e.field)}</code>: `
+      + `<del>${escapeHTML(JSON.stringify(e.before))}</del> `
+      + `<ins>${escapeHTML(JSON.stringify(e.after))}</ins>`
+      + (e.note ? ` — ${escapeHTML(e.note)}` : "") + `</li>`;
+  }
+  if (e.type === "note") {
+    return `<li><span class="lt">note</span> ${escapeHTML(e.note)}</li>`;
+  }
+  if (e.type === "split") {
+    return `<li><span class="lt">split</span> ${escapeHTML(e.segment_id)} → `
+      + escapeHTML((e.result_ids || []).join(", ")) + `</li>`;
+  }
+  if (e.type === "merge") {
+    return `<li><span class="lt">merge</span> ${escapeHTML((e.segment_ids || []).join(" + "))} `
+      + `→ ${escapeHTML(e.result_id)}</li>`;
+  }
+  return `<li>${escapeHTML(JSON.stringify(e))}</li>`;
+}
+
+function render() {
+  rebuildIndex();
+  const tree = $("tree");
+  tree.replaceChildren(ROOT ? renderSegment(ROOT) : document.createTextNode(""));
+}
+
+function renderWarnings(warnings) {
+  const box = $("warnings");
+  box.style.display = "";
+  if (!warnings || !warnings.length) {
+    box.className = "warnings empty";
+    box.innerHTML = "✓ No validation warnings — the tree is structurally sound.";
+    return;
+  }
+  box.className = "warnings";
+  box.innerHTML = `<strong>${warnings.length} validation warning`
+    + `${warnings.length === 1 ? "" : "s"}</strong> (you can still save — your judgment wins):`
+    + `<ul>${warnings.map(w => `<li>${escapeHTML(w)}</li>`).join("")}</ul>`;
+}
+
+// --- event delegation ----------------------------------------------------
+$("tree").addEventListener("change", (e) => {
+  const el = e.target;
+  const action = el.dataset.action;
+  const segId = el.dataset.seg;
+  if (!action || !segId) return;
+  const info = INDEX[segId];
+  if (!info) return;
+  const seg = info.seg;
+
+  if (action === "field") {
+    const field = el.dataset.field;
+    let after = el.value;
+    if (field === "meta.wall_clock_s" || field === "meta.tokens_in" || field === "meta.tokens_out") {
+      after = after === "" ? null : Number(after);
+      if (after != null && Number.isNaN(after)) return;
+    }
+    if ((field === "trigger.event_id" || field.startsWith("meta.event_range")) && after === "") {
+      after = field === "trigger.event_id" ? null : "";
+    }
+    const before = clone(getPath(seg, field));
+    setPath(seg, field, after);
+    pushFieldEdit(segId, field, before, after);
+    // if trigger.source flips to agent, event_id + text must go null
+    if (field === "trigger.source" && after === "agent") {
+      for (const f of ["trigger.event_id", "trigger.text"]) {
+        const b = clone(getPath(seg, f));
+        if (b != null) { setPath(seg, f, null); pushFieldEdit(segId, f, b, null); }
+      }
+    }
+    render();
+  } else if (action === "add-evidence") {
+    const val = el.value.trim();
+    if (!val) return;
+    seg.outcome = seg.outcome || { kind: "Success", evidence_event_ids: [] };
+    const arr = seg.outcome.evidence_event_ids || (seg.outcome.evidence_event_ids = []);
+    if (!arr.includes(val)) {
+      const before = clone(arr);
+      arr.push(val);
+      pushFieldEdit(segId, "outcome.evidence_event_ids", before, clone(arr));
+    }
+    render();
+  } else if (action === "note") {
+    commitNote(segId, el.value);
+    render();
+  }
+});
+
+$("tree").addEventListener("click", (e) => {
+  const btn = e.target.closest("button[data-action]");
+  if (btn) {
+    e.stopPropagation();
+    const segId = btn.dataset.seg;
+    const action = btn.dataset.action;
+    if (action === "split") splitSegment(segId);
+    else if (action === "merge") mergeWithNext(segId);
+    else if (action === "rm-evidence") {
+      const info = INDEX[segId];
+      if (!info) return;
+      const seg = info.seg;
+      const arr = (seg.outcome && seg.outcome.evidence_event_ids) || [];
+      const before = clone(arr);
+      const next = arr.filter(x => x !== btn.dataset.evid);
+      seg.outcome.evidence_event_ids = next;
+      pushFieldEdit(segId, "outcome.evidence_event_ids", before, clone(next));
+      render();
+    }
+    return;
+  }
+  const head = e.target.closest('.seg-head[data-action="toggle"]');
+  if (head) {
+    const segId = head.dataset.seg;
+    if (COLLAPSED.has(segId)) COLLAPSED.delete(segId);
+    else COLLAPSED.add(segId);
+    render();
+  }
+});
+
+// --- load / save ---------------------------------------------------------
+async function loadBundle() {
+  $("loading").style.display = "";
+  $("err").style.display = "none";
+  try {
+    const r = await fetch("/api/bundle");
+    const data = await r.json();
+    if (!r.ok) throw new Error(data.error || ("HTTP " + r.status));
+    ROOT = data.segments;
+    EVENT_INDEX = data.event_index || { order: [], events: {} };
+    SOURCE = data.source || "draft";
+    TMP_DIR = data.tmp_dir || "";
+    LOG = Array.isArray(data.existing_log) ? clone(data.existing_log) : [];
+    COLLAPSED = new Set();
+
+    // populate the shared event datalist once
+    const dl = $("eventlist");
+    dl.replaceChildren();
+    const frag = document.createDocumentFragment();
+    for (const eid of (EVENT_INDEX.order || [])) {
+      const s = EVENT_INDEX.events[eid] || {};
+      const opt = document.createElement("option");
+      opt.value = eid;
+      opt.textContent = `${s.type || ""} · ${(s.preview || "").slice(0, 80)}`;
+      frag.appendChild(opt);
+    }
+    dl.appendChild(frag);
+
+    $("loading").style.display = "none";
+    const pill = $("src-pill");
+    pill.style.display = "";
+    pill.textContent = SOURCE === "reviewed" ? "editing segments.reviewed.json" : "draft: segments.json";
+    pill.className = "src-pill" + (SOURCE === "reviewed" ? " reviewed" : "");
+    $("meta-line").innerHTML = `<code>${escapeHTML(TMP_DIR)}</code> · `
+      + `${(EVENT_INDEX.order || []).length} events indexed`
+      + (LOG.length ? ` · ${LOG.length} prior correction${LOG.length === 1 ? "" : "s"}` : "");
+    renderWarnings(data.warnings);
+    clearDirty();
+    render();
+  } catch (err) {
+    $("loading").style.display = "none";
+    $("err").style.display = "";
+    $("err").textContent = "Failed to load: " + err.message;
+  }
+}
+
+async function save() {
+  $("save-btn").disabled = true;
+  $("save-btn").textContent = "Saving…";
+  try {
+    const r = await fetch("/api/save", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ root: ROOT, log: LOG, base: SOURCE, reviewer: "user" }),
+    });
+    const data = await r.json();
+    if (!r.ok || !data.ok) throw new Error(data.error || ("HTTP " + r.status));
+    SOURCE = "reviewed";
+    const pill = $("src-pill");
+    pill.textContent = "editing segments.reviewed.json";
+    pill.className = "src-pill reviewed";
+    $("meta-line").innerHTML = `<code>${escapeHTML(data.path)}</code> · `
+      + `${(EVENT_INDEX.order || []).length} events indexed · ${data.log_size} correction`
+      + `${data.log_size === 1 ? "" : "s"} saved`;
+    renderWarnings(data.warnings);
+    clearDirty();
+    $("save-btn").textContent = "Saved ✓";
+    setTimeout(() => { $("save-btn").textContent = "Save reviewed"; }, 1400);
+  } catch (err) {
+    alert("Save failed: " + err.message);
+    $("save-btn").textContent = "Save reviewed";
+    $("save-btn").disabled = false;
+  }
+}
+
+$("save-btn").addEventListener("click", save);
+$("reload-btn").addEventListener("click", () => {
+  if (DIRTY && !confirm("Discard unsaved changes and reload from disk?")) return;
+  loadBundle();
+});
+window.addEventListener("beforeunload", (e) => {
+  if (DIRTY) { e.preventDefault(); e.returnValue = ""; }
+});
+
+loadBundle();
+</script>
+</body>
+</html>

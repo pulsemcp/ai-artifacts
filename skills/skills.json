@@ -23,6 +23,18 @@
     "path": "agent-transcript-analysis/2-decompose/decompose-into-transcript-segments",
     "references": ["transcript-segment", "open-transcripts-transcript", "open-transcripts-events"]
   },
+  "review-transcript-segments": {
+    "title": "Review Transcript Segments",
+    "description": "Open a localhost UI to audit and correct the AI-drafted Segment tree. Every Trigger/Goal/Outcome field is editable; split leaves, merge siblings, attach context notes. Saves segments.reviewed.json next to the draft with full correction provenance. Optional human review checkpoint for tier 2.",
+    "path": "agent-transcript-analysis/2-decompose/review-transcript-segments",
+    "references": ["transcript-segment", "open-transcripts-transcript", "open-transcripts-events"]
+  },
+  "learn-from-segment-corrections": {
+    "title": "Learn From Segment Corrections",
+    "description": "Read the human corrections captured in segments.reviewed.json files, cluster them into recurring patterns, and propose concrete heuristic changes to decompose-into-transcript-segments. Closes the loop between human review and the draft generator.",
+    "path": "agent-transcript-analysis/2-decompose/learn-from-segment-corrections",
+    "references": ["transcript-segment"]
+  },
   "analyze-agent-transcript": {
     "title": "Analyze Agent Transcript",
     "description": "Orchestrator. Drives decomposition (tier 2) and the per-Segment analyzers (tier 4) and produces a single consolidated report of actionable recommendations across human prompting, Skills, and MCP servers.",
