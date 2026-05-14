@@ -91,18 +91,31 @@ def _short(s: str, limit: int = PREVIEW_MAX_CHARS) -> str:
 
 
 def _build_preview(jsonl_path: Path) -> dict[str, Any]:
-    """Walk the JSONL once, extract:
+    """Walk the JSONL once, extract a compact preview with everything the UI
+    needs for filtering, sorting, and at-a-glance triage.
 
-    - ``first_prompt``: text of the first ``user`` line whose content is not a tool_result.
-    - ``last_response``: text of the last ``assistant`` line that has text content.
+    Fields:
+    - ``first_prompt`` / ``last_response``: snippets (redacted, truncated).
     - ``started_at`` / ``ended_at``: first and last timestamps seen.
-    - ``message_count``: number of user/assistant messages (rough size signal).
+    - ``user_turns``: count of user lines that aren't tool_results.
+    - ``assistant_turns``: count of assistant lines.
+    - ``input_tokens`` / ``output_tokens`` / ``cache_creation_tokens`` /
+      ``cache_read_tokens``: summed from ``message.usage`` on assistant lines.
+    - ``git_branch``: first non-empty ``gitBranch`` field seen.
+    - ``model``: most recent ``message.model`` from an assistant line.
     """
     first_prompt = ""
     last_response = ""
     started_at: str | None = None
     ended_at: str | None = None
-    message_count = 0
+    user_turns = 0
+    assistant_turns = 0
+    input_tokens = 0
+    output_tokens = 0
+    cache_creation_tokens = 0
+    cache_read_tokens = 0
+    git_branch = ""
+    model = ""
 
     try:
         for line in iter_jsonl(jsonl_path):
@@ -111,6 +124,12 @@ def _build_preview(jsonl_path: Path) -> dict[str, Any]:
                 if started_at is None:
                     started_at = ts
                 ended_at = ts
+
+            if not git_branch:
+                gb = line.get("gitBranch")
+                if isinstance(gb, str) and gb:
+                    git_branch = gb
+
             line_type = line.get("type")
             msg = line.get("message") if isinstance(line.get("message"), dict) else {}
             content = msg.get("content") if isinstance(msg, dict) else None
@@ -124,12 +143,21 @@ def _build_preview(jsonl_path: Path) -> dict[str, Any]:
                 if text and not first_prompt:
                     first_prompt = text
                 if text:
-                    message_count += 1
+                    user_turns += 1
             elif line_type == "assistant":
+                assistant_turns += 1
                 text = _text_from_blocks(content)
                 if text:
                     last_response = text
-                    message_count += 1
+                m = msg.get("model") if isinstance(msg, dict) else None
+                if isinstance(m, str) and m:
+                    model = m
+                usage = msg.get("usage") if isinstance(msg, dict) else None
+                if isinstance(usage, dict):
+                    input_tokens += int(usage.get("input_tokens") or 0)
+                    output_tokens += int(usage.get("output_tokens") or 0)
+                    cache_creation_tokens += int(usage.get("cache_creation_input_tokens") or 0)
+                    cache_read_tokens += int(usage.get("cache_read_input_tokens") or 0)
     except OSError as e:
         return {"error": f"read failed: {e}"}
 
@@ -138,7 +166,15 @@ def _build_preview(jsonl_path: Path) -> dict[str, Any]:
         "last_response": _short(redact_string(last_response)),
         "started_at": started_at,
         "ended_at": ended_at,
-        "message_count": message_count,
+        "user_turns": user_turns,
+        "assistant_turns": assistant_turns,
+        "message_count": user_turns + assistant_turns,
+        "input_tokens": input_tokens,
+        "output_tokens": output_tokens,
+        "cache_creation_tokens": cache_creation_tokens,
+        "cache_read_tokens": cache_read_tokens,
+        "git_branch": redact_string(git_branch),
+        "model": model,
     }
 
 
