@@ -5,17 +5,22 @@
     "description": "List all Claude Code session transcripts on this machine and spawn a local browser UI for picking one to analyze. Privacy-preserving: server-side redaction, localhost only, no uploads.",
     "path": "agent-transcript-analysis/1-acquire/find-all-claude-code-transcripts"
   },
-  "get-one-claude-code-transcript": {
-    "title": "Get One Claude Code Transcript",
-    "description": "Given a session id, produce a single OpenTranscripts transcript.json — the main session plus every subagent it spawned, linked and embedded in one self-contained document. Thin orchestrator over claude-code-to-open-transcript.",
-    "path": "agent-transcript-analysis/1-acquire/get-one-claude-code-transcript",
+  "get-claude-code-transcript": {
+    "title": "Get Claude Code Transcript",
+    "description": "Given a Claude Code session id (or a JSONL path), produce a single OpenTranscripts transcript.json — the main session plus every subagent it spawned, linked and embedded in one self-contained document. Owns the deterministic CC→OT mapping: no LLM, no heuristics, secret-redaction inline.",
+    "path": "agent-transcript-analysis/1-acquire/get-claude-code-transcript",
     "references": ["open-transcripts-transcript", "open-transcripts-events", "open-transcripts-claude-code-mapping"]
   },
-  "claude-code-to-open-transcript": {
-    "title": "Claude Code to OpenTranscripts",
-    "description": "Deterministic transformation: given a Claude Code session JSONL, produce a single OpenTranscripts Transcript JSON — main session plus every subagent linked via the canonical tool_use → tool_result → agentId chain. No LLM, no heuristics; pure field mapping. Owns the canonical CC→OT mapping.",
-    "path": "agent-transcript-analysis/1-acquire/claude-code-to-open-transcript",
-    "references": ["open-transcripts-transcript", "open-transcripts-events", "open-transcripts-claude-code-mapping"]
+  "gather-external-context": {
+    "title": "Gather External Context",
+    "description": "For a given transcript, gather the external context a reviewer would want before judging the session: the ticket the work traces back to (e.g. from Jira), the pull request it landed in (e.g. from GitHub), and background on the user's role/team/project. Consolidates everything into one external-context.json that travels with the transcript through every later tier. Best-effort: missing sources are recorded, never fatal.",
+    "path": "agent-transcript-analysis/1-acquire/gather-external-context",
+    "references": ["open-transcripts-transcript"]
+  },
+  "review-external-context": {
+    "title": "Review External Context",
+    "description": "Open a localhost UI to audit and correct the AI-gathered external-context.json — fix a wrong ticket, attach the right PR, adjust user context, flag low-confidence inferences. Saves external-context.reviewed.json next to the draft with full correction provenance. Optional human review checkpoint for tier 1, before decomposition runs.",
+    "path": "agent-transcript-analysis/1-acquire/review-external-context"
   },
   "decompose-into-transcript-segments": {
     "title": "Decompose Into Transcript Segments",

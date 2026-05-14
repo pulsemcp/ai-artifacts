@@ -17,6 +17,8 @@ Driven by Tier 3 (`3-orchestrate/analyze-agent-transcript`), once per Segment. E
 
 Analyzers in this tier do **not** read raw JSONL — they read Segments from `segments.json` produced by Tier 2. If a Segment field is missing or wrong, fix Tier 2 and re-run; don't patch around it here.
 
+`external-context.json` (from tier 1's `gather-external-context`, or its reviewed sibling) is available in the same `tmp_dir` and every analyzer is free to read it — the ticket, PR, and user context behind the session sharpen judgments about whether a Goal was the right one and whether an Outcome really succeeded. It is best-effort: analyzers must still produce a finding when it is absent. The narrower, on-demand counterpart is `pull-together-goal-context`, which reaches out only when a specific Segment's Goal is still unclear.
+
 ## Design decisions
 
 - **Three artifact-shaped buckets, one Segment-shaped bucket.** Prompts / Skills / MCP correspond to the three final-report buckets. `analyze-outcomes` is different in kind — it asks "did this Segment fail" and "was it efficient" — and routes its findings *into* the three artifact buckets via the gap analyzers.

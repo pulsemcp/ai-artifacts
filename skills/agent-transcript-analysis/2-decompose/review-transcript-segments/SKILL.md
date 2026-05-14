@@ -22,7 +22,7 @@ This is the **review checkpoint** for tier 2. It is optional — analyzers read 
 
 ## Inputs
 
-- `tmp_dir` (required): a transcript tmp_dir from `get-one-claude-code-transcript`. Must contain `segments.json` (or an existing `segments.reviewed.json` to keep iterating). `transcript.json` should also be present — it powers the event-preview index and lets the validator cross-check event ids.
+- `tmp_dir` (required): a transcript tmp_dir from `get-claude-code-transcript`. Must contain `segments.json` (or an existing `segments.reviewed.json` to keep iterating). `transcript.json` should also be present — it powers the event-preview index and lets the validator cross-check event ids.
 
 ## Outputs
 

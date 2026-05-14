@@ -1,7 +1,7 @@
 ---
 name: decompose-into-transcript-segments
 description: >
-  Given the tmp folder produced by get-one-claude-code-transcript (containing
+  Given the tmp folder produced by get-claude-code-transcript (containing
   transcript.json — an OpenTranscripts Transcript document), decompose the
   transcript into a recursive tree of Transcript Segments (see the
   transcript-segment reference). Each Segment
@@ -21,7 +21,7 @@ The Transcript Segment primitive (defined in the `transcript-segment` reference)
 
 ## Inputs
 
-- `tmp_dir` (required): output of `get-one-claude-code-transcript`. Must contain `transcript.json` (an OpenTranscripts `Transcript` document, possibly with nested subagents).
+- `tmp_dir` (required): output of `get-claude-code-transcript`. Must contain `transcript.json` (an OpenTranscripts `Transcript` document, possibly with nested subagents).
 
 ## Outputs
 

@@ -4,7 +4,7 @@ The orchestrator. Use this when you want a full single-session analysis — the 
 
 ## How it plugs in
 
-Upstream: consumes the tmp folder produced by `get-one-claude-code-transcript`.
+Upstream: consumes the tmp folder produced by `get-claude-code-transcript`.
 
 Drives, in order:
 

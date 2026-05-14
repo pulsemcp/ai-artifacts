@@ -4,7 +4,7 @@ The skill that produces the Transcript Segment tree. Sole gatekeeper of the data
 
 ## How it plugs in
 
-Upstream: `1-acquire/get-one-claude-code-transcript/` produces `transcript.json` (an OpenTranscripts Transcript document) — this skill consumes it.
+Upstream: `get-claude-code-transcript` produces `transcript.json` (an OpenTranscripts Transcript document) — this skill consumes it.
 
 Downstream: every tier-3 and tier-4 skill reads `segments.json` from the tmp folder, and dereferences event ids back into `transcript.json` for evidence. The flamegraph is for humans only.
 

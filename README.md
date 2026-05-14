@@ -74,7 +74,7 @@ The pipeline is built around the **Transcript Segment** — a recursive primitiv
                  │ session id
                  ▼
 ┌────────────────────────────────────┐
-│ 1: get-one-claude-code-transcript  │  Pull main + subagent transcripts
+│ 1: get-claude-code-transcript      │  Pull main + subagent transcripts
 └────────────────┬───────────────────┘  into a single tmp folder
                  │ tmp dir
                  ▼
@@ -114,7 +114,7 @@ The pipeline is built around the **Transcript Segment** — a recursive primitiv
 | Tier | Skill | Role |
 |---|---|---|
 | 1 — acquire | [`find-all-claude-code-transcripts`](skills/agent-transcript-analysis/1-acquire/find-all-claude-code-transcripts/SKILL.md) | Lists sessions from `~/.claude/projects` and spawns a local UI to pick one. |
-| 1 — acquire | [`get-one-claude-code-transcript`](skills/agent-transcript-analysis/1-acquire/get-one-claude-code-transcript/SKILL.md) | Given a session id, gathers the main transcript **plus any subagent transcripts** into a single tmp folder. |
+| 1 — acquire | [`get-claude-code-transcript`](skills/agent-transcript-analysis/1-acquire/get-claude-code-transcript/SKILL.md) | Given a session id, gathers the main transcript **plus any subagent transcripts** into a single tmp folder. |
 | 2 — decompose | [`decompose-into-transcript-segments`](skills/agent-transcript-analysis/2-decompose/decompose-into-transcript-segments/SKILL.md) | Walks the JSONL once and produces the recursive **Transcript Segment** tree (`segments.json`) plus an annotated `flamegraph.html`. Sole producer of the Segment primitive. |
 | 3 — orchestrate | [`analyze-agent-transcript`](skills/agent-transcript-analysis/3-orchestrate/analyze-agent-transcript/SKILL.md) | Orchestrator. Drives tier 2, runs the per-Segment analyzers in tier 4, and aggregates recommendations. |
 | 4 — analyze (outcomes) | [`analyze-failure-hypothesis`](skills/agent-transcript-analysis/4-analyze/analyze-outcomes/analyze-failure-hypothesis/SKILL.md) | For every Failure Outcome (and retro-Failure surfaced by a Correction Prompt), produces an improvement hypothesis. |
@@ -135,7 +135,7 @@ The pipeline is built around the **Transcript Segment** — a recursive primitiv
 This plugin is **local-first**. Transcripts live in `~/.claude/projects/`; analysis happens on your machine; the UI runs on `localhost`. Borrowing from the prior work in [`pulsemcp/agentic-engineering-infra`](https://github.com/pulsemcp/agentic-engineering-infra) (archived):
 
 - Server-side redaction of secrets (API keys, AWS creds, JWTs, private keys, connection strings, GitHub tokens, etc.) before any content reaches the browser.
-- No upload, no submit, no telemetry. The tmp folder produced by `get-one-claude-code-transcript` is yours; delete it when you're done.
+- No upload, no submit, no telemetry. The tmp folder produced by `get-claude-code-transcript` is yours; delete it when you're done.
 - All HTML/JS served from a single static file; no CDN imports, no build step.
 
 #### Prior art

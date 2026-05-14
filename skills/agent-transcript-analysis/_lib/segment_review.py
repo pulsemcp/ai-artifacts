@@ -43,7 +43,7 @@ TRIGGER_SOURCES = {"user", "agent", "subagent"}
 GOAL_KINDS = {"Plan", "Action"}
 OUTCOME_KINDS = {"Success", "Failure"}
 
-# --- filenames inside a get-one-claude-code-transcript tmp_dir ---
+# --- filenames inside a get-claude-code-transcript tmp_dir ---
 TRANSCRIPT_FILENAME = "transcript.json"
 DRAFT_FILENAME = "segments.json"
 REVIEWED_FILENAME = "segments.reviewed.json"

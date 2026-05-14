@@ -1,18 +1,23 @@
 #!/usr/bin/env python3
-"""Thin orchestrator: given a Claude Code session id, materialize a single
-OpenTranscripts document under a fresh tmp dir.
+"""Acquire one Claude Code session as a single OpenTranscripts document.
 
-Resolves the session id by scanning ``~/.claude/projects/*/<session-id>.jsonl``. If
-multiple matches exist (rare — same uuid across two project dirs), the most recently
-modified one wins.
+Given a session id (or a JSONL path directly), materialize one redacted
+`transcript.json` under a fresh tmp dir — the main session plus every subagent
+it spawned, linked and embedded recursively. The CC -> OpenTranscripts mapping
+is deterministic (no LLM, no heuristics); secret-redaction runs inline.
 
 Usage:
     python main.py <session-id> [--tmp-root <dir>] [--pretty]
+    python main.py --jsonl <path-to-session.jsonl> [--tmp-root <dir>] [--pretty]
+
+A session id is resolved by scanning ``~/.claude/projects/*/<session-id>.jsonl``.
+If multiple matches exist (same uuid across two project dirs), the most recently
+modified one wins.
 
 Output layout:
     <tmp-root>/<session-id>/
-        transcript.json        ← the OT document
-        run.log                ← redaction summary + per-step log
+        transcript.json        the OT document (redacted)
+        run.log                source, line/subagent/event counts, final metrics
 
 If ``--tmp-root`` is omitted, ``$TMPDIR/transcript-analysis/`` is used.
 """
@@ -26,7 +31,13 @@ import sys
 import tempfile
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+# Make _lib importable when this script is run directly. Walk up until the
+# package root is found, so the script keeps working regardless of how deep
+# the skill folder is nested.
+for _ancestor in Path(__file__).resolve().parents:
+    if (_ancestor / "_lib" / "__init__.py").exists():
+        sys.path.insert(0, str(_ancestor))
+        break
 
 from _lib.cc_jsonl import list_sessions, parse_session  # noqa: E402
 from _lib.open_transcripts import session_to_transcript  # noqa: E402
@@ -47,21 +58,43 @@ def resolve_session_jsonl(session_id: str) -> Path | None:
 
 def main(argv: list[str] | None = None) -> int:
     p = argparse.ArgumentParser(description=__doc__)
-    p.add_argument("session_id", help="Claude Code session UUID")
+    p.add_argument("session_id", nargs="?", help="Claude Code session UUID")
+    p.add_argument(
+        "--jsonl",
+        type=Path,
+        default=None,
+        help="Path to a CC session JSONL, used instead of a session id",
+    )
     p.add_argument("--tmp-root", type=Path, default=None)
     p.add_argument("--pretty", action="store_true")
     args = p.parse_args(argv)
 
-    jsonl = resolve_session_jsonl(args.session_id)
-    if jsonl is None:
+    if bool(args.session_id) == bool(args.jsonl):
         print(
-            f"error: session {args.session_id} not found under ~/.claude/projects/",
+            "error: pass exactly one of <session-id> or --jsonl <path>",
             file=sys.stderr,
         )
         return 2
 
+    if args.jsonl is not None:
+        jsonl = args.jsonl
+        if not jsonl.exists():
+            print(f"error: {jsonl} does not exist", file=sys.stderr)
+            return 2
+        session_id = jsonl.stem
+    else:
+        session_id = args.session_id
+        resolved = resolve_session_jsonl(session_id)
+        if resolved is None:
+            print(
+                f"error: session {session_id} not found under ~/.claude/projects/",
+                file=sys.stderr,
+            )
+            return 2
+        jsonl = resolved
+
     tmp_root = args.tmp_root or _default_tmp_root()
-    out_dir = tmp_root / args.session_id
+    out_dir = tmp_root / session_id
     out_dir.mkdir(parents=True, exist_ok=True)
 
     session = parse_session(jsonl)
@@ -77,7 +110,7 @@ def main(argv: list[str] | None = None) -> int:
     log_path = out_dir / "run.log"
     with log_path.open("w", encoding="utf-8") as f:
         f.write(f"source: {jsonl}\n")
-        f.write(f"session_id: {args.session_id}\n")
+        f.write(f"session_id: {session_id}\n")
         f.write(f"parent_lines: {len(session.parent_lines)}\n")
         f.write(f"subagents: {len(session.subagents)}\n")
         for sub in session.subagents:

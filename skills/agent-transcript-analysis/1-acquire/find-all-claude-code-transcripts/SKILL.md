@@ -11,7 +11,7 @@ user-invocable: true
 
 # Find All Claude Code Transcripts
 
-The entry point of the analysis workflow. Surfaces every session this machine has on disk and lets the caller pick one (or several) to feed into `get-one-claude-code-transcript`.
+The entry point of the analysis workflow. Surfaces every session this machine has on disk and lets the caller pick one (or several) to feed into `get-claude-code-transcript`.
 
 ## When to use
 
@@ -20,7 +20,7 @@ The entry point of the analysis workflow. Surfaces every session this machine ha
 - The user wants to start an analysis but hasn't specified a session id
 - You're chaining into `analyze-agent-transcript` and need to choose targets
 
-If the user already has a session id in hand, **skip this skill** and go straight to `get-one-claude-code-transcript`.
+If the user already has a session id in hand, **skip this skill** and go straight to `get-claude-code-transcript`.
 
 ## Invocation
 
@@ -28,7 +28,7 @@ If the user already has a session id in hand, **skip this skill** and go straigh
 python main.py [--port 9849] [--no-browser]
 ```
 
-`main.py` starts an HTTP server on `127.0.0.1:<port>` (default `9849`) and serves `ui.html`. The UI shows every session under `~/.claude/projects/`, sortable / filterable. Clicking "Analyze" POSTs to `/api/analyze`, which runs `get-one-claude-code-transcript` and surfaces the resulting `transcript.json` path.
+`main.py` starts an HTTP server on `127.0.0.1:<port>` (default `9849`) and serves `ui.html`. The UI shows every session under `~/.claude/projects/`, sortable / filterable. Clicking "Analyze" POSTs to `/api/analyze`, which runs `get-claude-code-transcript` and surfaces the resulting `transcript.json` path.
 
 Pass `--no-browser` to skip the auto-open (useful on remote / headless hosts where the user opens the URL manually).
 
@@ -59,7 +59,7 @@ None required. Optional:
 
 ## Outputs
 
-- A list of `{session_id, project, jsonl_path, last_active}` objects. The agent should hand these to `get-one-claude-code-transcript` next.
+- A list of `{session_id, project, jsonl_path, last_active}` objects. The agent should hand these to `get-claude-code-transcript` next.
 
 ## Privacy
 

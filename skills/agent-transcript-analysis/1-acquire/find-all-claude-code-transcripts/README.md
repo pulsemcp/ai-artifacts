@@ -5,9 +5,9 @@ Entry point of the analysis flow. Use this when you want to analyze a session bu
 ## How it plugs in
 
 Upstream: none — this is the start of the chain.
-Downstream: hands the chosen `session_id` to `get-one-claude-code-transcript`, which materializes the tmp folder the analyzers consume.
+Downstream: hands the chosen `session_id` to `get-claude-code-transcript`, which materializes the tmp folder the analyzers consume.
 
-If the session id is already known, skip this and go straight to `get-one-claude-code-transcript`.
+If the session id is already known, skip this and go straight to `get-claude-code-transcript`.
 
 ## Design decisions
 

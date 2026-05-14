@@ -1,8 +1,8 @@
 # Claude Code → OpenTranscripts mapping
 
-How Claude Code's `~/.claude/projects/<project-slug>/<session-uuid>.jsonl` files map onto OpenTranscripts v0.1. This is the canonical field-by-field reference used by the [`claude-code-to-open-transcript`](../../../skills/agent-transcript-analysis/1-acquire/claude-code-to-open-transcript/SKILL.md) skill.
+How Claude Code's `~/.claude/projects/<project-slug>/<session-uuid>.jsonl` files map onto OpenTranscripts v0.1. This is the canonical field-by-field reference used by the `get-claude-code-transcript` skill.
 
-Maintenance contract: whenever CC adds, renames, or removes a JSONL field, update this doc *first*; the transformation skill follows.
+Maintenance contract: this doc is the canonical spec for the mapping. When CC adds, renames, or removes a JSONL field, `get-claude-code-transcript` keeps running — any line it can't place becomes a `SystemEvent` and is accumulated in `provider.raw.unmapped_lines[]` rather than dropped — and the drift is reconciled back into this doc. Updating here is what promotes a drifted line back to a first-class event.
 
 ## Source shape (what CC writes)
 
