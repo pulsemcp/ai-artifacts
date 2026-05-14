@@ -123,7 +123,7 @@
 <div class="banner">
   <strong>This UI just picks transcripts.</strong> The actual analysis runs inside Claude Code (Skills can't be invoked from a browser). To analyze:
   <ol>
-    <li>Filter / sort to find the sessions you care about (column headers sort; the bar below filters).</li>
+    <li>Filter / sort to find the sessions you care about (column headers sort; the bar below filters). <em>Defaults to the last 7 days with ≥10k tokens — hit Reset to see everything.</em></li>
     <li>Tick the boxes (or click rows) for the transcripts you want.</li>
     <li>Copy the prompt from the bar at the bottom and paste it into a Claude Code session with this plugin installed.</li>
   </ol>
@@ -154,7 +154,7 @@
     <label for="f-since">Since</label>
     <input type="date" id="f-since">
   </div>
-  <button class="reset" id="f-reset" title="Clear all filters">Reset</button>
+  <button class="reset" id="f-reset" title="Reset filters to defaults (last 7 days, substantive sessions)">Reset</button>
 </div>
 
 <table>
@@ -210,6 +210,13 @@ let PREVIEWS = new Map();
 let SELECTED = new Set();
 let VISIBLE = [];
 const RENDER_LIMIT = 500;
+
+// Default view: recent, substantive sessions only — keeps junk (quick `whoami`
+// checks, aborted starts) out of the way. Almost every session sits at a ~42k
+// token floor (the cached system prompt), so the meaningful "real work" cut is
+// well above that — 50k. The Reset button restores these defaults.
+const DEFAULT_SINCE_DAYS = 7;
+const DEFAULT_MIN_TOKENS = 50000;
 
 let SORT = { key: 'when', dir: 'desc' };
 
@@ -580,14 +587,22 @@ $fProject.addEventListener('change', render);
 $fBranch.addEventListener('change', render);
 $fSince.addEventListener('change', render);
 $fReset.addEventListener('click', () => {
-  $fSearch.value = '';
-  $fMinTurns.value = '';
-  $fMinTokens.value = '';
-  $fProject.value = '';
-  $fBranch.value = '';
-  $fSince.value = '';
+  applyDefaultFilters();
   render();
 });
+
+// Seed the filter bar with the default view before the first fetch, so the
+// initial render is already scoped to recent + substantive sessions. Also used
+// by the Reset button — "reset" means back to defaults, not back to nothing.
+function applyDefaultFilters() {
+  $fSearch.value = '';
+  $fMinTurns.value = '';
+  $fProject.value = '';
+  $fBranch.value = '';
+  const since = new Date(Date.now() - DEFAULT_SINCE_DAYS * 86400 * 1000);
+  $fSince.value = since.toISOString().slice(0, 10);
+  $fMinTokens.value = String(DEFAULT_MIN_TOKENS);
+}
 
 async function loadSessions() {
   try {
@@ -639,6 +654,7 @@ async function pollProgress() {
   }
 }
 
+applyDefaultFilters();
 loadSessions();
 </script>
 </body>
