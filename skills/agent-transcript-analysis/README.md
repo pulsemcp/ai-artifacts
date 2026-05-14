@@ -99,7 +99,7 @@ flowchart TD
         LRC["<b>learn-from-report-corrections</b><br/>cluster corrections; flag synthesis fixes"]
     end
 
-    subgraph XB["Tier 3 · analyze-cross-transcript — batch pass over many transcripts"]
+    subgraph XB["analyze-cross-transcript — batch pass over many transcripts"]
         XT["<b>analyze-cross-transcript-patterns</b><br/>many report.md → cross-transcript findings"]
     end
 
