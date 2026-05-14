@@ -9,7 +9,7 @@ description: >
   PR the gatherer missed, correct role / team details, resolve what it could
   not. Saving writes external-context.reviewed.json next to the draft (the
   draft is never overwritten) with full correction provenance. Use after
-  gather-external-context and before decompose-into-transcript-segments when
+  gather-external-context and before decompose-agent-transcript-into-transcript-segments when
   you want human-blessed context. Optional but recommended.
 user-invocable: true
 ---

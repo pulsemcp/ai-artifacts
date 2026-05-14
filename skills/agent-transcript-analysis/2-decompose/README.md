@@ -4,9 +4,9 @@ Decomposition layer. Turns an OpenTranscripts `transcript.json` (produced by tie
 
 ## Skills in this tier
 
-- `decompose-into-transcript-segments/` — emits `segments.json` (structured) and `flamegraph.html` (annotated viz). Sole producer of the Segment primitive.
+- `decompose-agent-transcript-into-transcript-segments/` — emits `segments.json` (structured) and `flamegraph.html` (annotated viz). Sole producer of the Segment primitive.
 - `review-transcript-segments/` — **optional human review checkpoint.** Opens a localhost UI to audit and correct the AI-drafted tree; writes `segments.reviewed.json` next to the draft with full correction provenance. The draft is never overwritten.
-- `learn-from-segment-corrections/` — **optional feedback loop.** Reads the corrections captured by `review-transcript-segments`, clusters them into patterns, and flags concrete improvement opportunities for `decompose-into-transcript-segments` — it does not edit any skill.
+- `learn-from-segment-corrections/` — **optional feedback loop.** Reads the corrections captured by `review-transcript-segments`, clusters them into patterns, and flags concrete improvement opportunities for `decompose-agent-transcript-into-transcript-segments` — it does not edit any skill.
 
 ## How this tier plugs into the rest
 
@@ -19,10 +19,10 @@ Downstream readers go through `_lib/segment_review.py::load_bundle`, which **pre
 The review subsystem is its own loop:
 
 ```
-decompose-into-transcript-segments  →  segments.json (AI draft)
-review-transcript-segments          →  segments.reviewed.json + append-only correction log
-learn-from-segment-corrections      →  flagged opportunities for decompose-into-transcript-segments
-       └──────────────── close the loop ───────────────┘
+decompose-agent-transcript-into-transcript-segments  →  segments.json (AI draft)
+review-transcript-segments                           →  segments.reviewed.json + append-only correction log
+learn-from-segment-corrections                       →  flagged opportunities for decompose-agent-transcript-into-transcript-segments
+       └──────────────────────── close the loop ────────────────────────┘
 ```
 
 ## Design decisions

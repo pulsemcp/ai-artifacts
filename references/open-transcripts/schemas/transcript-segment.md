@@ -140,7 +140,7 @@ When analyzing a Segment, look for these in order. Anything that fires becomes a
 
 ## Output contract
 
-`decompose-into-transcript-segments` consumes a `Transcript` (the JSON document defined by [`transcript.md`](./transcript.md)) and emits **both**:
+`decompose-agent-transcript-into-transcript-segments` consumes a `Transcript` (the JSON document defined by [`transcript.md`](./transcript.md)) and emits **both**:
 
 1. **`segments.json`** — the structured tree. Every analyzer in tier 4 reads this and dereferences event ids into the Transcript as needed. Schema and example below.
 2. **`flamegraph.html`** — annotated visualization. The X axis is wall-clock time; the Y axis is Segment depth. Each block is color-coded by Outcome (green = Success, red = Failure) with a badge for any Correction trigger at the Segment's head (badge variant indicates `source: user` vs `source: agent`). Hover/click reveals the Goal text and meta.

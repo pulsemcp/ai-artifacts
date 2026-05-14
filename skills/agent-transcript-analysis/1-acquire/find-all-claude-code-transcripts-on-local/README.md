@@ -1,13 +1,13 @@
-# `find-all-claude-code-transcripts`
+# `find-all-claude-code-transcripts-on-local`
 
 Entry point of the analysis flow. Use this when you want to analyze a session but don't have its id yet — it lists everything under `~/.claude/projects/` and lets you pick one.
 
 ## How it plugs in
 
 Upstream: none — this is the start of the chain.
-Downstream: hands the chosen `session_id` to `get-claude-code-transcript`, which materializes the tmp folder the analyzers consume.
+Downstream: hands the chosen `session_id` to `get-claude-code-transcript-from-local`, which materializes the tmp folder the analyzers consume.
 
-If the session id is already known, skip this and go straight to `get-claude-code-transcript`.
+If the session id is already known, skip this and go straight to `get-claude-code-transcript-from-local`.
 
 ## Design decisions
 

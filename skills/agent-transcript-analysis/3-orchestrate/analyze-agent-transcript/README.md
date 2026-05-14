@@ -4,11 +4,11 @@ The orchestrator. Use this when you want a full single-session analysis — the 
 
 ## How it plugs in
 
-Upstream: consumes the tmp folder produced by `get-claude-code-transcript`.
+Upstream: consumes the tmp folder produced by `get-claude-code-transcript-from-local`.
 
 Drives, in order:
 
-1. **Tier 2**: `decompose-into-transcript-segments` to produce `segments.json` and `flamegraph.html` in the tmp folder.
+1. **Tier 2**: `decompose-agent-transcript-into-transcript-segments` to produce `segments.json` and `flamegraph.html` in the tmp folder.
 2. **Tier 4**, per Segment, across four buckets:
    - `analyze-outcomes/` — `analyze-segment-efficiency`, `analyze-failure-hypothesis`.
    - `analyze-prompts/` — `analyze-user-prompt`, `analyze-prompt-ambition`, helper `pull-together-goal-context`.
@@ -17,7 +17,7 @@ Drives, in order:
 
 Aggregates everything into the three output buckets: Prompting, Skills, MCP.
 
-Downstream of this orchestrator: `5-cross-transcript/analyze-cross-transcript-patterns` consumes many of these reports at once.
+Downstream of this orchestrator: `analyze-cross-transcript-patterns` consumes many of these reports at once.
 
 The tier-4 analyzers are not the supported entry point — invoke them directly only when debugging.
 

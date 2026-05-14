@@ -1,10 +1,10 @@
-# `decompose-into-transcript-segments`
+# `decompose-agent-transcript-into-transcript-segments`
 
 The skill that produces the Transcript Segment tree. Sole gatekeeper of the data model in the `transcript-segment` reference.
 
 ## How it plugs in
 
-Upstream: `get-claude-code-transcript` produces `transcript.json` (an OpenTranscripts Transcript document) — this skill consumes it.
+Upstream: `get-claude-code-transcript-from-local` produces `transcript.json` (an OpenTranscripts Transcript document) — this skill consumes it.
 
 Downstream: every tier-3 and tier-4 skill reads `segments.json` from the tmp folder, and dereferences event ids back into `transcript.json` for evidence. The flamegraph is for humans only.
 

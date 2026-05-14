@@ -2,8 +2,8 @@
 name: analyze-agent-transcript
 description: >
   Orchestrator for analyzing a single Claude Code session transcript. Takes
-  the tmp folder produced by get-claude-code-transcript, invokes
-  decompose-into-transcript-segments to produce the Segment tree, then drives
+  the tmp folder produced by get-claude-code-transcript-from-local, invokes
+  decompose-agent-transcript-into-transcript-segments to produce the Segment tree, then drives
   the per-Segment analyzers across four buckets (outcomes, prompts, skills,
   mcp) and aggregates their findings into actionable recommendations across
   three output buckets: human prompting, Skills (create/modify/delete), and
@@ -17,11 +17,11 @@ user-invocable: true
 
 The orchestrator. Turns a transcript into an actionable list of changes — to the user's prompting habits, to the Skill portfolio, and to the MCP server portfolio.
 
-The Transcript Segment is the analysis primitive. See the `transcript-segment` reference for the data model. This skill does not walk raw JSONL — it asks `decompose-into-transcript-segments` for `segments.json` and reads only from there.
+The Transcript Segment is the analysis primitive. See the `transcript-segment` reference for the data model. This skill does not walk raw JSONL — it asks `decompose-agent-transcript-into-transcript-segments` for `segments.json` and reads only from there.
 
 ## Inputs
 
-- `tmp_dir` (required): output of `get-claude-code-transcript`. Must contain `transcript.json` (an OpenTranscripts `Transcript` document, subagents embedded recursively).
+- `tmp_dir` (required): output of `get-claude-code-transcript-from-local`. Must contain `transcript.json` (an OpenTranscripts `Transcript` document, subagents embedded recursively).
 - `external_context` (optional): `external-context.json` — or `external-context.reviewed.json` — in the same `tmp_dir`, produced by `gather-external-context`. The ticket, PR, and user context behind the session. When present, pass it through to tier 2 and the tier-4 analyzers so Goal/Outcome judgments are grounded in *why* the session happened. Best-effort: absent is fine, never fatal.
 - `philosophy_skills` (optional): the `philosophy-on-skills` reference. Defaults to the bundled copy.
 - `philosophy_mcp` (optional): the `philosophy-on-mcp` reference. Defaults to the bundled copy.
@@ -67,7 +67,7 @@ Every recommendation must be specific enough to act on — to open a PR, to rewr
 ## Sequencing checklist
 
 - [ ] **Pick up external context if it exists.** Check `tmp_dir` for `external-context.json` (prefer `external-context.reviewed.json`). If present, hold it as shared context for tier 2 and every tier-4 analyzer. If absent, proceed — it is best-effort, never required.
-- [ ] **Decompose first.** Invoke `decompose-into-transcript-segments` with `tmp_dir`. It produces `segments.json` and `flamegraph.html` in `tmp_dir`. Do **not** walk raw JSONL from this skill — that's tier 2's job, exclusively.
+- [ ] **Decompose first.** Invoke `decompose-agent-transcript-into-transcript-segments` with `tmp_dir`. It produces `segments.json` and `flamegraph.html` in `tmp_dir`. Do **not** walk raw JSONL from this skill — that's tier 2's job, exclusively.
 - [ ] Load `segments.json`. The Segment tree is now the unit of analysis.
 - [ ] For each Segment, in tree order (parent before children, or vice versa — the analyzers don't care, but findings reference Segment ids), run the per-Segment analyzers in this order:
   - [ ] **Outcomes bucket** (always):
@@ -91,7 +91,7 @@ Every recommendation must be specific enough to act on — to open a PR, to rewr
 
 ## Out of scope
 
-- Acquiring the transcript — that's `get-claude-code-transcript`.
-- Producing `segments.json` — that's `decompose-into-transcript-segments`.
+- Acquiring the transcript — that's `get-claude-code-transcript-from-local`.
+- Producing `segments.json` — that's `decompose-agent-transcript-into-transcript-segments`.
 - The actual per-Segment scoring — that's the tier-4 analyzers below this orchestrator.
-- Cross-session patterns — that's `analyze-cross-transcript-patterns` in tier 5.
+- Cross-session patterns — that's `analyze-cross-transcript-patterns`, in tier 4's `analyze-cross-transcript` bucket.

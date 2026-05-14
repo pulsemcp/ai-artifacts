@@ -1,14 +1,14 @@
 {
   "$schema": "https://raw.githubusercontent.com/pulsemcp/air/main/schemas/skills.schema.json",
-  "find-all-claude-code-transcripts": {
-    "title": "Find All Claude Code Transcripts",
+  "find-all-claude-code-transcripts-on-local": {
+    "title": "Find All Claude Code Transcripts On Local",
     "description": "List all Claude Code session transcripts on this machine and spawn a local browser UI for picking one to analyze. Privacy-preserving: server-side redaction, localhost only, no uploads.",
-    "path": "agent-transcript-analysis/1-acquire/find-all-claude-code-transcripts"
+    "path": "agent-transcript-analysis/1-acquire/find-all-claude-code-transcripts-on-local"
   },
-  "get-claude-code-transcript": {
-    "title": "Get Claude Code Transcript",
+  "get-claude-code-transcript-from-local": {
+    "title": "Get Claude Code Transcript From Local",
     "description": "Given a Claude Code session id (or a JSONL path), produce a single OpenTranscripts transcript.json — the main session plus every subagent it spawned, linked and embedded in one self-contained document. Owns the deterministic CC→OT mapping: no LLM, no heuristics, secret-redaction inline.",
-    "path": "agent-transcript-analysis/1-acquire/get-claude-code-transcript",
+    "path": "agent-transcript-analysis/1-acquire/get-claude-code-transcript-from-local",
     "references": ["open-transcripts-transcript", "open-transcripts-events", "open-transcripts-claude-code-mapping"]
   },
   "gather-external-context": {
@@ -22,10 +22,10 @@
     "description": "Open a localhost UI to audit and correct the AI-gathered external-context.json — fix a wrong ticket, attach the right PR, adjust user context, flag low-confidence inferences. Saves external-context.reviewed.json next to the draft with full correction provenance. Optional human review checkpoint for tier 1, before decomposition runs.",
     "path": "agent-transcript-analysis/1-acquire/review-external-context"
   },
-  "decompose-into-transcript-segments": {
-    "title": "Decompose Into Transcript Segments",
+  "decompose-agent-transcript-into-transcript-segments": {
+    "title": "Decompose Agent Transcript Into Transcript Segments",
     "description": "Walk an OpenTranscripts transcript.json once and produce the recursive Transcript Segment tree (segments.json) plus an annotated flamegraph. Sole producer of the Segment primitive consumed by every downstream analyzer.",
-    "path": "agent-transcript-analysis/2-decompose/decompose-into-transcript-segments",
+    "path": "agent-transcript-analysis/2-decompose/decompose-agent-transcript-into-transcript-segments",
     "references": ["transcript-segment", "open-transcripts-transcript", "open-transcripts-events"]
   },
   "review-transcript-segments": {
@@ -36,7 +36,7 @@
   },
   "learn-from-segment-corrections": {
     "title": "Learn From Segment Corrections",
-    "description": "Read the human corrections captured in segments.reviewed.json files, cluster them into recurring patterns, and propose concrete heuristic changes to decompose-into-transcript-segments. Closes the loop between human review and the draft generator.",
+    "description": "Read the human corrections captured in segments.reviewed.json files, cluster them into recurring patterns, and propose concrete heuristic changes to decompose-agent-transcript-into-transcript-segments. Closes the loop between human review and the draft generator.",
     "path": "agent-transcript-analysis/2-decompose/learn-from-segment-corrections",
     "references": ["transcript-segment"]
   },
@@ -114,7 +114,7 @@
   "analyze-cross-transcript-patterns": {
     "title": "Analyze Cross-Transcript Patterns",
     "description": "Cross-cutting analyzer. Given the consolidated reports of several already-analyzed transcripts, surface patterns no single transcript reveals: hindsight-as-foresight Segment patterns, recurring user prompts, deduped Skill/MCP gaps, and time-spend patterns.",
-    "path": "agent-transcript-analysis/5-cross-transcript/analyze-cross-transcript-patterns",
+    "path": "agent-transcript-analysis/4-analyze/analyze-cross-transcript/analyze-cross-transcript-patterns",
     "references": ["philosophy-on-skills", "philosophy-on-mcp", "transcript-segment"]
   }
 }

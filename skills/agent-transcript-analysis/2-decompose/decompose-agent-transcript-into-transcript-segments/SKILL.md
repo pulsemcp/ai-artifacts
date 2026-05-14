@@ -1,7 +1,7 @@
 ---
-name: decompose-into-transcript-segments
+name: decompose-agent-transcript-into-transcript-segments
 description: >
-  Given the tmp folder produced by get-claude-code-transcript (containing
+  Given the tmp folder produced by get-claude-code-transcript-from-local (containing
   transcript.json — an OpenTranscripts Transcript document), decompose the
   transcript into a recursive tree of Transcript Segments (see the
   transcript-segment reference). Each Segment
@@ -21,7 +21,7 @@ The Transcript Segment primitive (defined in the `transcript-segment` reference)
 
 ## Inputs
 
-- `tmp_dir` (required): output of `get-claude-code-transcript`. Must contain `transcript.json` (an OpenTranscripts `Transcript` document, possibly with nested subagents).
+- `tmp_dir` (required): output of `get-claude-code-transcript-from-local`. Must contain `transcript.json` (an OpenTranscripts `Transcript` document, possibly with nested subagents).
 
 ## Outputs
 
@@ -61,7 +61,7 @@ Both must agree. Downstream skills read `segments.json`; humans look at `flamegr
 
 - Acquiring the transcript or transforming CC JSONL — that's tier 1.
 - Any analysis or recommendation — every `analyze-*` skill is downstream of this.
-- Cross-transcript work — that's tier 5.
+- Cross-transcript work — that's `analyze-cross-transcript-patterns`.
 
 ## Notes
 

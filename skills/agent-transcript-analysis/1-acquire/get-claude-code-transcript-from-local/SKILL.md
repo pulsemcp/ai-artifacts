@@ -1,12 +1,12 @@
 ---
-name: get-claude-code-transcript
+name: get-claude-code-transcript-from-local
 description: >
   Given a Claude Code session id (or a JSONL path), produce a single
   OpenTranscripts `transcript.json` — the main session plus every subagent it
   spawned, linked and nested in one self-contained JSON document. The CC →
   OpenTranscripts mapping is deterministic (no LLM, no heuristics) per the
   open-transcripts-claude-code-mapping reference, and secret-redaction runs
-  inline. Use this skill after find-all-claude-code-transcripts (or when the
+  inline. Use this skill after find-all-claude-code-transcripts-on-local (or when the
   session id is already known) and before any of the analyze-* skills. The
   output is a path to a tmp directory containing transcript.json conforming
   to the open-transcripts-transcript reference.
@@ -121,8 +121,8 @@ Subagents may themselves spawn subagents; the same recursion applies. No depth l
 
 ## Out of scope
 
-- Picking which session to pull — that's `find-all-claude-code-transcripts`.
-- Decomposing the Transcript into Segments — that's tier 2 (`decompose-into-transcript-segments`).
+- Picking which session to pull — that's `find-all-claude-code-transcripts-on-local`.
+- Decomposing the Transcript into Segments — that's tier 2 (`decompose-agent-transcript-into-transcript-segments`).
 - Any analysis or scoring — that's the `analyze-*` skills.
 
 ## When the Claude Code format drifts

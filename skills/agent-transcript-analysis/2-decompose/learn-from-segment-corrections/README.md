@@ -1,6 +1,6 @@
 # `learn-from-segment-corrections`
 
-The feedback half of the tier-2 review loop. Reads the human corrections captured by `review-transcript-segments` and **flags concrete improvement opportunities** for `decompose-into-transcript-segments` — it does not edit any skill.
+The feedback half of the tier-2 review loop. Reads the human corrections captured by `review-transcript-segments` and **flags concrete improvement opportunities** for `decompose-agent-transcript-into-transcript-segments` — it does not edit any skill.
 
 ## Why this exists
 
@@ -26,14 +26,14 @@ tmp_dir(s)/
   segment-correction-learnings.md   # written: clustered patterns + flagged opportunities
 ```
 
-The output is a **write-up of flagged opportunities for a human**, not an applied change. This skill never edits `decompose-into-transcript-segments` — the skill files it can see are a deployed copy, not the source of truth. It does the analysis that makes a change obvious and well-motivated; a human makes the change, at its source, through the usual PR gate.
+The output is a **write-up of flagged opportunities for a human**, not an applied change. This skill never edits `decompose-agent-transcript-into-transcript-segments` — the skill files it can see are a deployed copy, not the source of truth. It does the analysis that makes a change obvious and well-motivated; a human makes the change, at its source, through the usual PR gate.
 
 ## The loop
 
 ```
-decompose-into-transcript-segments   →  segments.json        (AI draft)
+decompose-agent-transcript-into-transcript-segments   →  segments.json        (AI draft)
 review-transcript-segments           →  segments.reviewed.json + correction log
-learn-from-segment-corrections       →  flagged opportunities for decompose-into-transcript-segments
+learn-from-segment-corrections       →  flagged opportunities for decompose-agent-transcript-into-transcript-segments
         └──────────────── close the loop ────────────────┘
 ```
 

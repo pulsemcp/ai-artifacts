@@ -8,7 +8,7 @@ The single-skill layer in the middle of the pipeline. Owns fan-out to the per-Se
 
 ## How this tier plugs into the rest
 
-Tier 3 sits between Tier 2 (`2-decompose/decompose-into-transcript-segments`) and Tier 4 (per-domain analysis). It consumes `segments.json` (and `flamegraph.html`) from Tier 2, drives each Tier 4 analyzer per Segment, and emits the final consolidated report. Downstream of this tier, `5-cross-transcript/analyze-cross-transcript-patterns` aggregates many such reports.
+Tier 3 sits between Tier 2 (`decompose-agent-transcript-into-transcript-segments`) and Tier 4 (per-domain analysis). It consumes `segments.json` (and `flamegraph.html`) from Tier 2, drives each Tier 4 analyzer per Segment, and emits the final consolidated report. Downstream of this tier, `analyze-cross-transcript-patterns` aggregates many such reports.
 
 The orchestrator is the **supported entry point** for analysis. Per-domain analyzers from Tier 4 should not be invoked directly except when debugging. Tier 2's decomposer is invoked by the orchestrator, not by the user.
 

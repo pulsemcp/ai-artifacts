@@ -16,9 +16,9 @@ user-invocable: true
 
 # Learn from segment corrections
 
-`review-transcript-segments` captures, in structured form, every place a human disagreed with the decomposer's draft. This skill is the **other half of that loop**: it reads those corrections, finds the patterns in them, and **flags concrete improvement opportunities** for the `decompose-into-transcript-segments` heuristics — so a human knows exactly where the decomposer is drifting from what they'd have done.
+`review-transcript-segments` captures, in structured form, every place a human disagreed with the decomposer's draft. This skill is the **other half of that loop**: it reads those corrections, finds the patterns in them, and **flags concrete improvement opportunities** for the `decompose-agent-transcript-into-transcript-segments` heuristics — so a human knows exactly where the decomposer is drifting from what they'd have done.
 
-It **flags opportunities; it does not apply them.** This skill never edits `decompose-into-transcript-segments` (or any other skill). The skill files visible at runtime are a deployed copy — their source of truth lives elsewhere — so the right move is always to *surface* the opportunity for a human, not to patch the copy in place.
+It **flags opportunities; it does not apply them.** This skill never edits `decompose-agent-transcript-into-transcript-segments` (or any other skill). The skill files visible at runtime are a deployed copy — their source of truth lives elsewhere — so the right move is always to *surface* the opportunity for a human, not to patch the copy in place.
 
 Without this skill, review is a one-shot cleanup. With it, every review tells you something actionable about the draft generator.
 
@@ -30,7 +30,7 @@ Without this skill, review is a one-shot cleanup. With it, every review tells yo
 
 - **`segment-correction-learnings.md`** — written to the first `tmp_dir` (or a path the caller specifies). A write-up of flagged opportunities for a human, not an applied change. It contains:
   - **Correction patterns** — the corrections clustered by what they have in common (e.g. "the decomposer keeps marking agent-source pivots as `New` when the human reclassifies them `Correction`").
-  - **Flagged opportunities** — for each pattern, which `decompose-into-transcript-segments` heuristic appears to be misfiring and **in which direction** (too aggressive / too conservative / missing entirely), with the corrections that motivate it cited as evidence. Describe the opportunity precisely enough that a human can act on it — but stop there: don't write a ready-to-paste edit, and don't point at skill files by path.
+  - **Flagged opportunities** — for each pattern, which `decompose-agent-transcript-into-transcript-segments` heuristic appears to be misfiring and **in which direction** (too aggressive / too conservative / missing entirely), with the corrections that motivate it cited as evidence. Describe the opportunity precisely enough that a human can act on it — but stop there: don't write a ready-to-paste edit, and don't point at skill files by path.
   - **Open questions** — corrections that don't generalize yet, or that conflict with each other, flagged for a human to weigh in.
 
 This skill **flags; it does not apply.** Whoever picks up the write-up decides whether and how to change the decomposer, and makes that change at its source of truth through the normal PR gate.
@@ -40,7 +40,7 @@ This skill **flags; it does not apply.** Whoever picks up the write-up decides w
 - [ ] Load every `segments.reviewed.json` and pull its `review.log` (the append-only correction log) plus the per-Segment `review.corrections` stamps
 - [ ] Bucket each log entry by type — `field`, `split`, `merge`, `note` — and, for `field` edits, by the dotted `field` path (`trigger.kind`, `goal.kind`, `outcome.kind`, `meta.event_range.*`, …)
 - [ ] **Cluster within buckets**: a `before → after` direction that repeats is a pattern. Read the attached `note` entries — they are the human's own explanation of *why* the draft was wrong, and are the highest-signal input
-- [ ] For each cluster, **trace it back to a heuristic** in `decompose-into-transcript-segments` (or to the segmentation methodology in the `transcript-segment` reference) — which heuristic produced the wrong draft? Was a heuristic missing entirely?
+- [ ] For each cluster, **trace it back to a heuristic** in `decompose-agent-transcript-into-transcript-segments` (or to the segmentation methodology in the `transcript-segment` reference) — which heuristic produced the wrong draft? Was a heuristic missing entirely?
 - [ ] Describe the opportunity **specifically and directionally**. Vague advice ("be more careful about Triggers") is useless; "the decomposer's Correction-vs-New heuristic is too broad — it's flagging `UserMessage`s that only add a fact without changing the ask" is actionable. Cite the corrections; don't write the patch
 - [ ] Separate **generalizable** corrections from **one-offs** — a correction that fired once, or that contradicts another correction, goes in "Open questions", not "Flagged opportunities"
 - [ ] Write `segment-correction-learnings.md` and print its path to stdout
@@ -64,8 +64,8 @@ Each `segments.reviewed.json` carries `review.log` — a flat, time-ordered list
 ## Out of scope
 
 - Capturing corrections — that's `review-transcript-segments`.
-- Editing `decompose-into-transcript-segments` or any other skill — this skill **flags opportunities for a human**; it never patches a skill. The deployed skill files are a copy; changes belong at the source of truth, behind the normal PR gate.
-- Cross-transcript *analysis* findings — that's tier 5. This skill is narrowly about surfacing what the decomposer's own review history reveals.
+- Editing `decompose-agent-transcript-into-transcript-segments` or any other skill — this skill **flags opportunities for a human**; it never patches a skill. The deployed skill files are a copy; changes belong at the source of truth, behind the normal PR gate.
+- Cross-transcript *analysis* findings — that's `analyze-cross-transcript-patterns`. This skill is narrowly about surfacing what the decomposer's own review history reveals.
 
 ## Notes
 

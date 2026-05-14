@@ -2,27 +2,27 @@
 name: review-transcript-segments
 description: >
   Open a local browser UI to audit and correct the AI-drafted Transcript
-  Segment tree (segments.json) produced by decompose-into-transcript-segments.
+  Segment tree (segments.json) produced by decompose-agent-transcript-into-transcript-segments.
   Decomposition is the most interpretive step in the pipeline — where Goals
   change, whether a Segment was a Failure, what the Trigger was — so its
   output is a draft a human should review. Every field is editable; the user
   can split a leaf Segment, merge adjacent siblings, and attach context notes.
   Saving writes segments.reviewed.json next to the draft (the draft is never
   overwritten) with full correction provenance. Use this skill after
-  decompose-into-transcript-segments and before any analyze-* skill when you
+  decompose-agent-transcript-into-transcript-segments and before any analyze-* skill when you
   want a human-blessed decomposition. Optional but recommended.
 user-invocable: true
 ---
 
 # Review transcript segments
 
-`decompose-into-transcript-segments` emits `segments.json` — an **AI draft**. Decomposition is the most interpretive step in the whole pipeline: deciding where a Goal changes, whether a Segment was a Failure, and what its Trigger was are all judgment calls. This skill puts that draft in front of a human in an editable UI so they can correct it, and records every correction with enough provenance that `learn-from-segment-corrections` can turn the fixes into flagged improvement opportunities for the decompose skill.
+`decompose-agent-transcript-into-transcript-segments` emits `segments.json` — an **AI draft**. Decomposition is the most interpretive step in the whole pipeline: deciding where a Goal changes, whether a Segment was a Failure, and what its Trigger was are all judgment calls. This skill puts that draft in front of a human in an editable UI so they can correct it, and records every correction with enough provenance that `learn-from-segment-corrections` can turn the fixes into flagged improvement opportunities for the decompose skill.
 
 This is the **review checkpoint** for tier 2. It is optional — analyzers read `segments.json` fine on their own — but every correction captured here makes the next decomposition better.
 
 ## Inputs
 
-- `tmp_dir` (required): a transcript tmp_dir from `get-claude-code-transcript`. Must contain `segments.json` (or an existing `segments.reviewed.json` to keep iterating). `transcript.json` should also be present — it powers the event-preview index and lets the validator cross-check event ids.
+- `tmp_dir` (required): a transcript tmp_dir from `get-claude-code-transcript-from-local`. Must contain `segments.json` (or an existing `segments.reviewed.json` to keep iterating). `transcript.json` should also be present — it powers the event-preview index and lets the validator cross-check event ids.
 
 ## Outputs
 
@@ -44,7 +44,7 @@ python main.py --tmp-dir /path/to/transcript-tmp-dir [--port 9850] [--no-browser
 
 ## Sequencing checklist
 
-- [ ] Confirm `tmp_dir` contains `segments.json` (or `segments.reviewed.json`); if not, run `decompose-into-transcript-segments` first
+- [ ] Confirm `tmp_dir` contains `segments.json` (or `segments.reviewed.json`); if not, run `decompose-agent-transcript-into-transcript-segments` first
 - [ ] Start the local UI (`python main.py --tmp-dir <tmp_dir>`, default `localhost:9850`)
 - [ ] The user audits the tree: every Trigger / Goal / Outcome field is editable; the event-preview index next to each Segment lets them sanity-check boundaries and evidence
 - [ ] The user fixes what's wrong — edit fields, **Split** a leaf into sub-segments, **Merge ↓** a Segment into its next sibling, and add a **Why / context** note explaining each correction
@@ -71,7 +71,7 @@ The correction-provenance contract lives in `_lib/segment_review.py` and is shar
 
 ## Out of scope
 
-- Producing the draft — that's `decompose-into-transcript-segments`.
+- Producing the draft — that's `decompose-agent-transcript-into-transcript-segments`.
 - Turning the corrections into improvement opportunities for the decompose skill — that's the sibling skill `learn-from-segment-corrections`.
 - Any analysis or recommendation — every `analyze-*` skill is downstream of this.
 

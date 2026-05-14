@@ -1,6 +1,6 @@
 """Human-in-the-loop review contract for the Transcript Segment tree.
 
-`2-decompose/decompose-into-transcript-segments` emits `segments.json` — an
+`2-decompose/decompose-agent-transcript-into-transcript-segments` emits `segments.json` — an
 AI-drafted decomposition. Decomposition is the most *interpretive* step in the
 pipeline (where do Goals change? was this a Failure?), so its output is a draft
 the user audits and corrects, not a final answer.
@@ -43,7 +43,7 @@ TRIGGER_SOURCES = {"user", "agent", "subagent"}
 GOAL_KINDS = {"Plan", "Action"}
 OUTCOME_KINDS = {"Success", "Failure"}
 
-# --- filenames inside a get-claude-code-transcript tmp_dir ---
+# --- filenames inside a get-claude-code-transcript-from-local tmp_dir ---
 TRANSCRIPT_FILENAME = "transcript.json"
 DRAFT_FILENAME = "segments.json"
 REVIEWED_FILENAME = "segments.reviewed.json"
@@ -311,7 +311,7 @@ def _resolve(tmp_dir: Path) -> tuple[Path, str]:
         return draft, "draft"
     raise FileNotFoundError(
         f"no {REVIEWED_FILENAME} or {DRAFT_FILENAME} in {tmp_dir} — "
-        "run decompose-into-transcript-segments first"
+        "run decompose-agent-transcript-into-transcript-segments first"
     )
 
 

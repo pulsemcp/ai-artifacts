@@ -6,16 +6,16 @@ Tier 1's context-gathering step. Pulls the ticket, the pull request, and the use
 
 A transcript is a record of *what the agent did*. Analysis needs *why it was doing it* — the ticket behind the work, the PR it turned into, who the user is and what project they're on. Without that, every downstream judgment ("was this Segment a Failure?", "was the Goal closed?") is made in a vacuum.
 
-`get-claude-code-transcript` gives you the *what*. This skill gathers the *why*, once, up front, so tiers 2-5 never have to.
+`get-claude-code-transcript-from-local` gives you the *what*. This skill gathers the *why*, once, up front, so tiers 2-5 never have to.
 
 ## Where it sits
 
 ```
-get-claude-code-transcript  →  transcript.json
-gather-external-context     →  external-context.json           (this skill)
-review-external-context     →  external-context.reviewed.json  (optional human check)
+get-claude-code-transcript-from-local  →  transcript.json
+gather-external-context                →  external-context.json           (this skill)
+review-external-context                →  external-context.reviewed.json  (optional human check)
         ↓
-decompose-into-transcript-segments and every later tier read both files from tmp_dir
+decompose-agent-transcript-into-transcript-segments and every later tier read both files from tmp_dir
 ```
 
 It runs after acquisition and before decomposition. It is **best-effort**: a session with no ticket or no reachable tracker still produces a valid (smaller) bundle, and the pipeline runs fine if the skill is skipped entirely.

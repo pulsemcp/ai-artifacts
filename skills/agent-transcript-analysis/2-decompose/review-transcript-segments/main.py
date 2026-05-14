@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Localhost review UI for an AI-drafted Transcript Segment tree.
 
-Decomposition (``2-decompose/decompose-into-transcript-segments``) is the most
+Decomposition (``2-decompose/decompose-agent-transcript-into-transcript-segments``) is the most
 interpretive step in the pipeline — where Goals change, whether a Segment was a
 Failure, what the Trigger was. Its ``segments.json`` is therefore a *draft*. This
 server lets a human audit and correct that draft in a browser:
@@ -164,7 +164,7 @@ def main(argv: list[str] | None = None) -> int:
     ).exists():
         print(
             f"error: {TMP_DIR} has no segments.json or segments.reviewed.json — "
-            "run decompose-into-transcript-segments first",
+            "run decompose-agent-transcript-into-transcript-segments first",
             file=sys.stderr,
         )
         return 2

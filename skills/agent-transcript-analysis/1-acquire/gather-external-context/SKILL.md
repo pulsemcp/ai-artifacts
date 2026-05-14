@@ -5,11 +5,11 @@ description: >
   before judging the session: the ticket the work traces back to (e.g. from
   Jira), the pull request it landed in (e.g. from GitHub), and background on
   the user's role, team, and project. Reads transcript.json from
-  get-claude-code-transcript, infers what to look up from the session's
+  get-claude-code-transcript-from-local, infers what to look up from the session's
   cwd / git remote / branch / prompts, pulls it from whatever systems are
   reachable, and consolidates everything into one external-context.json that
   travels with the transcript through every later tier. Use after
-  get-claude-code-transcript and before decompose-into-transcript-segments.
+  get-claude-code-transcript-from-local and before decompose-agent-transcript-into-transcript-segments.
   Best-effort: missing sources are recorded, never fatal. The set of sources
   is expected to grow over time.
 user-invocable: true
@@ -25,7 +25,7 @@ It is **best-effort**. No Jira integration, no associated PR, no org directory �
 
 ## Inputs
 
-- `tmp_dir` (required): a transcript tmp_dir from `get-claude-code-transcript`, containing `transcript.json`.
+- `tmp_dir` (required): a transcript tmp_dir from `get-claude-code-transcript-from-local`, containing `transcript.json`.
 - Context sources (optional, environment-dependent): a Jira MCP server or API token, a GitHub MCP server or the `gh` CLI, an org directory that can resolve a user to a role / team. The skill uses whatever is reachable and skips the rest.
 
 ## Output
@@ -63,7 +63,7 @@ One file written into `tmp_dir`:
 
 ## Sequencing checklist
 
-- [ ] Confirm `tmp_dir` contains `transcript.json`; if not, run `get-claude-code-transcript` first
+- [ ] Confirm `tmp_dir` contains `transcript.json`; if not, run `get-claude-code-transcript-from-local` first
 - [ ] Infer lookup keys from the transcript: git remote + branch, branch-name ticket prefixes, ticket ids / PR / issue URLs mentioned in messages, the repo and project slug
 - [ ] **Ticket** — if a ticket id or strong branch-prefix signal exists, fetch it from the tracker. Record `id`, `url`, `title`, `description`, `status`, plus `confidence` and `how_found`
 - [ ] **Pull request** — resolve the PR the session led to (a PR URL in the transcript, or the branch matched against recent PRs on the repo). Record metadata and a short `diff_summary` — do not inline the full diff
@@ -74,7 +74,7 @@ One file written into `tmp_dir`:
 
 ## Out of scope
 
-- Acquiring the transcript itself — that's `get-claude-code-transcript`.
+- Acquiring the transcript itself — that's `get-claude-code-transcript-from-local`.
 - Correcting the gathered context — that's `review-external-context`.
 - Per-Segment context lookups during analysis — that's `pull-together-goal-context` in tier 4, which does narrow, on-demand pulls once a specific Segment's Goal is unclear. This skill does the one-time, transcript-wide gather up front.
 - Any judgment about whether the session went well — that's tiers 3-5.
