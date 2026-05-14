@@ -612,44 +612,56 @@ async function loadSessions() {
     rebuildProjectOptions();
     rebuildBranchOptions();
     render();
-    if (data.progress && !data.progress.complete) {
-      pollProgress();
-    }
   } catch (e) {
     $stats.textContent = 'failed to load: ' + e;
+    return;
+  }
+  scheduleRefresh();
+}
+
+// Pull a fresh /api/sessions snapshot and re-render in place. Selection and
+// filter state live in JS, not the DOM, so they survive the re-render.
+async function refreshSessions() {
+  try {
+    const r = await fetch('/api/sessions');
+    const data = await r.json();
+    SESSIONS = data.sessions || SESSIONS;
+    PREVIEWS = new Map();
+    hydratePreviewsFromSessions();
+    reindexAllSessions();
+    rebuildBranchOptions();
+    render();
+  } catch (e) {
+    // transient — the next tick will try again
   }
 }
 
-// Poll the cheap /api/progress endpoint every few seconds. When the indexed
-// count advances, fetch /api/sessions once to refresh the full snapshot —
-// much cheaper than per-row round-trips, and avoids re-fetching when nothing
-// new is ready yet.
-let lastIndexedSeen = 0;
-async function pollProgress() {
-  while (true) {
-    await new Promise(r => setTimeout(r, 1800));
-    try {
-      const r = await fetch('/api/progress');
-      const p = await r.json();
-      if (p.indexed > lastIndexedSeen) {
-        lastIndexedSeen = p.indexed;
-        const r2 = await fetch('/api/sessions');
-        const data = await r2.json();
-        SESSIONS = data.sessions || SESSIONS;
-        hydratePreviewsFromSessions();
-        reindexAllSessions();
-        rebuildBranchOptions();
-        render();
-      }
-      if (p.complete) {
-        $indexPill.style.display = 'none';
-        return;
-      }
-    } catch (e) {
-      // keep polling; transient errors are fine
-    }
-  }
+// The machine is live: sessions get created and appended to while this UI is
+// open, and the server builds previews for new/active ones a beat after they
+// first show up in the listing. So the UI never stops refreshing — it only
+// adapts cadence: fast while any row is still un-indexed (a freshly-spawned
+// session the server hasn't previewed yet), relaxed once everything has
+// settled (still polling, to discover new sessions and age the timestamps).
+// Skipped while the tab is hidden so a backgrounded picker costs nothing.
+let refreshTimer = 0;
+function scheduleRefresh() {
+  clearTimeout(refreshTimer);
+  let pending = 0;
+  for (const s of SESSIONS) if (!s.indexed) pending++;
+  const delay = pending > 0 ? 1800 : 10000;
+  refreshTimer = setTimeout(async () => {
+    if (!document.hidden) await refreshSessions();
+    scheduleRefresh();
+  }, delay);
 }
+
+// Coming back to a backgrounded tab: refresh now instead of waiting out the tick.
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden) {
+    clearTimeout(refreshTimer);
+    refreshTimer = setTimeout(async () => { await refreshSessions(); scheduleRefresh(); }, 120);
+  }
+});
 
 applyDefaultFilters();
 loadSessions();
