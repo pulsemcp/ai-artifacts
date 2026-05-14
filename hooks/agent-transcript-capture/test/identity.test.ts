@@ -1,11 +1,24 @@
 import { describe, it, expect } from "vitest";
-import { getUsername, sanitizeUserId } from "../src/identity";
+import { getClaudeAuthEmail, getUsername, sanitizeUserId } from "../src/identity";
 
 describe("getUsername", () => {
   it("returns a non-empty string", () => {
     const u = getUsername();
     expect(typeof u).toBe("string");
     expect(u.length).toBeGreaterThan(0);
+  });
+});
+
+describe("getClaudeAuthEmail", () => {
+  // The result depends on the host: either the `claude` CLI is installed and
+  // logged in with an email (string with @), or it's not (null). Either is
+  // a valid outcome — assert the shape, not a specific value.
+  it("returns either null or an email-shaped string", () => {
+    const result = getClaudeAuthEmail();
+    if (result !== null) {
+      expect(typeof result).toBe("string");
+      expect(result).toContain("@");
+    }
   });
 });
 

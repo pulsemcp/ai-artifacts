@@ -1,12 +1,39 @@
 import * as os from "os";
+import { execFileSync } from "child_process";
 
 /**
- * Local system username, used verbatim for the {user_id} segment of the
- * object key. Without auth, per-user hashing is theatre — the user_id is
- * organizational, not a security boundary.
+ * Best-effort lookup of the Claude account email via `claude auth status`.
+ * Returns null if the binary is missing, auth lookup fails, or the user
+ * isn't logged in via an account method (e.g., raw API key with no email).
+ */
+export function getClaudeAuthEmail(): string | null {
+  try {
+    const out = execFileSync("claude", ["auth", "status"], {
+      stdio: ["ignore", "pipe", "ignore"],
+      encoding: "utf-8",
+      timeout: 5_000,
+    });
+    const parsed = JSON.parse(out) as { loggedIn?: boolean; email?: string };
+    if (parsed.loggedIn && typeof parsed.email === "string" && parsed.email) {
+      return parsed.email;
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Identity used for the {user_id} segment of the object key. Prefers the
+ * Claude account email (so transcripts from one person on multiple machines
+ * cluster together) and falls back to the OS username when no account email
+ * is available.
+ *
+ * Without auth, per-user hashing is theatre — the user_id is organizational,
+ * not a security boundary.
  */
 export function getUsername(): string {
-  return os.userInfo().username || "unknown";
+  return getClaudeAuthEmail() || os.userInfo().username || "unknown";
 }
 
 /**
