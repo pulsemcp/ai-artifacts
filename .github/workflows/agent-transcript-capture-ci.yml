@@ -1,0 +1,29 @@
+name: agent-transcript-capture CI
+
+on:
+  push:
+    branches: [main, "feat/**"]
+    paths:
+      - "hooks/agent-transcript-capture/**"
+      - ".github/workflows/agent-transcript-capture-ci.yml"
+  pull_request:
+    paths:
+      - "hooks/agent-transcript-capture/**"
+      - ".github/workflows/agent-transcript-capture-ci.yml"
+
+jobs:
+  unit-tests:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: hooks/agent-transcript-capture
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - run: npm install
+      - run: npm run build
+      - run: npm test

@@ -1,0 +1,321 @@
+# agent-transcript-capture
+
+A hook that archives complete coding agent session transcripts to cloud storage whenever a task completes. Designed for organizations that want to audit, analyze, or learn from agent sessions across their team — with **zero per-user cloud credentials**.
+
+## How it works
+
+```
+Stop event → read stdin → auto-detect agent → collect files → redact → tar.gz → unauthenticated PUT to bucket
+```
+
+The hook fires on the `Stop` event (each time the agent finishes a task), bundles the full session into a `.tar.gz`, optionally redacts secrets, and uploads via a single unauthenticated HTTP `PUT` to either Google Cloud Storage or Amazon S3.
+
+### No-authentication mode
+
+There is no per-user authentication. The bucket is configured to accept unauthenticated PUT/DELETE, gated by a shared secret called the `namespace_key`. The secret is wired in differently on each provider:
+
+- **S3** — the bucket policy scopes unauthenticated PUT/DELETE to a single Resource ARN prefix (`bucket/{namespace_key}/*`). The bucket name is plain; the secret lives in the policy.
+- **GCS** — GCP refuses IAM Conditions on `allUsers` (the `PublicResourceAllowConditionCheck` lint, which can't be bypassed). So instead, the secret is embedded into the **bucket name** itself (`agent-transcripts-{namespace_key}`), and the bucket gets a permissive bucket-wide binding for unauthenticated writes. Because the bucket is dedicated to transcripts, the blast radius is the same as the S3 prefix-scoped variant.
+
+Object layout:
+```
+S3:  s3://{bucket}/{namespace_key}/{user_id}/{YYYY}/{MM}/{DD}/{session_uuid}.tar.gz
+GCS: gs://{bucket-with-namespace_key-suffix}/{user_id}/{YYYY}/{MM}/{DD}/{session_uuid}.tar.gz
+```
+
+On S3 the `{namespace_key}/` prefix is load-bearing — the bucket policy's Resource ARN scope requires it. On GCS the secret is already in the bucket name, so the path skips the redundant prefix.
+
+- `namespace_key` is a high-entropy random string of the form `secret-do-not-share-<12+ hex chars>` (default generator produces 32). The prefix in the name is self-documenting — anyone who sees it in logs or a screenshot knows immediately that it's a secret.
+- Unauthenticated **reads and listings are NOT granted** on either provider. Without the key, nobody can write to your bucket; with the key, you can only write — not enumerate, not download.
+- Rotating the secret:
+  - **S3:** generate a new `namespace_key`, update the bucket policy Resource ARN, update `HOOK.json` (or the `STORAGE_NAMESPACE_KEY` env var).
+  - **GCS:** create a new bucket with the new `namespace_key` suffix, bind allUsers to the custom write-only role on it, update `HOOK.json`, drop the old bucket when you're ready.
+
+### What it captures
+
+```
+manifest.json                  # Session metadata (id, timestamp, agent, privacy mode, file list)
+transcript.jsonl               # Parent session transcript
+subagents/
+  agent-{id}.jsonl             # Subagent transcripts (all of them)
+  agent-{id}.meta.json         # Subagent metadata (type, description)
+tool-results/
+  toolu_{id}.txt               # Externalized large tool outputs
+```
+
+A single interactive session may produce multiple Stops (one per completed task). Each Stop overwrites the previous archive for that session, so the stored version always reflects the latest state.
+
+## Setup
+
+### 1. Generate a namespace_key
+
+```bash
+echo "secret-do-not-share-$(openssl rand -hex 16)"
+# example output: secret-do-not-share-a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6
+```
+
+You'll plug this into the bucket name (GCS) or bucket policy (S3) and into `HOOK.json`. Keep it out of public commits.
+
+### 2A. Google Cloud Storage
+
+GCP rejects IAM Conditions on `allUsers` (the `PublicResourceAllowConditionCheck` lint, which can't be disabled). So instead of scoping unauthenticated access by object-key prefix, we embed the `namespace_key` into the **bucket name** itself and grant unauthenticated writes bucket-wide. The blast radius is the same as long as the bucket is dedicated to transcripts.
+
+```bash
+export PROJECT=your-gcp-project
+export NS=secret-do-not-share-...                # from step 1
+export GCS_BUCKET=agent-transcripts-$NS          # secret-suffixed name
+
+# 1. Create the bucket (uniform bucket-level access required).
+gcloud storage buckets create gs://$GCS_BUCKET \
+  --project=$PROJECT \
+  --uniform-bucket-level-access
+
+# 2. Create a custom IAM role with ONLY create + delete (no read, no list).
+#    No predefined GCS role gives just these two perms on a UBLA bucket,
+#    so we define our own.
+cat > /tmp/transcript-writer.yaml <<EOF
+title: "Transcript Writer"
+description: "Create and delete objects only; no read or list."
+stage: GA
+includedPermissions:
+  - storage.objects.create
+  - storage.objects.delete
+EOF
+gcloud iam roles create transcriptWriter \
+  --project=$PROJECT \
+  --file=/tmp/transcript-writer.yaml
+
+# 3. Bind allUsers to the custom role on the bucket. No IAM Condition needed —
+#    the bucket name itself is the secret.
+gcloud storage buckets add-iam-policy-binding gs://$GCS_BUCKET \
+  --member=allUsers \
+  --role=projects/$PROJECT/roles/transcriptWriter
+
+# 4. (Optional) Lifecycle: auto-delete after 90 days so a leaked key has
+#    bounded blast radius. Skip this only if you have other rotation hygiene.
+cat > /tmp/lifecycle.json <<EOF
+{"lifecycle":{"rule":[{"action":{"type":"Delete"},"condition":{"age":90}}]}}
+EOF
+gcloud storage buckets update gs://$GCS_BUCKET --lifecycle-file=/tmp/lifecycle.json
+
+# 5. (Optional) If your project has Public Access Prevention enforced, the
+#    allUsers binding will be rejected. Disable it on this bucket only:
+# gcloud storage buckets update gs://$GCS_BUCKET --no-public-access-prevention
+```
+
+**In `HOOK.json`**, set `no_auth.bucket` to the full secret-suffixed bucket name (`agent-transcripts-{namespace_key}`) and `no_auth.namespace_key` to the same key (still required for config validation, but not added to the object path — the bucket name already provides the scoping secret).
+
+**Recommended bucket hardening:**
+- Set up a billing alert on the project so a runaway upload spree gets noticed.
+- Leave bucket reads private — only project admins can list/download.
+- Don't reuse the bucket for anything else. The whole bucket is gated by a single secret.
+
+### 2B. Amazon S3
+
+On S3, IAM doesn't have GCP's lint problem — the bucket policy can scope unauthenticated PUT/DELETE to a Resource ARN with the `namespace_key` as a prefix. The bucket name stays plain.
+
+```bash
+export S3_BUCKET=your-org-transcripts
+export S3_REGION=us-east-1
+export NS=secret-do-not-share-...  # from step 1
+
+aws s3api create-bucket --bucket $S3_BUCKET --region $S3_REGION
+
+# You MUST disable Block Public Access to allow unauthenticated PUT.
+# This is the documented trade-off — reads remain private, writes are scoped by Resource ARN.
+aws s3api put-public-access-block --bucket $S3_BUCKET --public-access-block-configuration \
+  "BlockPublicAcls=false,IgnorePublicAcls=false,BlockPublicPolicy=false,RestrictPublicBuckets=false"
+
+# Bucket policy: unauthenticated PUT and DELETE, scoped to the namespace_key prefix.
+cat <<EOF > /tmp/policy.json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "NoAuthWriteScopedToNamespace",
+      "Effect": "Allow",
+      "Principal": "*",
+      "Action": ["s3:PutObject", "s3:DeleteObject"],
+      "Resource": "arn:aws:s3:::$S3_BUCKET/$NS/*"
+    }
+  ]
+}
+EOF
+aws s3api put-bucket-policy --bucket $S3_BUCKET --policy file:///tmp/policy.json
+
+# (Optional) Lifecycle: auto-delete after 90 days.
+cat <<EOF > /tmp/lifecycle.json
+{
+  "Rules": [{
+    "ID": "expire-90-days",
+    "Status": "Enabled",
+    "Filter": {"Prefix": "$NS/"},
+    "Expiration": {"Days": 90}
+  }]
+}
+EOF
+aws s3api put-bucket-lifecycle-configuration --bucket $S3_BUCKET --lifecycle-configuration file:///tmp/lifecycle.json
+```
+
+**Recommended bucket hardening:**
+- Set a CloudWatch billing alarm.
+- Consider an Object Size lifecycle rule that aborts oversized uploads (defense in depth alongside the client-side `max_archive_bytes` limit).
+
+### 3. Install the hook
+
+```bash
+# From your project root
+cp -r path/to/ai-artifacts/hooks/agent-transcript-capture .claude/hooks/agent-transcript-capture
+```
+
+Edit `.claude/hooks/agent-transcript-capture/HOOK.json` and set the `x-config.no_auth` block.
+
+GCS:
+```json
+{
+  "x-config": {
+    "mode": "no-auth",
+    "no_auth": {
+      "provider": "gcs",
+      "bucket": "agent-transcripts-secret-do-not-share-...",
+      "namespace_key": "secret-do-not-share-...",
+      "max_archive_bytes": 52428800
+    },
+    "privacy": { "mode": "redacted", "extra_patterns": [] }
+  }
+}
+```
+
+S3:
+```json
+{
+  "x-config": {
+    "mode": "no-auth",
+    "no_auth": {
+      "provider": "s3",
+      "bucket": "your-org-transcripts",
+      "region": "us-east-1",
+      "namespace_key": "secret-do-not-share-...",
+      "max_archive_bytes": 52428800
+    },
+    "privacy": { "mode": "redacted", "extra_patterns": [] }
+  }
+}
+```
+
+If you'd rather keep the `namespace_key` out of the file, leave a placeholder there and set `STORAGE_NAMESPACE_KEY` in your shell. The env var wins.
+
+### 4. Register the hook with Claude Code
+
+Add to `~/.claude/settings.json` (global) or `.claude/settings.json` (per-project):
+
+```json
+{
+  "hooks": {
+    "Stop": [
+      {
+        "matcher": "",
+        "hooks": [
+          { "type": "command", "command": "node .claude/hooks/agent-transcript-capture/dist/capture.js" }
+        ]
+      }
+    ]
+  }
+}
+```
+
+**Prerequisites:** Node.js 18+ (for built-in `fetch`). No `npm install` needed at runtime — there are zero runtime dependencies. The compiled `dist/` directory is checked in.
+
+## Configuration reference
+
+All config lives under the `x-config` key in `HOOK.json`.
+
+### `no_auth.provider` — `"gcs" | "s3"`, required
+### `no_auth.bucket` — string, required. Bare bucket name (no `gs://` / `s3://`).
+### `no_auth.namespace_key` — string, required. Format `^secret-do-not-share-[a-f0-9]{12,}$`. Overridden by env `STORAGE_NAMESPACE_KEY`.
+### `no_auth.region` — string, required when provider is `"s3"`. AWS region (e.g., `us-east-1`).
+### `no_auth.max_archive_bytes` — number, default `52428800` (50 MB). Hard client-side cap. Uploads larger than this fail loudly with `archive_too_large` rather than silently bloating the bucket.
+
+### `privacy.mode` — `"full" | "redacted"`, required
+- `"redacted"` (recommended): scrubs API keys, JWTs, connection strings, email addresses, etc. from transcripts before upload.
+- `"full"`: uploads verbatim.
+
+### `privacy.extra_patterns` — array, default `[]`. Additional regex redaction patterns:
+
+```json
+{
+  "name": "internal_customer_id",
+  "pattern": "CUST-[0-9]{6}",
+  "replacement": "[REDACTED:internal_customer_id]"
+}
+```
+
+## CLI
+
+The hook records every upload to a local JSONL manifest at `~/.agent-transcript-capture/uploads.jsonl` (override with `AGENT_TRANSCRIPT_CAPTURE_HOME`).
+
+```bash
+node hooks/agent-transcript-capture/dist/cli.js list          # most recent 25
+node hooks/agent-transcript-capture/dist/cli.js list -n 50
+node hooks/agent-transcript-capture/dist/cli.js list --all    # include deleted
+
+node hooks/agent-transcript-capture/dist/cli.js delete 5f1a4e51
+```
+
+`delete` issues an unauthenticated DELETE against the bucket (scoped by `namespace_key`), then appends a `status: "deleted"` record to the manifest. Session IDs can be prefixes as long as they're unambiguous.
+
+## Built-in redaction patterns
+
+When `privacy.mode` is `"redacted"`, these patterns are applied in order (most-specific first):
+
+`private_key`, `jwt`, `aws_key`, `aws_secret`, `github_pat`, `github_token`, `anthropic_key`, `stripe_key`, `openai_key`, `bearer_token`, `generic_api_key`, `connection_string`, `password_assignment`, `env_secret`, `email`.
+
+## Security model — the trade-off
+
+This is "no-authentication + scoped secret" mode. The honest read:
+
+- **Pro:** Zero per-user credentials. No service accounts, no key distribution, no auth library, no SDK, no CLI. The hook is one `node` invocation that writes a tar.gz.
+- **Pro:** Reads stay private. Even if the `namespace_key` leaks, the leaker can write garbage into your bucket but cannot enumerate or download anyone else's transcripts.
+- **Con:** Anyone with the `namespace_key` can upload arbitrary objects to your bucket. Mitigations:
+  - **Lifecycle expiry** (optional, recommended) caps long-term blast radius.
+  - **Client-side `max_archive_bytes`** caps per-object size.
+  - **Billing alarms** catch a write-flood early.
+  - **Rotate the key** if you suspect a leak:
+    - S3: generate a new `namespace_key`, update the bucket policy `Resource` ARN, update `HOOK.json` (or `STORAGE_NAMESPACE_KEY`).
+    - GCS: create a new bucket suffixed with the new `namespace_key`, bind allUsers to the custom write-only role on it, update `HOOK.json`, retire the old bucket.
+- **Con (S3 only):** You must disable Block Public Access on the bucket. The policy still restricts unauthenticated access to PUT/DELETE under the `namespace_key` prefix, but the bucket will show as "public" in AWS Console warnings. This is the documented cost of the architecture.
+- **Con (GCS only):** GCP rejects IAM Conditions on `allUsers`, so the `namespace_key` is embedded into the **bucket name** rather than the object-key prefix. This means the whole bucket must be dedicated to transcripts — don't reuse it for anything else. Rotation requires a new bucket rather than a policy edit.
+
+## Error handling
+
+When an upload fails, the hook:
+
+1. Writes an HTML error page to `/tmp/` with remediation instructions
+2. Opens it in the default browser (TTY sessions only — overridable via `AGENT_TRANSCRIPT_CAPTURE_OPEN_BROWSER=0/1`)
+3. Writes the error to stderr
+4. Exits with code 2
+
+Common error categories: `permission_denied`, `not_found`, `payload_too_large`, `archive_too_large`, `network_error`, `http_error`.
+
+## Development
+
+```bash
+npm install
+npm run build
+npm test       # 80 tests, all in-process — no real network or buckets
+```
+
+### Adding a storage backend
+
+1. Create `src/backends/yourbackend.ts` implementing the `StorageBackend` interface
+2. Add a case to `createBackend()` in `src/backends/interface.ts`
+3. Document the new provider value and any provider-specific config
+
+### Adding an agent adapter
+
+1. Create `src/adapters/youragent.ts` implementing the `AgentAdapter` interface
+2. Add detection logic to `detectAgent()` in `src/adapters/interface.ts`
+
+## License
+
+MIT — see [LICENSE](../../LICENSE).

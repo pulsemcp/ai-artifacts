@@ -1,0 +1,20 @@
+{
+  "event": "Stop",
+  "command": "node",
+  "args": ["dist/capture.js"],
+  "timeout_seconds": 120,
+  "x-config": {
+    "mode": "no-auth",
+    "no_auth": {
+      "provider": "gcs",
+      "bucket": "my-org-transcripts",
+      "namespace_key": "secret-do-not-share-REPLACE_WITH_HEX_CHARS",
+      "region": "us-east-1",
+      "max_archive_bytes": 52428800
+    },
+    "privacy": {
+      "mode": "redacted",
+      "extra_patterns": []
+    }
+  }
+}
