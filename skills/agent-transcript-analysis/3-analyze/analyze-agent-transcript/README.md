@@ -16,7 +16,7 @@ With `segments.json` in hand, it drives, in order:
 2. Writes each bucket's conclusions to `tmp_dir` as `findings.{outcomes,prompts,skills,mcp}.json` — the reviewable intermediate `review-analysis` consumes.
 3. **Tier 4**: invokes `synthesize-report` against those findings — its last step. `synthesize-report` makes the leap from findings to recommendations and writes `findings.report.json` (reviewable) and `report.md` (the human-readable consolidated report).
 
-Downstream of this orchestrator: `analyze-cross-transcript-patterns` consumes many transcripts' `report.md` at once.
+Downstream of this orchestrator: `analyze-cross-transcript-patterns` consumes many transcripts' `findings.*.json` sets at once — the per-Segment analyzer outputs this orchestrator writes, not the synthesized `report.md`.
 
 The tier-3 analyzers and `synthesize-report` are not the supported entry point — invoke them directly only when debugging, or when running `synthesize-report` on a cross-transcript batch.
 

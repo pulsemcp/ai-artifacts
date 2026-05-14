@@ -113,7 +113,7 @@
   },
   "analyze-cross-transcript-patterns": {
     "title": "Analyze Cross-Transcript Patterns",
-    "description": "Cross-cutting analyzer. Given the consolidated reports of several already-analyzed transcripts, surface patterns no single transcript reveals: hindsight-as-foresight Segment patterns, recurring user prompts, deduped Skill/MCP gaps, and time-spend patterns.",
+    "description": "Cross-cutting analyzer. Given the per-transcript findings.*.json sets of several already-analyzed transcripts (the tier-3 outputs of analyze-agent-transcript, not their synthesized reports), surface patterns no single transcript reveals: hindsight-as-foresight Segment patterns, recurring user prompts, deduped Skill/MCP gaps, and time-spend patterns.",
     "path": "agent-transcript-analysis/3-analyze/analyze-cross-transcript/analyze-cross-transcript-patterns",
     "references": ["philosophy-on-skills", "philosophy-on-mcp", "transcript-segment"]
   },
