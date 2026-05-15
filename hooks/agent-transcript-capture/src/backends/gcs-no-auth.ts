@@ -10,7 +10,7 @@
  * No SDK, no CLI, no auth header. The whole backend is two `fetch` calls.
  */
 
-import { BackendConfig, StorageBackend, UploadResult } from "./interface";
+import { GcsBackendConfig, StorageBackend, UploadResult } from "./interface";
 
 const JSON_API = "https://storage.googleapis.com/storage/v1/b";
 const UPLOAD_API = "https://storage.googleapis.com/upload/storage/v1/b";
@@ -19,7 +19,7 @@ export class GcsNoAuthBackend implements StorageBackend {
   readonly provider = "gcs" as const;
   readonly bucket: string;
 
-  constructor(config: BackendConfig) {
+  constructor(config: GcsBackendConfig) {
     this.bucket = config.bucket;
   }
 

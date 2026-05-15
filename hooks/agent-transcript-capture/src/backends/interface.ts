@@ -16,13 +16,20 @@ export interface UploadResult {
 
 export type StorageProvider = "gcs" | "s3";
 
-export interface BackendConfig {
-  provider: StorageProvider;
+export interface S3BackendConfig {
+  provider: "s3";
   bucket: string;
   namespace_key: string;
-  /** AWS region — required for s3, ignored for gcs. */
-  region?: string;
+  /** AWS region — required for s3. */
+  region: string;
 }
+
+export interface GcsBackendConfig {
+  provider: "gcs";
+  bucket: string;
+}
+
+export type BackendConfig = S3BackendConfig | GcsBackendConfig;
 
 export interface StorageBackend {
   /** Provider identifier for diagnostics. */

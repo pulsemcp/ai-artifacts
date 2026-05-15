@@ -7,9 +7,7 @@
     "mode": "no-auth",
     "no_auth": {
       "provider": "gcs",
-      "bucket": "my-org-transcripts",
-      "namespace_key": "secret-do-not-share-REPLACE_WITH_HEX_CHARS",
-      "region": "us-east-1",
+      "bucket": "agent-transcripts-secret-do-not-share-REPLACE_WITH_HEX_CHARS",
       "max_archive_bytes": 52428800
     },
     "privacy": {

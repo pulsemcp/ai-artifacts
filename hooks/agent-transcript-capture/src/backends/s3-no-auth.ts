@@ -10,7 +10,7 @@
  * No SDK, no CLI, no auth header. The whole backend is two `fetch` calls.
  */
 
-import { BackendConfig, StorageBackend, UploadResult } from "./interface";
+import { S3BackendConfig, StorageBackend, UploadResult } from "./interface";
 
 export class S3NoAuthBackend implements StorageBackend {
   readonly provider = "s3" as const;
@@ -18,7 +18,7 @@ export class S3NoAuthBackend implements StorageBackend {
   private namespaceKey: string;
   private region: string;
 
-  constructor(config: BackendConfig) {
+  constructor(config: S3BackendConfig) {
     this.bucket = config.bucket;
     this.namespaceKey = config.namespace_key;
     if (!config.region) {

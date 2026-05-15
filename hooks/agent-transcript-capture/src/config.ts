@@ -17,14 +17,23 @@ export interface PrivacyConfig {
   extra_patterns?: RedactionPattern[];
 }
 
-export interface NoAuthModeConfig {
-  provider: StorageProvider;
+export interface S3NoAuthConfig {
+  provider: "s3";
   bucket: string;
   namespace_key: string;
-  region?: string;
+  region: string;
   /** Hard cap on the tar.gz size before uploading, in bytes. Default 50 MB. */
   max_archive_bytes?: number;
 }
+
+export interface GcsNoAuthConfig {
+  provider: "gcs";
+  bucket: string;
+  /** Hard cap on the tar.gz size before uploading, in bytes. Default 50 MB. */
+  max_archive_bytes?: number;
+}
+
+export type NoAuthModeConfig = S3NoAuthConfig | GcsNoAuthConfig;
 
 export interface CaptureConfig {
   mode: "no-auth";
@@ -39,6 +48,11 @@ export interface CaptureConfig {
 // The namespace_key prefix is self-documenting so it's obvious in logs, pastes,
 // and screenshots. Same idea as -----BEGIN OPENSSH PRIVATE KEY-----.
 export const NAMESPACE_KEY_PATTERN = /^secret-do-not-share-[a-f0-9]{12,}$/;
+
+// For GCS, the secret lives in the bucket name itself. The bucket must end
+// with the secret suffix so the self-documenting "secret-do-not-share-" marker
+// is preserved end-to-end.
+export const GCS_BUCKET_SUFFIX_PATTERN = /secret-do-not-share-[a-f0-9]{12,}$/;
 
 export const DEFAULT_MAX_ARCHIVE_BYTES = 50 * 1024 * 1024;
 
@@ -107,35 +121,6 @@ export function loadConfig(): CaptureConfig | null {
     );
   }
 
-  // namespace_key sourcing: env var wins (so HOOK.json can be checked in with a
-  // placeholder), then the config field.
-  const envKey = process.env.STORAGE_NAMESPACE_KEY;
-  const cfgKey = typeof noAuth.namespace_key === "string" ? noAuth.namespace_key : "";
-  const namespaceKey = envKey && envKey.length > 0 ? envKey : cfgKey;
-
-  if (!namespaceKey) {
-    throw new Error(
-      "agent-transcript-capture config: 'no_auth.namespace_key' (or env STORAGE_NAMESPACE_KEY) is required"
-    );
-  }
-  if (!NAMESPACE_KEY_PATTERN.test(namespaceKey)) {
-    throw new Error(
-      "agent-transcript-capture config: 'namespace_key' must match " +
-        "^secret-do-not-share-[a-f0-9]{12,}$. " +
-        "Generate one with: echo \"secret-do-not-share-$(openssl rand -hex 16)\""
-    );
-  }
-
-  let region: string | undefined;
-  if (provider === "s3") {
-    if (typeof noAuth.region !== "string" || !noAuth.region) {
-      throw new Error(
-        "agent-transcript-capture config: 'no_auth.region' is required when provider is 's3'"
-      );
-    }
-    region = noAuth.region;
-  }
-
   let maxArchiveBytes = DEFAULT_MAX_ARCHIVE_BYTES;
   if (noAuth.max_archive_bytes !== undefined) {
     if (
@@ -148,6 +133,80 @@ export function loadConfig(): CaptureConfig | null {
       );
     }
     maxArchiveBytes = noAuth.max_archive_bytes;
+  }
+
+  let noAuthConfig: NoAuthModeConfig;
+  if (provider === "gcs") {
+    // For GCS, the namespace secret is embedded in the bucket name itself
+    // (see hooks/agent-transcript-capture/src/backends/gcs-no-auth.ts). A
+    // separate namespace_key field would be redundant — reject it loudly so
+    // the config doesn't encode the same secret twice. `in` catches explicit
+    // null too, not just undefined.
+    if ("namespace_key" in noAuth && noAuth.namespace_key !== undefined) {
+      throw new Error(
+        "agent-transcript-capture config: 'no_auth.namespace_key' must NOT be set when provider is 'gcs'. " +
+          "For GCS, the namespace secret is embedded in the bucket name itself (no separate field). " +
+          "Remove the 'namespace_key' field. See README for details."
+      );
+    }
+    // Only complain about STORAGE_NAMESPACE_KEY if it's set to a non-empty value,
+    // matching how the S3 path treats env precedence. An exported-but-empty
+    // env var ("") is functionally unset and shouldn't trip the validator.
+    if (
+      process.env.STORAGE_NAMESPACE_KEY !== undefined &&
+      process.env.STORAGE_NAMESPACE_KEY.length > 0
+    ) {
+      throw new Error(
+        "agent-transcript-capture config: the STORAGE_NAMESPACE_KEY env var is set, but it is unused when provider is 'gcs'. " +
+          "For GCS, the namespace secret is embedded in the bucket name itself. Unset STORAGE_NAMESPACE_KEY. " +
+          "See README for details."
+      );
+    }
+    if (!GCS_BUCKET_SUFFIX_PATTERN.test(noAuth.bucket)) {
+      throw new Error(
+        "agent-transcript-capture config: GCS bucket name must end with " +
+          "'secret-do-not-share-<12+ hex chars>' " +
+          "(e.g., 'agent-transcripts-secret-do-not-share-a1b2c3d4e5f6'). " +
+          "Generate the suffix with: echo \"secret-do-not-share-$(openssl rand -hex 16)\". " +
+          "See README for details."
+      );
+    }
+    noAuthConfig = {
+      provider: "gcs",
+      bucket: noAuth.bucket,
+      max_archive_bytes: maxArchiveBytes,
+    };
+  } else {
+    // S3: namespace_key sourcing — env var wins (so HOOK.json can be checked
+    // in with a placeholder), then the config field.
+    const envKey = process.env.STORAGE_NAMESPACE_KEY;
+    const cfgKey = typeof noAuth.namespace_key === "string" ? noAuth.namespace_key : "";
+    const namespaceKey = envKey && envKey.length > 0 ? envKey : cfgKey;
+
+    if (!namespaceKey) {
+      throw new Error(
+        "agent-transcript-capture config: 'no_auth.namespace_key' (or env STORAGE_NAMESPACE_KEY) is required when provider is 's3'"
+      );
+    }
+    if (!NAMESPACE_KEY_PATTERN.test(namespaceKey)) {
+      throw new Error(
+        "agent-transcript-capture config: 'namespace_key' must match " +
+          "^secret-do-not-share-[a-f0-9]{12,}$. " +
+          "Generate one with: echo \"secret-do-not-share-$(openssl rand -hex 16)\""
+      );
+    }
+    if (typeof noAuth.region !== "string" || !noAuth.region) {
+      throw new Error(
+        "agent-transcript-capture config: 'no_auth.region' is required when provider is 's3'"
+      );
+    }
+    noAuthConfig = {
+      provider: "s3",
+      bucket: noAuth.bucket,
+      namespace_key: namespaceKey,
+      region: noAuth.region,
+      max_archive_bytes: maxArchiveBytes,
+    };
   }
 
   // --- privacy ---
@@ -177,13 +236,7 @@ export function loadConfig(): CaptureConfig | null {
 
   return {
     mode: "no-auth",
-    no_auth: {
-      provider,
-      bucket: noAuth.bucket,
-      namespace_key: namespaceKey,
-      region,
-      max_archive_bytes: maxArchiveBytes,
-    },
+    no_auth: noAuthConfig,
     privacy: {
       mode: privacy.mode as "full" | "redacted",
       extra_patterns: extraPatterns,
@@ -195,10 +248,16 @@ export function loadConfig(): CaptureConfig | null {
  * Helper: derive a BackendConfig from a no-auth-mode config.
  */
 export function toBackendConfig(noAuth: NoAuthModeConfig): BackendConfig {
+  if (noAuth.provider === "s3") {
+    return {
+      provider: "s3",
+      bucket: noAuth.bucket,
+      namespace_key: noAuth.namespace_key,
+      region: noAuth.region,
+    };
+  }
   return {
-    provider: noAuth.provider,
+    provider: "gcs",
     bucket: noAuth.bucket,
-    namespace_key: noAuth.namespace_key,
-    region: noAuth.region,
   };
 }
