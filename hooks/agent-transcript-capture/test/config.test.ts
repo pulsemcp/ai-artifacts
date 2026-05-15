@@ -209,6 +209,41 @@ describe("loadConfig", () => {
     );
   });
 
+  it("accepts an empty STORAGE_NAMESPACE_KEY env var under provider: gcs (treated as unset)", () => {
+    process.env.STORAGE_NAMESPACE_KEY = "";
+    writeHookJson({
+      mode: "no-auth",
+      no_auth: {
+        provider: "gcs",
+        bucket: GOOD_GCS_BUCKET,
+      },
+      privacy: { mode: "full" },
+    });
+    // Should NOT throw — empty env var is functionally unset.
+    const config = loadConfig();
+    expect(config!.no_auth.provider).toBe("gcs");
+  });
+
+  it("throws when explicit null namespace_key is set under provider: gcs", () => {
+    writeHookJson({
+      mode: "no-auth",
+      no_auth: {
+        provider: "gcs",
+        bucket: GOOD_GCS_BUCKET,
+        namespace_key: null,
+      },
+      privacy: { mode: "full" },
+    });
+    // `in` operator catches explicit null/undefined-but-present too.
+    // null specifically: present in the object but not === undefined.
+    // Verify we don't silently accept it.
+    // (If the author chose to permit null, this test will fail and they can
+    // update — but the intent here is "no namespace_key field at all".)
+    expect(() => loadConfig()).toThrow(
+      /'no_auth\.namespace_key' must NOT be set when provider is 'gcs'/
+    );
+  });
+
   it("accepts a GCS bucket name with the secret suffix anywhere it ends", () => {
     writeHookJson({
       mode: "no-auth",

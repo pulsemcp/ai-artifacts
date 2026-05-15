@@ -20,10 +20,10 @@ There is no per-user authentication. The bucket is configured to accept unauthen
 Object layout:
 ```
 S3:  s3://{bucket}/{namespace_key}/{user_id}/{YYYY}/{MM}/{DD}/{session_uuid}.tar.gz
-GCS: gs://{bucket-with-namespace_key-suffix}/{user_id}/{YYYY}/{MM}/{DD}/{session_uuid}.tar.gz
+GCS: gs://{bucket-ending-in-secret-do-not-share-<hex>}/{user_id}/{YYYY}/{MM}/{DD}/{session_uuid}.tar.gz
 ```
 
-On S3 the `{namespace_key}/` prefix is load-bearing — the bucket policy's Resource ARN scope requires it. On GCS the secret is already in the bucket name, so the path skips the redundant prefix.
+On S3 the `{namespace_key}/` prefix is load-bearing — the bucket policy's Resource ARN scope requires it. On GCS the `secret-do-not-share-<hex>` suffix in the bucket name is the secret, so the object path skips the redundant prefix.
 
 - The shared secret is a high-entropy random string of the form `secret-do-not-share-<12+ hex chars>` (default generator produces 32 hex chars). The `secret-do-not-share-` prefix in the name is self-documenting — anyone who sees it in logs or a screenshot knows immediately that it's a secret.
 - Unauthenticated **reads and listings are NOT granted** on either provider. Without the secret, nobody can write to your bucket; with the secret, you can only write — not enumerate, not download.
@@ -287,9 +287,9 @@ This is "no-authentication + scoped secret" mode. The honest read:
   - **Billing alarms** catch a write-flood early.
   - **Rotate the key** if you suspect a leak:
     - S3: generate a new `namespace_key`, update the bucket policy `Resource` ARN, update `HOOK.json` (or `STORAGE_NAMESPACE_KEY`).
-    - GCS: create a new bucket suffixed with the new `namespace_key`, bind allUsers to the custom write-only role on it, update `HOOK.json`, retire the old bucket.
+    - GCS: create a new bucket whose name ends with a fresh `secret-do-not-share-<hex>` suffix, bind allUsers to the custom write-only role on it, update `no_auth.bucket` in `HOOK.json`, retire the old bucket.
 - **Con (S3 only):** You must disable Block Public Access on the bucket. The policy still restricts unauthenticated access to PUT/DELETE under the `namespace_key` prefix, but the bucket will show as "public" in AWS Console warnings. This is the documented cost of the architecture.
-- **Con (GCS only):** GCP rejects IAM Conditions on `allUsers`, so the `namespace_key` is embedded into the **bucket name** rather than the object-key prefix. This means the whole bucket must be dedicated to transcripts — don't reuse it for anything else. Rotation requires a new bucket rather than a policy edit.
+- **Con (GCS only):** GCP rejects IAM Conditions on `allUsers`, so the secret is embedded into the **bucket name** rather than the object-key prefix. This means the whole bucket must be dedicated to transcripts — don't reuse it for anything else. Rotation requires a new bucket rather than a policy edit.
 
 ## Error handling
 

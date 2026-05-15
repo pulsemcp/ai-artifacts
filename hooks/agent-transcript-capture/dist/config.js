@@ -103,13 +103,18 @@ function loadConfig() {
         // For GCS, the namespace secret is embedded in the bucket name itself
         // (see hooks/agent-transcript-capture/src/backends/gcs-no-auth.ts). A
         // separate namespace_key field would be redundant — reject it loudly so
-        // the config doesn't encode the same secret twice.
-        if (noAuth.namespace_key !== undefined) {
+        // the config doesn't encode the same secret twice. `in` catches explicit
+        // null too, not just undefined.
+        if ("namespace_key" in noAuth && noAuth.namespace_key !== undefined) {
             throw new Error("agent-transcript-capture config: 'no_auth.namespace_key' must NOT be set when provider is 'gcs'. " +
                 "For GCS, the namespace secret is embedded in the bucket name itself (no separate field). " +
                 "Remove the 'namespace_key' field. See README for details.");
         }
-        if (process.env.STORAGE_NAMESPACE_KEY !== undefined) {
+        // Only complain about STORAGE_NAMESPACE_KEY if it's set to a non-empty value,
+        // matching how the S3 path treats env precedence. An exported-but-empty
+        // env var ("") is functionally unset and shouldn't trip the validator.
+        if (process.env.STORAGE_NAMESPACE_KEY !== undefined &&
+            process.env.STORAGE_NAMESPACE_KEY.length > 0) {
             throw new Error("agent-transcript-capture config: the STORAGE_NAMESPACE_KEY env var is set, but it is unused when provider is 'gcs'. " +
                 "For GCS, the namespace secret is embedded in the bucket name itself. Unset STORAGE_NAMESPACE_KEY. " +
                 "See README for details.");
