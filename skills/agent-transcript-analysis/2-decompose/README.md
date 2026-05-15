@@ -5,23 +5,23 @@ Decomposition layer. Turns an OpenTranscripts `transcript.json` (produced by pha
 ## Skills in this phase
 
 - `decompose-agent-transcript-into-transcript-segments/` — emits `segments.json` (structured) and `flamegraph.html` (annotated viz). Sole producer of the Segment primitive.
-- `review-transcript-segments/` — **optional human review checkpoint.** Opens a localhost UI to audit and correct the AI-drafted tree; writes `segments.reviewed.json` next to the draft with full correction provenance. The draft is never overwritten.
-- `learn-from-segment-corrections/` — **optional feedback loop.** Reads the corrections captured by `review-transcript-segments`, clusters them into patterns, and flags concrete improvement opportunities for `decompose-agent-transcript-into-transcript-segments` — it does not edit any skill.
+- `review-agent-transcript-segments/` — **optional human review checkpoint.** Opens a localhost UI to audit and correct the AI-drafted tree; writes `segments.reviewed.json` next to the draft with full correction provenance. The draft is never overwritten.
+- `learn-from-agent-transcript-segment-corrections/` — **optional feedback loop.** Reads the corrections captured by `review-agent-transcript-segments`, clusters them into patterns, and flags concrete improvement opportunities for `decompose-agent-transcript-into-transcript-segments` — it does not edit any skill.
 
 ## How this phase plugs into the rest
 
 Phase 1 → Phase 2 → Phase 3. The orchestrator that opens Phase 3 and every per-segment analyzer it fans out read the Segment tree and dereference event ids back into `transcript.json` — they never re-walk events from scratch.
 
-When phase 1's `gather-external-context` has run, `external-context.json` (or its reviewed sibling) sits in the same `tmp_dir`. Decomposition may read it to ground a Segment's Trigger and Goal in the ticket and PR behind the work, but it is best-effort context, not a required input — the tree is built from `transcript.json` alone when it is absent.
+When phase 1's `gather-agent-transcript-external-context` has run, `external-context.json` (or its reviewed sibling) sits in the same `tmp_dir`. Decomposition may read it to ground a Segment's Trigger and Goal in the ticket and PR behind the work, but it is best-effort context, not a required input — the tree is built from `transcript.json` alone when it is absent.
 
-Downstream readers go through the `load_bundle` helper in `review-transcript-segments`'s bundled `segment_review.py`, which **prefers `segments.reviewed.json` when it exists** and falls back to `segments.json`. Because the reviewed file is schema-compatible with the draft, no analyzer needs to know whether a human touched the tree.
+Downstream readers go through the `load_bundle` helper in `review-agent-transcript-segments`'s bundled `segment_review.py`, which **prefers `segments.reviewed.json` when it exists** and falls back to `segments.json`. Because the reviewed file is schema-compatible with the draft, no analyzer needs to know whether a human touched the tree.
 
 The review subsystem is its own loop:
 
 ```
 decompose-agent-transcript-into-transcript-segments  →  segments.json (AI draft)
-review-transcript-segments                           →  segments.reviewed.json + append-only correction log
-learn-from-segment-corrections                       →  flagged opportunities for decompose-agent-transcript-into-transcript-segments
+review-agent-transcript-segments                           →  segments.reviewed.json + append-only correction log
+learn-from-agent-transcript-segment-corrections                       →  flagged opportunities for decompose-agent-transcript-into-transcript-segments
        └──────────────────────── close the loop ────────────────────────┘
 ```
 
@@ -32,5 +32,5 @@ learn-from-segment-corrections                       →  flagged opportunities 
 - **One walker, many readers.** This phase walks every event once; everything downstream reads the structured tree. Cheaper than re-walking events in every analyzer.
 - **Two artifacts, one truth.** `segments.json` is the source of truth; `flamegraph.html` is the humanizing view. If they disagree, fix `segments.json` first and re-render.
 - **Outcome is per-Goal.** A Success sub-step under a Failure parent stays Success. The tree carries enough info for the orchestrator to decide how to aggregate.
-- **Decomposition is a draft, not an answer.** It is the most interpretive step in the whole pipeline, so its output is reviewable: `review-transcript-segments` lets a human correct it, and `segments.json` is kept pristine so the AI-vs-human diff stays inspectable. Phase 1's deterministic steps need no such checkpoint.
-- **Corrections are signal.** The review UI records *why* a human disagreed, not just *what* they changed — a structured, replayable correction log — so `learn-from-segment-corrections` can turn those disagreements into flagged improvement opportunities for the decomposer.
+- **Decomposition is a draft, not an answer.** It is the most interpretive step in the whole pipeline, so its output is reviewable: `review-agent-transcript-segments` lets a human correct it, and `segments.json` is kept pristine so the AI-vs-human diff stays inspectable. Phase 1's deterministic steps need no such checkpoint.
+- **Corrections are signal.** The review UI records *why* a human disagreed, not just *what* they changed — a structured, replayable correction log — so `learn-from-agent-transcript-segment-corrections` can turn those disagreements into flagged improvement opportunities for the decomposer.

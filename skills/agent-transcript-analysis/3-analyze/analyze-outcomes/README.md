@@ -4,14 +4,14 @@ The Segment-level analysis bucket. Where `analyze-prompts/`, `analyze-skills/`, 
 
 ## Skills in this bucket
 
-- `analyze-failure-hypothesis/` — every Failure Outcome (and every retro-Failure surfaced by a Correction trigger at the next Segment's head — user-source or agent-source) gets a concrete improvement hypothesis.
-- `analyze-segment-efficiency/` — wall-clock / token spend vs a reasonable counterfactual. Flags wasteful branches and model-size mismatches.
+- `analyze-agent-transcript-failure-hypothesis/` — every Failure Outcome (and every retro-Failure surfaced by a Correction trigger at the next Segment's head — user-source or agent-source) gets a concrete improvement hypothesis.
+- `analyze-agent-transcript-segment-efficiency/` — wall-clock / token spend vs a reasonable counterfactual. Flags wasteful branches and model-size mismatches.
 
 ## How the skills interplay
 
-`analyze-agent-transcript` runs both per Segment. `analyze-failure-hypothesis` answers "why did this Segment fail and what would have prevented it"; `analyze-segment-efficiency` answers "even on Successes, where did time and tokens go that shouldn't have." The two are complementary — a Segment can be Success-but-wasteful, or Failure-but-fast-fail.
+`analyze-agent-transcript` runs both per Segment. `analyze-agent-transcript-failure-hypothesis` answers "why did this Segment fail and what would have prevented it"; `analyze-agent-transcript-segment-efficiency` answers "even on Successes, where did time and tokens go that shouldn't have." The two are complementary — a Segment can be Success-but-wasteful, or Failure-but-fast-fail.
 
-Output from this bucket *does not* directly map to one of the final report's three buckets — instead, each finding declares, via a `recommendation_route`, which downstream bucket(s) (Prompting / Skills / MCP) its recommendation flows to. `synthesize-report` (phase 4) follows that route when it folds the findings into the report.
+Output from this bucket *does not* directly map to one of the final report's three buckets — instead, each finding declares, via a `recommendation_route`, which downstream bucket(s) (Prompting / Skills / MCP) its recommendation flows to. `synthesize-agent-transcript-analysis-report` (phase 4) follows that route when it folds the findings into the report.
 
 ## Design decisions
 

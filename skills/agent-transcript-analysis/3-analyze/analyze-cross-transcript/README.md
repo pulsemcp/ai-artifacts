@@ -4,7 +4,7 @@ Phase 3's cross-cutting bucket. The other three artifact buckets and `analyze-ou
 
 ## Skills in this bucket
 
-- `analyze-cross-transcript-patterns/` — reads the phase-3 `findings.*.json` sets of N already-analyzed transcripts (the per-Segment analyzer outputs `analyze-agent-transcript` wrote for each) and surfaces hindsight-as-foresight Segment patterns, recurring user prompts, deduped cross-session Skill/MCP gaps, and time-spend patterns.
+- `analyze-cross-agent-transcript-patterns/` — reads the phase-3 `findings.*.json` sets of N already-analyzed transcripts (the per-Segment analyzer outputs `analyze-agent-transcript` wrote for each) and surfaces hindsight-as-foresight Segment patterns, recurring user prompts, deduped cross-session Skill/MCP gaps, and time-spend patterns.
 
 ## Why it sits in phase 3
 
@@ -15,11 +15,11 @@ It is not driven by the per-transcript orchestrator (`analyze-agent-transcript`)
 ## How this bucket plugs into the rest
 
 Upstream: a batch of many transcripts' phase-3 findings sets — the `findings.{outcomes,prompts,skills,mcp}.json` `analyze-agent-transcript` produced for each transcript. There is no per-transcript report; this bucket reads the raw per-transcript findings to catch the long tail that only becomes significant in aggregate. It takes the list of per-transcript `tmp_dir`s that make up the batch, plus a `batch_dir` (the batch-level working directory).
-Downstream: it writes `findings.cross-transcript.json` into `batch_dir`, where `synthesize-report` reads it in phase 4 — an optional pre-report augmentation alongside every transcript's `findings.*.json`. `synthesize-report` always synthesizes the whole batch's findings into one actionable recommendation slate.
+Downstream: it writes `findings.cross-transcript.json` into `batch_dir`, where `synthesize-agent-transcript-analysis-report` reads it in phase 4 — an optional pre-report augmentation alongside every transcript's `findings.*.json`. `synthesize-agent-transcript-analysis-report` always synthesizes the whole batch's findings into one actionable recommendation slate.
 
 ## Design decisions
 
 - **Pure aggregation, no re-walking.** This bucket reads only the structured outputs of per-transcript analysis — the `findings.*.json` sets (and the `segments.json` they were derived from), never raw JSONL. There is no per-transcript report to read; running cross-transcript analysis on raw findings is what catches the individually-minor findings that only matter once they recur. If something is missing from a `segments.json`, fix phase 2 and re-run the lower phases; don't paper over it here.
 - **Clusters require a minimum count.** Patterns flagged here must appear in at least two (often three) sessions. One-off findings belong in the per-transcript analysis.
-- **Labeling, not synthesis.** This bucket produces findings — "this pattern recurs in N sessions." Turning those findings into a prioritized change list is `synthesize-report`'s job (phase 4), not this bucket's. It is still phase-3 labeling — it just runs once over the whole batch as a last, optional pre-report step rather than per transcript.
+- **Labeling, not synthesis.** This bucket produces findings — "this pattern recurs in N sessions." Turning those findings into a prioritized change list is `synthesize-agent-transcript-analysis-report`'s job (phase 4), not this bucket's. It is still phase-3 labeling — it just runs once over the whole batch as a last, optional pre-report step rather than per transcript.
 - **A different scope, intentionally.** The per-Segment buckets answer "how could this Segment have gone better"; this bucket answers "what pattern recurs across sessions." Same phase, different unit of analysis.

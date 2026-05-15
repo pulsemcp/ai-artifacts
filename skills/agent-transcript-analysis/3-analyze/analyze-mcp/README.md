@@ -2,15 +2,15 @@
 
 The MCP recommendation bucket — three analyzers covering existing MCP tools and missing ones:
 
-- `analyze-mcp-trigger-performance/` — tools called when they shouldn't have been, or available tools the agent didn't reach for
-- `analyze-mcp-action-performance/` — tools that ran: response shape, token cost, error quality
-- `analyze-mcp-gaps/` — MCP servers / tools that *should exist but don't*
+- `analyze-agent-transcript-mcp-trigger-performance/` — tools called when they shouldn't have been, or available tools the agent didn't reach for
+- `analyze-agent-transcript-mcp-action-performance/` — tools that ran: response shape, token cost, error quality
+- `analyze-agent-transcript-mcp-gaps/` — MCP servers / tools that *should exist but don't*
 
 Mirrors the structure of `../analyze-skills/`, but for MCP instead of Skills.
 
 ## How the skills interplay
 
-`analyze-agent-transcript` runs all three per Segment. Same trigger / action / gaps split as the Skills bucket; the same boundary rules apply (a wrong response from the right tool is an *action* problem, not a trigger problem). The gaps analyzer additionally accepts seeds from `analyze-failure-hypothesis` and `analyze-prompt-ambition` (deterministic-trigger candidates) when they point at MCP.
+`analyze-agent-transcript` runs all three per Segment. Same trigger / action / gaps split as the Skills bucket; the same boundary rules apply (a wrong response from the right tool is an *action* problem, not a trigger problem). The gaps analyzer additionally accepts seeds from `analyze-agent-transcript-failure-hypothesis` and `analyze-agent-transcript-prompt-ambition` (deterministic-trigger candidates) when they point at MCP.
 
 Note: Skills frequently wrap MCP tools. A Skill that was supposed to call an MCP tool but didn't is a Skill-body issue (handled in `../analyze-skills/`), not an MCP trigger issue.
 

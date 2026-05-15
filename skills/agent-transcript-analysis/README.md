@@ -17,7 +17,7 @@ The split means: a new vendor (Codex, Pi, Cursor) only needs a new mapping doc +
 
 Phases 1–3 run **per transcript**: acquire → decompose → analyze, ending at that transcript's `findings.{outcomes,prompts,skills,mcp}.json` set. The findings sets are the durable, accumulating substrate of the pipeline. You repeat phases 1–3 for every transcript you care about; the findings sets pile up, one set per transcript, each in its own transcript `tmp_dir`.
 
-When the batch is complete — the user has no more transcripts to analyze — two **batch-level** steps run once each over the whole batch: `analyze-cross-transcript-patterns` (optional, the last phase-3 step) and `synthesize-report` (phase 4). Their artifacts land in a `batch_dir` — a batch-level working directory distinct from any single transcript's `tmp_dir`. `synthesize-report` produces the one final report.
+When the batch is complete — the user has no more transcripts to analyze — two **batch-level** steps run once each over the whole batch: `analyze-cross-agent-transcript-patterns` (optional, the last phase-3 step) and `synthesize-agent-transcript-analysis-report` (phase 4). Their artifacts land in a `batch_dir` — a batch-level working directory distinct from any single transcript's `tmp_dir`. `synthesize-agent-transcript-analysis-report` produces the one final report.
 
 ## How to run the pipeline
 
@@ -26,13 +26,13 @@ End-to-end, an operator does this:
 1. **Pick a transcript.** Invoke `find-all-claude-code-transcripts-on-local` to browse local sessions and pick one. Skip this and jump to step 2 if you already have a Claude Code session id.
 2. **Run the per-transcript spine.** For each transcript:
    - `get-claude-code-transcript-from-local` — session id → `transcript.json` in that transcript's `tmp_dir`.
-   - `gather-external-context` — pulls ticket / PR / user context into `external-context.json` next to it.
+   - `gather-agent-transcript-external-context` — pulls ticket / PR / user context into `external-context.json` next to it.
    - `decompose-agent-transcript-into-transcript-segments` — `transcript.json` → `segments.json` (+ flamegraph).
    - `analyze-agent-transcript` — entry point of phase 3; drives the per-Segment analyzers, writes `findings.outcomes.json`, `findings.prompts.json`, `findings.skills.json`, `findings.mcp.json` into the same `tmp_dir`. Stops there.
-3. **Optional review at any phase.** `review-external-context`, `review-transcript-segments`, `review-analysis` each open a localhost UI over the draft artifact and write a `<artifact>.reviewed.json` next to it. The draft is never overwritten; downstream skills prefer `.reviewed.json` automatically.
+3. **Optional review at any phase.** `review-agent-transcript-external-context`, `review-agent-transcript-segments`, `review-agent-transcript-analysis` each open a localhost UI over the draft artifact and write a `<artifact>.reviewed.json` next to it. The draft is never overwritten; downstream skills prefer `.reviewed.json` automatically.
 4. **Close the batch.** Repeat steps 2–3 for every transcript you care about — findings sets accumulate, one set per `tmp_dir`. When the batch is complete:
-   - Optionally `analyze-cross-transcript-patterns` — reads every transcript's findings, writes `findings.cross-transcript.json` into the `batch_dir`.
-   - `synthesize-report` — reads the whole batch's findings (+ cross-transcript findings if present) from the `batch_dir`, writes `findings.report.json` and `report.md`. Optionally followed by `review-report`.
+   - Optionally `analyze-cross-agent-transcript-patterns` — reads every transcript's findings, writes `findings.cross-transcript.json` into the `batch_dir`.
+   - `synthesize-agent-transcript-analysis-report` — reads the whole batch's findings (+ cross-transcript findings if present) from the `batch_dir`, writes `findings.report.json` and `report.md`. Optionally followed by `review-agent-transcript-analysis-report`.
 
 Each skill's `SKILL.md` documents inputs, outputs, and the exact CLI shape — names in backticks above are clickable entries in `skills/skills.json`.
 
@@ -49,14 +49,14 @@ Per-phase signals that say the artifact is usable:
 
 The pipeline is intentionally human-correctable at every phase, in two ways:
 
-1. **Review checkpoints.** Each phase has an optional review skill — `review-external-context`, `review-transcript-segments`, `review-analysis`, `review-report` — that opens a localhost UI over the draft. Corrections are written to a `.reviewed.json` next to the draft (the draft is never overwritten); downstream skills prefer `.reviewed.json` automatically. This is how you fix a specific artifact without re-running the whole phase.
-2. **Learn-from-corrections loops.** `learn-from-segment-corrections`, `learn-from-analysis-corrections`, `learn-from-report-corrections` cluster the review corrections across many transcripts into flagged improvement opportunities for the upstream draft generator. Because the `SKILL.md` files are themselves generated/iterated from prompts, **the corrections are the canonical signal** for evolving those skills — not hand-edits to the deployed copy.
+1. **Review checkpoints.** Each phase has an optional review skill — `review-agent-transcript-external-context`, `review-agent-transcript-segments`, `review-agent-transcript-analysis`, `review-agent-transcript-analysis-report` — that opens a localhost UI over the draft. Corrections are written to a `.reviewed.json` next to the draft (the draft is never overwritten); downstream skills prefer `.reviewed.json` automatically. This is how you fix a specific artifact without re-running the whole phase.
+2. **Learn-from-corrections loops.** `learn-from-agent-transcript-segment-corrections`, `learn-from-agent-transcript-analysis-corrections`, `learn-from-agent-transcript-analysis-report-corrections` cluster the review corrections across many transcripts into flagged improvement opportunities for the upstream draft generator. Because the `SKILL.md` files are themselves generated/iterated from prompts, **the corrections are the canonical signal** for evolving those skills — not hand-edits to the deployed copy.
 
 A short "if X looks wrong, the bug is likely in Phase Y" map:
 
 - **A finding cites an event that doesn't exist or doesn't say what it claims.** Most likely an analyzer hallucination in Phase 3. But also check whether `segments.json`'s `evidence_event_ids` are correct (Phase 2) and whether `transcript.json` actually has the event (Phase 1) — the analyzer can only cite what decomposition handed it.
 - **A `Compaction`-followed-by-`UserMessage` failure heuristic doesn't fire.** Check whether Phase 1 actually emits `Compaction` events at all — CC's `compact_boundary` system lines should map to an OpenTranscripts `Compaction` event, and if they're silently dropped the heuristic has nothing to bite on.
-- **The report's distance-from-ideal numbers look wrong.** The source for Failures / Corrections / wall-clock is `segments.json` (Phase 2); the source for the human-counterfactual sum is `findings.outcomes.json` (Phase 3). Drift between them is a Phase-2 / Phase-3 disagreement, not a Phase-4 bug — `synthesize-report` is just adding up what it was given.
+- **The report's distance-from-ideal numbers look wrong.** The source for Failures / Corrections / wall-clock is `segments.json` (Phase 2); the source for the human-counterfactual sum is `findings.outcomes.json` (Phase 3). Drift between them is a Phase-2 / Phase-3 disagreement, not a Phase-4 bug — `synthesize-agent-transcript-analysis-report` is just adding up what it was given.
 - **Two transcripts' findings files have divergent id schemes.** Phase-3 orchestrator drift. The canonical item shape is stamped by the orchestrator (`analyze-agent-transcript`): `id` = `<analyzer-short-name>-<segment_id>`, evidence = event ids from `transcript.json`. If two `findings.*.json` sets disagree on the shape, the orchestrator on one of the runs went off-spec.
 
 ## How the skills interplay
@@ -68,49 +68,49 @@ agent-transcript-analysis/
   1-acquire/              # phase 1: a session id → one transcript.json + its external context
     find-all-claude-code-transcripts-on-local/
     get-claude-code-transcript-from-local/      # session id → deterministic CC → OpenTranscripts mapping
-    gather-external-context/                    # pull the ticket / PR / user context into external-context.json
-    review-external-context/                    # optional human-review UI for the gathered context
+    gather-agent-transcript-external-context/                    # pull the ticket / PR / user context into external-context.json
+    review-agent-transcript-external-context/                    # optional human-review UI for the gathered context
   2-decompose/            # phase 2: produce the Segment tree (segments.json + flamegraph) + review loop
     decompose-agent-transcript-into-transcript-segments/
-    review-transcript-segments/                 # optional human-review UI over the Segment tree
-    learn-from-segment-corrections/              # cluster review corrections; flag decomposer fixes
+    review-agent-transcript-segments/                 # optional human-review UI over the Segment tree
+    learn-from-agent-transcript-segment-corrections/              # cluster review corrections; flag decomposer fixes
   3-analyze/              # phase 3: orchestrator entry point + per-Segment analyzers (4 buckets) + cross-transcript + review loop
     analyze-agent-transcript/                   # the entry point: picks up segments.json, drives the analyzers, writes findings.*.json — stops there
-    analyze-outcomes/         { analyze-failure-hypothesis, analyze-segment-efficiency }
-    analyze-prompts/          { analyze-user-prompt, analyze-prompt-ambition,
-                                pull-together-goal-context }
+    analyze-outcomes/         { analyze-agent-transcript-failure-hypothesis, analyze-agent-transcript-segment-efficiency }
+    analyze-prompts/          { analyze-agent-transcript-user-prompt, analyze-agent-transcript-prompt-ambition,
+                                pull-together-agent-transcript-goal-context }
     analyze-skills/           { trigger, action, gaps }
     analyze-mcp/              { trigger, action, gaps }
-    analyze-cross-transcript/ { analyze-cross-transcript-patterns }   # optional batch step: runs once, last, over the whole batch's findings
-    review-analysis/                  # human-review UI over any findings.<kind>.json draft
-    learn-from-analysis-corrections/  # cluster review corrections; flag phase-3 analyzer fixes
+    analyze-cross-transcript/ { analyze-cross-agent-transcript-patterns }   # optional batch step: runs once, last, over the whole batch's findings
+    review-agent-transcript-analysis/                  # human-review UI over any findings.<kind>.json draft
+    learn-from-agent-transcript-analysis-corrections/  # cluster review corrections; flag phase-3 analyzer fixes
   4-report/               # phase 4: synthesize the whole batch's findings into the one final report + review loop
-    synthesize-report/                # the batch's findings.*.json (+ findings.cross-transcript.json) → findings.report.json + report.md
-    review-report/                    # optional human-review UI over the recommendation slate
-    learn-from-report-corrections/    # cluster review corrections; flag synthesize-report fixes
+    synthesize-agent-transcript-analysis-report/                # the batch's findings.*.json (+ findings.cross-transcript.json) → findings.report.json + report.md
+    review-agent-transcript-analysis-report/                    # optional human-review UI over the recommendation slate
+    learn-from-agent-transcript-analysis-report-corrections/    # cluster review corrections; flag synthesize-agent-transcript-analysis-report fixes
 ```
 
-Phase 1 → 2 → 3 run per transcript; phase 4 runs once over the batch. Decomposition (phase 2) runs first and concretely; phase 3's entry point, `analyze-agent-transcript`, picks up `segments.json`, drives the per-Segment analyzers, and writes that transcript's `findings.*.json` set — and stops there. It has nothing to do with the report. You repeat phases 1–3 for every transcript in the batch. When the batch is complete, `analyze-cross-transcript-patterns` runs once, last in phase 3, over all the analyzed transcripts' `findings.*.json` sets — an optional pre-report augmentation — and then `synthesize-report` (phase 4) runs once over the whole batch's findings (plus `findings.cross-transcript.json` when present) to produce the single final report.
+Phase 1 → 2 → 3 run per transcript; phase 4 runs once over the batch. Decomposition (phase 2) runs first and concretely; phase 3's entry point, `analyze-agent-transcript`, picks up `segments.json`, drives the per-Segment analyzers, and writes that transcript's `findings.*.json` set — and stops there. It has nothing to do with the report. You repeat phases 1–3 for every transcript in the batch. When the batch is complete, `analyze-cross-agent-transcript-patterns` runs once, last in phase 3, over all the analyzed transcripts' `findings.*.json` sets — an optional pre-report augmentation — and then `synthesize-agent-transcript-analysis-report` (phase 4) runs once over the whole batch's findings (plus `findings.cross-transcript.json` when present) to produce the single final report.
 
 Numbered prefixes only land on grouping folders, never on Skill folders themselves — the Skills spec requires a Skill's folder name to match its `name`.
 
 ## Skill flow
 
-How transcripts move through the skills, top to bottom. **The per-transcript spine — `FA ==> GET ==> GEC ==> DEC ==> ORCH ==> T3A` — runs once per transcript** and ends at that transcript's four `findings.*.json` files. There is no per-transcript report. **Thick arrows are the main spine**; the spine's end is the batch report, fed by every analyzed transcript's findings. **Dotted arrows are the side loops** — each phase's optional human-review checkpoint, the `learn-from-*-corrections` edge that feeds corrections back to the draft generator, and the optional cross-transcript augmentation. `analyze-cross-transcript-patterns` and `synthesize-report` are **batch-level steps that run once, after the batch is done** — edges feeding them carry `×N transcripts` to mark that they consume every transcript's findings, not one's. Every node is a registered Skill.
+How transcripts move through the skills, top to bottom. **The per-transcript spine — `FA ==> GET ==> GEC ==> DEC ==> ORCH ==> T3A` — runs once per transcript** and ends at that transcript's four `findings.*.json` files. There is no per-transcript report. **Thick arrows are the main spine**; the spine's end is the batch report, fed by every analyzed transcript's findings. **Dotted arrows are the side loops** — each phase's optional human-review checkpoint, the `learn-from-*-corrections` edge that feeds corrections back to the draft generator, and the optional cross-transcript augmentation. `analyze-cross-agent-transcript-patterns` and `synthesize-agent-transcript-analysis-report` are **batch-level steps that run once, after the batch is done** — edges feeding them carry `×N transcripts` to mark that they consume every transcript's findings, not one's. Every node is a registered Skill.
 
 ```mermaid
 flowchart TD
     subgraph T1["Phase 1 · acquire — per transcript"]
         FA["<b>find-all-claude-code-transcripts-on-local</b><br/>browse local sessions, pick one"]
         GET["<b>get-claude-code-transcript-from-local</b><br/>session id → transcript.json"]
-        GEC["<b>gather-external-context</b><br/>+ ticket / PR / user context → external-context.json"]
-        REC["<b>review-external-context</b><br/>optional review UI"]
+        GEC["<b>gather-agent-transcript-external-context</b><br/>+ ticket / PR / user context → external-context.json"]
+        REC["<b>review-agent-transcript-external-context</b><br/>optional review UI"]
     end
 
     subgraph T2["Phase 2 · decompose — per transcript"]
         DEC["<b>decompose-agent-transcript-into-transcript-segments</b><br/>transcript.json → Segment tree"]
-        REV["<b>review-transcript-segments</b><br/>optional review UI"]
-        LSC["<b>learn-from-segment-corrections</b><br/>cluster corrections; flag decomposer fixes"]
+        REV["<b>review-agent-transcript-segments</b><br/>optional review UI"]
+        LSC["<b>learn-from-agent-transcript-segment-corrections</b><br/>cluster corrections; flag decomposer fixes"]
     end
 
     subgraph T3["Phase 3 · analyze — per transcript"]
@@ -118,37 +118,37 @@ flowchart TD
         subgraph T3A["per-Segment analyzers — fanned out by analyze-agent-transcript"]
             direction LR
             subgraph T3O["analyze-outcomes"]
-                FH["analyze-failure-hypothesis"]
-                SE["analyze-segment-efficiency"]
+                FH["analyze-agent-transcript-failure-hypothesis"]
+                SE["analyze-agent-transcript-segment-efficiency"]
             end
             subgraph T3P["analyze-prompts"]
-                UP["analyze-user-prompt"]
-                PA["analyze-prompt-ambition"]
-                GC["pull-together-goal-context"]
+                UP["analyze-agent-transcript-user-prompt"]
+                PA["analyze-agent-transcript-prompt-ambition"]
+                GC["pull-together-agent-transcript-goal-context"]
             end
             subgraph T3S["analyze-skills"]
-                STP["analyze-skill-trigger-performance"]
-                SAP["analyze-skill-action-performance"]
-                SG["analyze-skill-gaps"]
+                STP["analyze-agent-transcript-skill-trigger-performance"]
+                SAP["analyze-agent-transcript-skill-action-performance"]
+                SG["analyze-agent-transcript-skill-gaps"]
             end
             subgraph T3M["analyze-mcp"]
-                MTP["analyze-mcp-trigger-performance"]
-                MAP["analyze-mcp-action-performance"]
-                MG["analyze-mcp-gaps"]
+                MTP["analyze-agent-transcript-mcp-trigger-performance"]
+                MAP["analyze-agent-transcript-mcp-action-performance"]
+                MG["analyze-agent-transcript-mcp-gaps"]
             end
         end
-        RA["<b>review-analysis</b><br/>optional review UI"]
-        LAC["<b>learn-from-analysis-corrections</b><br/>cluster corrections; flag analyzer fixes"]
+        RA["<b>review-agent-transcript-analysis</b><br/>optional review UI"]
+        LAC["<b>learn-from-agent-transcript-analysis-corrections</b><br/>cluster corrections; flag analyzer fixes"]
     end
 
     subgraph XB["batch — runs once, last, after all per-transcript analyses; optional pre-report augmentation"]
-        XT["<b>analyze-cross-transcript-patterns</b><br/>optional · all transcripts' findings.*.json → findings.cross-transcript.json"]
+        XT["<b>analyze-cross-agent-transcript-patterns</b><br/>optional · all transcripts' findings.*.json → findings.cross-transcript.json"]
     end
 
     subgraph T4["Phase 4 · report — runs once over the batch"]
-        SYN["<b>synthesize-report</b><br/>the whole batch's findings → findings.report.json + report.md"]
-        RR["<b>review-report</b><br/>optional review UI"]
-        LRC["<b>learn-from-report-corrections</b><br/>cluster corrections; flag synthesis fixes"]
+        SYN["<b>synthesize-agent-transcript-analysis-report</b><br/>the whole batch's findings → findings.report.json + report.md"]
+        RR["<b>review-agent-transcript-analysis-report</b><br/>optional review UI"]
+        LRC["<b>learn-from-agent-transcript-analysis-report-corrections</b><br/>cluster corrections; flag synthesis fixes"]
     end
 
     %% per-transcript spine — runs once per transcript, ends at T3A's findings.*.json
@@ -182,14 +182,14 @@ flowchart TD
 
 - **Two data primitives, one downstream contract.** `Transcript` (phase 1 output) carries vendor-coupled detail; `TranscriptSegment` (phase 2 output) is the analysis tree. The downstream phases read only `segments.json` and dereference event ids back into `transcript.json` for evidence. If either is wrong, fix the producing phase and re-run — don't patch around it downstream.
 - **OpenTranscripts is the cross-vendor contract.** Phase 1's output shape is governed by the `open-transcripts` reference set, not by any one vendor's JSONL. When CC changes its format, only the mapping doc + the transformation skill change.
-- **External context is gathered once, up front.** A transcript records *what* the agent did; it rarely records *why*. Phase 1's `gather-external-context` pulls the ticket, the PR, and light user context into one `external-context.json` that rides alongside `transcript.json` through every later phase — so no analyzer has to re-derive the Goal's backdrop. It is best-effort (missing sources are recorded, never fatal) and has `review-external-context` as its optional human checkpoint, mirroring phase 2's `review-transcript-segments`.
+- **External context is gathered once, up front.** A transcript records *what* the agent did; it rarely records *why*. Phase 1's `gather-agent-transcript-external-context` pulls the ticket, the PR, and light user context into one `external-context.json` that rides alongside `transcript.json` through every later phase — so no analyzer has to re-derive the Goal's backdrop. It is best-effort (missing sources are recorded, never fatal) and has `review-agent-transcript-external-context` as its optional human checkpoint, mirroring phase 2's `review-agent-transcript-segments`.
 - **Numbered phases, not flat buckets.** The execution layers (acquire → decompose → analyze → report) are visible in the directory tree.
 - **Grouping folders are never Skills.** `1-acquire/`, `2-decompose/`, `3-analyze/`, `4-report/`, and the per-domain buckets under phase 3 contain no `SKILL.md` of their own. That keeps the spec's "everything under a skill folder belongs to that skill" model intact.
 - **The orchestrator is the analyze phase's entry point, not a phase of its own.** `analyze-agent-transcript` doesn't sit *between* decompose and analyze — it *is* the front door of the analyze phase. Decomposition (phase 2) runs first and concretely; the orchestrator picks up `segments.json`, fans out the four per-Segment buckets, and writes that transcript's `findings.*.json` set. It stops there — it does not touch the report. Giving orchestration its own phase number made it look like a pipeline stage that data flows *through*; it isn't one — it's the conductor of phase 3.
-- **Per-transcript phases, one batch-final report.** Phases 1–3 run per transcript and end at `findings.*.json` — there is no per-transcript report. The findings sets accumulate, one per transcript. Once the batch is complete, `synthesize-report` runs once over the whole batch's findings and produces the single final report. Synthesizing per transcript would bury the cross-session picture and force the reviewer through one report per session; one batch-final report keeps the recommendation slate deduped and prioritized across everything analyzed.
-- **Four per-Segment phase-3 buckets, three output buckets.** `analyze-outcomes/` is Segment-shaped (failure hypotheses, efficiency); its findings *route* into the three artifact buckets (Prompting / Skills / MCP) via `recommendation_route`. `synthesize-report` (phase 4) follows that route to fold the findings into a clean three-bucket report.
-- **Labeling and synthesis are separate phases.** Phase 3 produces *findings* — flat lists of conclusions, per transcript. Phase 4 (`synthesize-report`) makes the *leap* from the whole batch's findings to one prioritized, deduped recommendation slate. Splitting them gives the leap its own review checkpoint (`review-report`) and learn loop (`learn-from-report-corrections`) — the same draft → review → learn shape phases 2 and 3 already have — and the orchestrator never touches phase 4 at all.
-- **Cross-transcript is phase-3 labeling, run last over the batch.** Patterns visible only at scale (recurring prompts, hindsight-as-foresight Segment shapes, time-spend trends) need many transcripts' findings as input — the per-transcript `findings.*.json` sets. It is still *labeling*, the same kind of work as the per-Segment buckets, so `analyze-cross-transcript/` lives in phase 3. But it is **batch-scoped**: it runs once, very last in phase 3, over all the analyzed transcripts' findings — not interleaved per transcript, not fanned out by the orchestrator. It is an optional pre-report augmentation: skip it and the report simply has no cross-transcript findings folded in; run it and its `findings.cross-transcript.json` feeds `synthesize-report` alongside the per-transcript findings.
+- **Per-transcript phases, one batch-final report.** Phases 1–3 run per transcript and end at `findings.*.json` — there is no per-transcript report. The findings sets accumulate, one per transcript. Once the batch is complete, `synthesize-agent-transcript-analysis-report` runs once over the whole batch's findings and produces the single final report. Synthesizing per transcript would bury the cross-session picture and force the reviewer through one report per session; one batch-final report keeps the recommendation slate deduped and prioritized across everything analyzed.
+- **Four per-Segment phase-3 buckets, three output buckets.** `analyze-outcomes/` is Segment-shaped (failure hypotheses, efficiency); its findings *route* into the three artifact buckets (Prompting / Skills / MCP) via `recommendation_route`. `synthesize-agent-transcript-analysis-report` (phase 4) follows that route to fold the findings into a clean three-bucket report.
+- **Labeling and synthesis are separate phases.** Phase 3 produces *findings* — flat lists of conclusions, per transcript. Phase 4 (`synthesize-agent-transcript-analysis-report`) makes the *leap* from the whole batch's findings to one prioritized, deduped recommendation slate. Splitting them gives the leap its own review checkpoint (`review-agent-transcript-analysis-report`) and learn loop (`learn-from-agent-transcript-analysis-report-corrections`) — the same draft → review → learn shape phases 2 and 3 already have — and the orchestrator never touches phase 4 at all.
+- **Cross-transcript is phase-3 labeling, run last over the batch.** Patterns visible only at scale (recurring prompts, hindsight-as-foresight Segment shapes, time-spend trends) need many transcripts' findings as input — the per-transcript `findings.*.json` sets. It is still *labeling*, the same kind of work as the per-Segment buckets, so `analyze-cross-transcript/` lives in phase 3. But it is **batch-scoped**: it runs once, very last in phase 3, over all the analyzed transcripts' findings — not interleaved per transcript, not fanned out by the orchestrator. It is an optional pre-report augmentation: skip it and the report simply has no cross-transcript findings folded in; run it and its `findings.cross-transcript.json` feeds `synthesize-agent-transcript-analysis-report` alongside the per-transcript findings.
 - **Folder hierarchy is for humans.** AIR resolves Skills via `skills.json`, which is flat. The nested folders exist so contributors can see the pipeline shape at a glance.
-- **Philosophy docs are the tie-breaker.** The phase-3 analyzers consult the `philosophy-on-skills` and `philosophy-on-mcp` references as they draft findings, and `synthesize-report` cross-checks every recommendation against them at the synthesis step — so the output stays consistent with team stance, not just per-Segment heuristics.
+- **Philosophy docs are the tie-breaker.** The phase-3 analyzers consult the `philosophy-on-skills` and `philosophy-on-mcp` references as they draft findings, and `synthesize-agent-transcript-analysis-report` cross-checks every recommendation against them at the synthesis step — so the output stays consistent with team stance, not just per-Segment heuristics.
 - **Local-first.** Nothing in this plugin uploads or phones home; all analysis happens against the local tmp folder.

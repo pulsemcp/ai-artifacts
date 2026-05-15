@@ -282,7 +282,7 @@ What this example demonstrates:
 
 ## `segments.reviewed.json` — the reviewed sibling
 
-`segments.json` is an **AI draft**. Decomposition is the most interpretive step in the pipeline — where a Goal changes, whether a Segment was a Failure, whether a Trigger was a Correction — so the draft is meant to be reviewed by a human. `2-decompose/review-transcript-segments` opens a UI for that review and writes `segments.reviewed.json` **next to** `segments.json` (the draft is never overwritten).
+`segments.json` is an **AI draft**. Decomposition is the most interpretive step in the pipeline — where a Goal changes, whether a Segment was a Failure, whether a Trigger was a Correction — so the draft is meant to be reviewed by a human. `2-decompose/review-agent-transcript-segments` opens a UI for that review and writes `segments.reviewed.json` **next to** `segments.json` (the draft is never overwritten).
 
 `segments.reviewed.json` is **schema-compatible with `segments.json`** — its top-level value is the root Segment, with the exact same shape — so every downstream analyzer reads it transparently. It adds a `review` block in two places:
 
@@ -322,7 +322,7 @@ What this example demonstrates:
 
 ### Reader rule
 
-Downstream skills go through `_lib/segment_review.py::load_bundle`, which **prefers `segments.reviewed.json` when it exists** and falls back to `segments.json`. Analyzers never need to branch on whether a tree was reviewed — they just read the resolved tree. `learn-from-segment-corrections` is the one consumer that reads `review.log` specifically, to cluster corrections into flagged improvement opportunities for the decomposer.
+Downstream skills go through `_lib/segment_review.py::load_bundle`, which **prefers `segments.reviewed.json` when it exists** and falls back to `segments.json`. Analyzers never need to branch on whether a tree was reviewed — they just read the resolved tree. `learn-from-agent-transcript-segment-corrections` is the one consumer that reads `review.log` specifically, to cluster corrections into flagged improvement opportunities for the decomposer.
 
 ## Notes for analyzer authors
 

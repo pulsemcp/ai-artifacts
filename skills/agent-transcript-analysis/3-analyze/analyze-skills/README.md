@@ -2,9 +2,9 @@
 
 The Skills recommendation bucket — three analyzers covering existing Skills and missing Skills:
 
-- `analyze-skill-trigger-performance/` — Skills that fired but shouldn't have, or should have fired but didn't (issue lives in the `description`)
-- `analyze-skill-action-performance/` — Skills that ran: did they help? at what cost? (issue lives in the body)
-- `analyze-skill-gaps/` — Skills that *should exist but don't*
+- `analyze-agent-transcript-skill-trigger-performance/` — Skills that fired but shouldn't have, or should have fired but didn't (issue lives in the `description`)
+- `analyze-agent-transcript-skill-action-performance/` — Skills that ran: did they help? at what cost? (issue lives in the body)
+- `analyze-agent-transcript-skill-gaps/` — Skills that *should exist but don't*
 
 ## How the skills interplay
 
