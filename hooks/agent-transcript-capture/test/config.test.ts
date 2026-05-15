@@ -10,6 +10,7 @@ let savedHookJson: Buffer | null = null;
 let savedEnvKey: string | undefined;
 
 const GOOD_KEY = "secret-do-not-share-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+const GOOD_GCS_BUCKET = `agent-transcripts-${GOOD_KEY}`;
 
 beforeEach(() => {
   savedHookJson = fs.existsSync(hookJsonPath)
@@ -64,13 +65,12 @@ describe("loadConfig", () => {
     expect(loadConfig()).toBeNull();
   });
 
-  it("loads a valid GCS no-auth config", () => {
+  it("loads a valid GCS no-auth config (no namespace_key)", () => {
     writeHookJson({
       mode: "no-auth",
       no_auth: {
         provider: "gcs",
-        bucket: "my-bucket",
-        namespace_key: GOOD_KEY,
+        bucket: GOOD_GCS_BUCKET,
       },
       privacy: { mode: "redacted" },
     });
@@ -78,8 +78,11 @@ describe("loadConfig", () => {
     expect(config).not.toBeNull();
     expect(config!.mode).toBe("no-auth");
     expect(config!.no_auth.provider).toBe("gcs");
-    expect(config!.no_auth.bucket).toBe("my-bucket");
-    expect(config!.no_auth.namespace_key).toBe(GOOD_KEY);
+    expect(config!.no_auth.bucket).toBe(GOOD_GCS_BUCKET);
+    // namespace_key must not be present on the GCS variant.
+    expect(
+      (config!.no_auth as { namespace_key?: string }).namespace_key
+    ).toBeUndefined();
     expect(config!.privacy.mode).toBe("redacted");
   });
 
@@ -96,23 +99,29 @@ describe("loadConfig", () => {
     });
     const config = loadConfig();
     expect(config!.no_auth.provider).toBe("s3");
-    expect(config!.no_auth.region).toBe("us-east-1");
+    expect((config!.no_auth as { namespace_key: string }).namespace_key).toBe(
+      GOOD_KEY
+    );
+    expect((config!.no_auth as { region: string }).region).toBe("us-east-1");
     expect(config!.privacy.mode).toBe("full");
   });
 
-  it("sources namespace_key from STORAGE_NAMESPACE_KEY env when set", () => {
+  it("sources S3 namespace_key from STORAGE_NAMESPACE_KEY env when set", () => {
     process.env.STORAGE_NAMESPACE_KEY = GOOD_KEY;
     writeHookJson({
       mode: "no-auth",
       no_auth: {
-        provider: "gcs",
+        provider: "s3",
         bucket: "b",
         namespace_key: "placeholder",
+        region: "us-east-1",
       },
       privacy: { mode: "redacted" },
     });
     const config = loadConfig();
-    expect(config!.no_auth.namespace_key).toBe(GOOD_KEY);
+    expect((config!.no_auth as { namespace_key: string }).namespace_key).toBe(
+      GOOD_KEY
+    );
   });
 
   it("throws when mode is not 'no-auth'", () => {
@@ -136,7 +145,7 @@ describe("loadConfig", () => {
   it("throws when bucket is missing", () => {
     writeHookJson({
       mode: "no-auth",
-      no_auth: { provider: "gcs", namespace_key: GOOD_KEY },
+      no_auth: { provider: "gcs" },
       privacy: { mode: "full" },
     });
     expect(() => loadConfig()).toThrow("'no_auth.bucket' is required");
@@ -147,34 +156,98 @@ describe("loadConfig", () => {
       mode: "no-auth",
       no_auth: {
         provider: "gcs",
-        bucket: "gs://my-bucket",
-        namespace_key: GOOD_KEY,
+        bucket: `gs://${GOOD_GCS_BUCKET}`,
       },
       privacy: { mode: "full" },
     });
     expect(() => loadConfig()).toThrow("bare bucket name");
   });
 
-  it("throws when namespace_key has wrong format", () => {
+  // --- GCS-specific: namespace_key prohibited ---
+
+  it("throws when namespace_key is set under provider: gcs (HOOK.json field)", () => {
     writeHookJson({
       mode: "no-auth",
       no_auth: {
         provider: "gcs",
+        bucket: GOOD_GCS_BUCKET,
+        namespace_key: GOOD_KEY,
+      },
+      privacy: { mode: "full" },
+    });
+    expect(() => loadConfig()).toThrow(
+      /'no_auth\.namespace_key' must NOT be set when provider is 'gcs'/
+    );
+  });
+
+  it("throws when STORAGE_NAMESPACE_KEY env var is set under provider: gcs", () => {
+    process.env.STORAGE_NAMESPACE_KEY = GOOD_KEY;
+    writeHookJson({
+      mode: "no-auth",
+      no_auth: {
+        provider: "gcs",
+        bucket: GOOD_GCS_BUCKET,
+      },
+      privacy: { mode: "full" },
+    });
+    expect(() => loadConfig()).toThrow(
+      /STORAGE_NAMESPACE_KEY env var is set, but it is unused when provider is 'gcs'/
+    );
+  });
+
+  it("throws when GCS bucket name does not end with secret-do-not-share-<hex>", () => {
+    writeHookJson({
+      mode: "no-auth",
+      no_auth: {
+        provider: "gcs",
+        bucket: "my-plain-bucket",
+      },
+      privacy: { mode: "full" },
+    });
+    expect(() => loadConfig()).toThrow(
+      /GCS bucket name must end with 'secret-do-not-share-/
+    );
+  });
+
+  it("accepts a GCS bucket name with the secret suffix anywhere it ends", () => {
+    writeHookJson({
+      mode: "no-auth",
+      no_auth: {
+        provider: "gcs",
+        // Some other org-specific prefix, but ends with the secret suffix.
+        bucket: `org-prefix-${GOOD_KEY}`,
+      },
+      privacy: { mode: "full" },
+    });
+    const config = loadConfig();
+    expect(config!.no_auth.bucket).toBe(`org-prefix-${GOOD_KEY}`);
+  });
+
+  // --- S3-specific: namespace_key required ---
+
+  it("throws when S3 namespace_key has wrong format", () => {
+    writeHookJson({
+      mode: "no-auth",
+      no_auth: {
+        provider: "s3",
         bucket: "b",
         namespace_key: "not-a-real-key",
+        region: "us-east-1",
       },
       privacy: { mode: "full" },
     });
     expect(() => loadConfig()).toThrow(/namespace_key.*must match/);
   });
 
-  it("throws when namespace_key is missing entirely", () => {
+  it("throws when S3 namespace_key is missing entirely", () => {
     writeHookJson({
       mode: "no-auth",
-      no_auth: { provider: "gcs", bucket: "b" },
+      no_auth: { provider: "s3", bucket: "b", region: "us-east-1" },
       privacy: { mode: "full" },
     });
-    expect(() => loadConfig()).toThrow(/namespace_key.*required/);
+    expect(() => loadConfig()).toThrow(
+      /'no_auth\.namespace_key'.*required when provider is 's3'/
+    );
   });
 
   it("throws when region is missing for s3", () => {
@@ -193,7 +266,7 @@ describe("loadConfig", () => {
   it("throws on invalid privacy.mode", () => {
     writeHookJson({
       mode: "no-auth",
-      no_auth: { provider: "gcs", bucket: "b", namespace_key: GOOD_KEY },
+      no_auth: { provider: "gcs", bucket: GOOD_GCS_BUCKET },
       privacy: { mode: "summary" },
     });
     expect(() => loadConfig()).toThrow("'privacy.mode' must be");
@@ -202,7 +275,7 @@ describe("loadConfig", () => {
   it("parses extra_patterns", () => {
     writeHookJson({
       mode: "no-auth",
-      no_auth: { provider: "gcs", bucket: "b", namespace_key: GOOD_KEY },
+      no_auth: { provider: "gcs", bucket: GOOD_GCS_BUCKET },
       privacy: {
         mode: "redacted",
         extra_patterns: [{ name: "custom", pattern: "CUSTOM-[0-9]+" }],
@@ -218,8 +291,7 @@ describe("loadConfig", () => {
       mode: "no-auth",
       no_auth: {
         provider: "gcs",
-        bucket: "b",
-        namespace_key: GOOD_KEY,
+        bucket: GOOD_GCS_BUCKET,
         max_archive_bytes: -1,
       },
       privacy: { mode: "full" },

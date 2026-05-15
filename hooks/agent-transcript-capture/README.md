@@ -12,10 +12,10 @@ The hook fires on the `Stop` event (each time the agent finishes a task), bundle
 
 ### No-authentication mode
 
-There is no per-user authentication. The bucket is configured to accept unauthenticated PUT/DELETE, gated by a shared secret called the `namespace_key`. The secret is wired in differently on each provider:
+There is no per-user authentication. The bucket is configured to accept unauthenticated PUT/DELETE, gated by a shared secret of the form `secret-do-not-share-<12+ hex chars>`. The secret is wired in differently on each provider, and so is its config name:
 
-- **S3** — the bucket policy scopes unauthenticated PUT/DELETE to a single Resource ARN prefix (`bucket/{namespace_key}/*`). The bucket name is plain; the secret lives in the policy.
-- **GCS** — GCP refuses IAM Conditions on `allUsers` (the `PublicResourceAllowConditionCheck` lint, which can't be bypassed). So instead, the secret is embedded into the **bucket name** itself (`agent-transcripts-{namespace_key}`), and the bucket gets a permissive bucket-wide binding for unauthenticated writes. Because the bucket is dedicated to transcripts, the blast radius is the same as the S3 prefix-scoped variant.
+- **S3** — the bucket policy scopes unauthenticated PUT/DELETE to a single Resource ARN prefix (`bucket/{namespace_key}/*`). The bucket name is plain; the secret lives in the policy and in `no_auth.namespace_key`.
+- **GCS** — GCP refuses IAM Conditions on `allUsers` (the `PublicResourceAllowConditionCheck` lint, which can't be bypassed). So instead, the secret is embedded into the **bucket name** itself (e.g., `agent-transcripts-secret-do-not-share-...`), and the bucket gets a permissive bucket-wide binding for unauthenticated writes. There is no separate `namespace_key` field for GCS — the bucket name carries the secret end-to-end, and config validation rejects a `namespace_key` field (or `STORAGE_NAMESPACE_KEY` env var) under `provider: "gcs"` so the secret isn't encoded twice. Because the bucket is dedicated to transcripts, the blast radius is the same as the S3 prefix-scoped variant.
 
 Object layout:
 ```
@@ -25,11 +25,11 @@ GCS: gs://{bucket-with-namespace_key-suffix}/{user_id}/{YYYY}/{MM}/{DD}/{session
 
 On S3 the `{namespace_key}/` prefix is load-bearing — the bucket policy's Resource ARN scope requires it. On GCS the secret is already in the bucket name, so the path skips the redundant prefix.
 
-- `namespace_key` is a high-entropy random string of the form `secret-do-not-share-<12+ hex chars>` (default generator produces 32). The prefix in the name is self-documenting — anyone who sees it in logs or a screenshot knows immediately that it's a secret.
-- Unauthenticated **reads and listings are NOT granted** on either provider. Without the key, nobody can write to your bucket; with the key, you can only write — not enumerate, not download.
+- The shared secret is a high-entropy random string of the form `secret-do-not-share-<12+ hex chars>` (default generator produces 32 hex chars). The `secret-do-not-share-` prefix in the name is self-documenting — anyone who sees it in logs or a screenshot knows immediately that it's a secret.
+- Unauthenticated **reads and listings are NOT granted** on either provider. Without the secret, nobody can write to your bucket; with the secret, you can only write — not enumerate, not download.
 - Rotating the secret:
-  - **S3:** generate a new `namespace_key`, update the bucket policy Resource ARN, update `HOOK.json` (or the `STORAGE_NAMESPACE_KEY` env var).
-  - **GCS:** create a new bucket with the new `namespace_key` suffix, bind allUsers to the custom write-only role on it, update `HOOK.json`, drop the old bucket when you're ready.
+  - **S3:** generate a new value, update the bucket policy Resource ARN, update `no_auth.namespace_key` in `HOOK.json` (or the `STORAGE_NAMESPACE_KEY` env var).
+  - **GCS:** create a new bucket with the new `secret-do-not-share-...` suffix, bind allUsers to the custom write-only role on it, update `no_auth.bucket` in `HOOK.json`, drop the old bucket when you're ready.
 
 ### What it captures
 
@@ -47,14 +47,18 @@ A single interactive session may produce multiple Stops (one per completed task)
 
 ## Setup
 
-### 1. Generate a namespace_key
+### 1. Generate a shared secret
 
 ```bash
 echo "secret-do-not-share-$(openssl rand -hex 16)"
 # example output: secret-do-not-share-a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6
 ```
 
-You'll plug this into the bucket name (GCS) or bucket policy (S3) and into `HOOK.json`. Keep it out of public commits.
+You'll plug this into:
+- **GCS:** the bucket name (as a suffix, e.g., `agent-transcripts-secret-do-not-share-...`).
+- **S3:** the bucket policy Resource ARN, and `no_auth.namespace_key` in `HOOK.json`.
+
+Keep it out of public commits.
 
 ### 2A. Google Cloud Storage
 
@@ -103,7 +107,7 @@ gcloud storage buckets update gs://$GCS_BUCKET --lifecycle-file=/tmp/lifecycle.j
 # gcloud storage buckets update gs://$GCS_BUCKET --no-public-access-prevention
 ```
 
-**In `HOOK.json`**, set `no_auth.bucket` to the full secret-suffixed bucket name (`agent-transcripts-{namespace_key}`) and `no_auth.namespace_key` to the same key (still required for config validation, but not added to the object path — the bucket name already provides the scoping secret).
+**In `HOOK.json`**, set `no_auth.bucket` to the full secret-suffixed bucket name (`agent-transcripts-secret-do-not-share-...`). Do NOT set `no_auth.namespace_key` for GCS — the validator rejects it, because the bucket name already carries the scoping secret. The bucket name must end with `secret-do-not-share-<12+ hex chars>` or the validator will refuse to load the config.
 
 **Recommended bucket hardening:**
 - Set up a billing alert on the project so a runaway upload spree gets noticed.
@@ -178,13 +182,14 @@ GCS:
     "no_auth": {
       "provider": "gcs",
       "bucket": "agent-transcripts-secret-do-not-share-...",
-      "namespace_key": "secret-do-not-share-...",
       "max_archive_bytes": 52428800
     },
     "privacy": { "mode": "redacted", "extra_patterns": [] }
   }
 }
 ```
+
+> Note: for GCS, do **not** add a `namespace_key` field — the secret is in the bucket name. The validator rejects `namespace_key` (and the `STORAGE_NAMESPACE_KEY` env var) when `provider` is `"gcs"`.
 
 S3:
 ```json
@@ -203,7 +208,7 @@ S3:
 }
 ```
 
-If you'd rather keep the `namespace_key` out of the file, leave a placeholder there and set `STORAGE_NAMESPACE_KEY` in your shell. The env var wins.
+**S3 only:** if you'd rather keep the `namespace_key` out of the file, leave a placeholder there and set `STORAGE_NAMESPACE_KEY` in your shell. The env var wins. (For GCS the secret is in the bucket name, so neither field nor env var applies.)
 
 ### 4. Register the hook with Claude Code
 
@@ -231,8 +236,8 @@ Add to `~/.claude/settings.json` (global) or `.claude/settings.json` (per-projec
 All config lives under the `x-config` key in `HOOK.json`.
 
 ### `no_auth.provider` — `"gcs" | "s3"`, required
-### `no_auth.bucket` — string, required. Bare bucket name (no `gs://` / `s3://`).
-### `no_auth.namespace_key` — string, required. Format `^secret-do-not-share-[a-f0-9]{12,}$`. Overridden by env `STORAGE_NAMESPACE_KEY`.
+### `no_auth.bucket` — string, required. Bare bucket name (no `gs://` / `s3://`). For `gcs`, the name must end with `secret-do-not-share-<12+ hex chars>`.
+### `no_auth.namespace_key` — string. **Required when `provider` is `"s3"`** (overridden by env `STORAGE_NAMESPACE_KEY`). **Prohibited when `provider` is `"gcs"`** — the secret lives in the bucket name; setting this field (or `STORAGE_NAMESPACE_KEY`) throws a validation error. Format `^secret-do-not-share-[a-f0-9]{12,}$`.
 ### `no_auth.region` — string, required when provider is `"s3"`. AWS region (e.g., `us-east-1`).
 ### `no_auth.max_archive_bytes` — number, default `52428800` (50 MB). Hard client-side cap. Uploads larger than this fail loudly with `archive_too_large` rather than silently bloating the bucket.
 

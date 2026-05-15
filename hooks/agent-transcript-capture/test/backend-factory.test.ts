@@ -4,16 +4,16 @@ import { GcsNoAuthBackend } from "../src/backends/gcs-no-auth";
 import { S3NoAuthBackend } from "../src/backends/s3-no-auth";
 
 const GOOD_KEY = "secret-do-not-share-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+const GOOD_GCS_BUCKET = `agent-transcripts-${GOOD_KEY}`;
 
 describe("createBackend", () => {
   it("returns a GcsNoAuthBackend for provider=gcs", () => {
     const backend = createBackend({
       provider: "gcs",
-      bucket: "b",
-      namespace_key: GOOD_KEY,
+      bucket: GOOD_GCS_BUCKET,
     });
     expect(backend.provider).toBe("gcs");
-    expect(backend.bucket).toBe("b");
+    expect(backend.bucket).toBe(GOOD_GCS_BUCKET);
   });
 
   it("returns an S3NoAuthBackend for provider=s3", () => {
@@ -33,7 +33,7 @@ describe("createBackend", () => {
         provider: "azure" as any,
         bucket: "b",
         namespace_key: GOOD_KEY,
-      })
+      } as never)
     ).toThrow(/Unknown storage provider/);
   });
 });
@@ -43,7 +43,6 @@ describe("GcsNoAuthBackend", () => {
     const backend = new GcsNoAuthBackend({
       provider: "gcs",
       bucket: "my-bucket",
-      namespace_key: GOOD_KEY,
     });
     expect(backend.objectUrl("foo/bar.tar.gz")).toBe("gs://my-bucket/foo/bar.tar.gz");
   });
@@ -51,8 +50,7 @@ describe("GcsNoAuthBackend", () => {
   it("buildObjectKey returns the suffix unchanged (namespace_key lives in the bucket name)", () => {
     const backend = new GcsNoAuthBackend({
       provider: "gcs",
-      bucket: `agent-transcripts-${GOOD_KEY}`,
-      namespace_key: GOOD_KEY,
+      bucket: GOOD_GCS_BUCKET,
     });
     expect(backend.buildObjectKey("alice/2026/05/14/abc.tar.gz")).toBe(
       "alice/2026/05/14/abc.tar.gz"
@@ -68,7 +66,7 @@ describe("S3NoAuthBackend", () => {
           provider: "s3",
           bucket: "b",
           namespace_key: GOOD_KEY,
-        })
+        } as never)
     ).toThrow(/'region' is required/);
   });
 
