@@ -1,35 +1,40 @@
 ---
 name: synthesize-report
 description: >
-  Tier-4 synthesis. Take the tier-3 findings for a transcript — the flat
-  conclusion lists in findings.outcomes.json / findings.prompts.json /
-  findings.skills.json / findings.mcp.json (and findings.cross-transcript.json
-  for a cross-transcript batch) — and synthesize them into one consolidated
-  report of actionable next steps across three buckets: human prompting, Skills
-  (create/modify/delete), and MCP servers (create/modify/delete). Writes
+  Tier-4 synthesis — runs once over a whole batch of analyzed transcripts.
+  Given the per-transcript tmp_dirs that make up the batch, reads every
+  transcript's tier-3 findings (findings.outcomes/prompts/skills/mcp.json) plus
+  findings.cross-transcript.json when present, and synthesizes them into ONE
+  final report of actionable next steps across three buckets: human prompting,
+  Skills (create/modify/delete), and MCP servers (create/modify/delete). Writes
   findings.report.json (the reviewable recommendation slate) and report.md (the
-  human-readable report, including the distance-from-ideal north-star block).
-  Use after the tier-3 analyzers have run — driven by analyze-agent-transcript
-  for a single session, or invoked directly on a cross-transcript batch.
+  human-readable report, including the distance-from-ideal north-star block
+  aggregated across the batch) into a batch_dir. Use once the user has finished
+  analyzing every transcript of interest — a batch of one transcript is valid
+  input too. Never driven by analyze-agent-transcript.
 user-invocable: true
 ---
 
 # Synthesize report
 
-Tier 3 produces **labels** — flat lists of conclusions about Outcomes, Prompts, Skills, and MCP servers. This skill produces the **synthesis**: it reads those findings and turns them into a prioritized, deduped slate of actionable next steps a human can act on — open a PR, rewrite a prompting habit, file an issue.
+Tier 3 produces **labels** — flat lists of conclusions about Outcomes, Prompts, Skills, and MCP servers, one set per transcript. This skill produces the **synthesis**: it reads the whole batch's findings and turns them into a prioritized, deduped slate of actionable next steps a human can act on — open a PR, rewrite a prompting habit, file an issue.
 
-This is the one place the pipeline makes the **leap from analysis to recommendations**. A finding says "this Skill fired on a Segment it had no business firing on"; a recommendation says "narrow `analyze-skill-X`'s description — here's the change, here's the priority, here are the findings that motivate it." Tier 3 never makes that leap; tier 4 does, once, in one place, so the leap itself is reviewable (`review-report`) and improvable (`learn-from-report-corrections`).
+This is the one place the pipeline makes the **leap from analysis to recommendations**, and it makes it **once, over the whole batch** — not per transcript. A finding says "this Skill fired on a Segment it had no business firing on"; a recommendation says "narrow `analyze-skill-X`'s description — here's the change, here's the priority, here are the findings that motivate it." Tier 3 never makes that leap; tier 4 does, once, in one place, so the leap itself is reviewable (`review-report`) and improvable (`learn-from-report-corrections`).
+
+`synthesize-report` runs **after the batch is complete** — once the user has analyzed every transcript of interest. It is never invoked by `analyze-agent-transcript`; the orchestrator stops at per-transcript findings and has nothing to do with the report.
 
 ## Inputs
 
-- `tmp_dir` (required): a transcript tmp_dir. Must contain at least one tier-3 findings file — `findings.outcomes.json`, `findings.prompts.json`, `findings.skills.json`, `findings.mcp.json` (the per-Segment buckets), or `findings.cross-transcript.json` (the cross-transcript bucket). Prefer the `.reviewed.json` sibling of any file when it exists — a human-blessed finding is stronger input than a raw draft.
-- `segments.json` (optional, same `tmp_dir`): the Segment tree, used only for the distance-from-ideal north-star block. Prefer `segments.reviewed.json` when present. Absent → emit the report without the north-star block and note the omission.
-- `external_context` (optional, same `tmp_dir`): `external-context.json` or `external-context.reviewed.json`. The ticket / PR / user context behind the session — used to judge whether a recommendation is worth the user's time given what they were actually trying to do.
+- `transcripts` (required): the list of per-transcript `tmp_dir`s that make up the batch — each one a folder `analyze-agent-transcript` ran over. From each, this skill reads the tier-3 findings set: `findings.outcomes.json`, `findings.prompts.json`, `findings.skills.json`, `findings.mcp.json`, preferring the `.reviewed.json` sibling of any file when it exists — a human-blessed finding is stronger input than a raw draft. A batch of one `tmp_dir` is valid; it is still "the batch," not a distinct single-transcript mode.
+- `batch_dir` (optional): a batch-level working directory, distinct from any single transcript's `tmp_dir`. The report artifacts are written here. Defaults to a new tmp dir created for the batch.
+- `findings.cross-transcript.json` (optional): when `analyze-cross-transcript-patterns` has been run over the batch, it lands in `batch_dir` — read it alongside the per-transcript findings. Absent is fine: the report simply has no cross-transcript findings folded in.
+- `segments.json` (optional, in each transcript's `tmp_dir`): the Segment tree, used only for the distance-from-ideal north-star block, which aggregates across the batch. Prefer `segments.reviewed.json` when present. If a transcript is missing `segments.json`, note the omission for that transcript rather than failing.
+- `external_context` (optional, in each transcript's `tmp_dir`): `external-context.json` or `external-context.reviewed.json`. The ticket / PR / user context behind a session — used to judge whether a recommendation is worth the user's time given what they were actually trying to do.
 - `philosophy_skills` / `philosophy_mcp` (optional): the `philosophy-on-skills` and `philosophy-on-mcp` references. Default to the bundled copies. Every Skill/MCP recommendation is cross-checked against them before it lands in the report.
 
 ## Outputs
 
-Two files written into `tmp_dir`:
+Two files written into `batch_dir`:
 
 - **`findings.report.json`** — the **reviewable recommendation slate**. Same envelope as every tier-3 findings file (`{kind, items: [{id, …}]}`) with `kind: "report"`, so `review-report` reviews it with the exact same engine `review-analysis` uses for tier-3 findings. Each item is one recommendation:
 
@@ -53,12 +58,12 @@ Two files written into `tmp_dir`:
   }
   ```
 
-  `sources` is what makes the leap auditable: it points back at the exact tier-3 finding ids a recommendation was synthesized from, so `review-report` can check whether the recommendation actually follows from them.
+  `sources` is what makes the leap auditable: it points back at the exact tier-3 finding ids a recommendation was synthesized from, so `review-report` can check whether the recommendation actually follows from them. A `source` id may come from any transcript in the batch (or from `findings.cross-transcript.json`).
 
-- **`report.md`** — the **human-readable consolidated report**. Structure:
+- **`report.md`** — the **human-readable final report**. Structure:
 
   ```
-  # Session <id> report   (or: Cross-transcript report over <N> sessions)
+  # Batch report over <N> transcript(s)
 
   ## Recommendations
     ### Prompting
@@ -69,47 +74,52 @@ Two files written into `tmp_dir`:
       - create / modify / delete <recommendation> — <priority> — sources: …
 
   ## Distance from ideal end-state
-    Single paragraph (single-transcript mode only): how many Failure Outcomes,
-    how many Correction triggers (broken out by user-source vs agent-source),
-    total wall-clock vs sum of human counterfactuals, count of user-source New
-    triggers flagged as deterministic-trigger candidates. The north-star,
-    measured. Omitted with a note when segments.json is absent.
+    Single paragraph, aggregated across the whole batch: how many Failure
+    Outcomes, how many Correction triggers (broken out by user-source vs
+    agent-source), total wall-clock vs sum of human counterfactuals, count of
+    user-source New triggers flagged as deterministic-trigger candidates —
+    summed across every transcript in the batch, read from each transcript's
+    segments.json (prefer segments.reviewed.json). The north-star, measured.
+    If a transcript is missing segments.json, note that transcript's omission
+    rather than failing.
 
   ## Provenance
-    Which findings files (and whether draft or reviewed) fed this report.
+    Which transcripts, and which findings files (draft or reviewed) from each,
+    fed this report; whether findings.cross-transcript.json was present.
   ```
 
 `report.md` is the artifact a human reads; `findings.report.json` is the artifact `review-report` corrects. They carry the same recommendations — if they ever disagree, `findings.report.json` is the source of truth and `report.md` is re-rendered from it.
 
-## Two modes
+## One report, over the batch
 
-- **Single-transcript** — the common path. `analyze-agent-transcript` invokes this skill as its final step, against the `findings.{outcomes,prompts,skills,mcp}.json` it just wrote. Produces that session's report.
-- **Cross-transcript batch** — invoked directly (not by the orchestrator), against a `tmp_dir` that holds a `findings.cross-transcript.json` from `analyze-cross-transcript-patterns`. Produces a report whose recommendations are scoped to habits visible only across sessions. Same skill, same output shape — only the input bucket and the `report.md` title differ.
+`synthesize-report` is **single-mode**: it always synthesizes "the batch." It is given the list of per-transcript `tmp_dir`s that make up the batch, reads every transcript's findings (plus `findings.cross-transcript.json` when present), and produces the **one final report** — the prioritized, deduped slate of action items across the three buckets. This single report is the pipeline's final output. A batch of one transcript is valid input — but there is no distinct "single-transcript mode," and the orchestrator never drives this skill.
 
 ## Sequencing checklist
 
-- [ ] Discover the findings files in `tmp_dir`. For each bucket, prefer `findings.<kind>.reviewed.json` over `findings.<kind>.json`. Record which you used — it goes in the report's Provenance section
-- [ ] Read every finding. Drop items stamped `review.verdict == "rejected"` — a human already threw them out
-- [ ] **Synthesize, don't restate.** Cluster findings that point at the same change; a recommendation usually draws on several findings. Each recommendation gets a `sources` list naming the finding ids it came from
+- [ ] Resolve `batch_dir` (create a new tmp dir for the batch if none was given). Take the list of per-transcript `tmp_dir`s that make up the batch
+- [ ] In each transcript's `tmp_dir`, discover the findings files. For each bucket, prefer `findings.<kind>.reviewed.json` over `findings.<kind>.json`. Record which you used per transcript — it goes in the report's Provenance section
+- [ ] Check `batch_dir` for `findings.cross-transcript.json` (preferring `findings.cross-transcript.reviewed.json`). If present, read it as one more findings source; if absent, proceed without it
+- [ ] Read every finding across every transcript. Drop items stamped `review.verdict == "rejected"` — a human already threw them out
+- [ ] **Synthesize, don't restate.** Cluster findings that point at the same change — across transcripts, not just within one. A recommendation usually draws on several findings. Each recommendation gets a `sources` list naming the finding ids it came from
 - [ ] **Route into three buckets.** `outcomes` findings carry a `recommendation_route` — follow it. `prompts` findings feed Prompting; `skills` feed Skills; `mcp` feed MCP. No cross-bucket invention
 - [ ] **Cross-check every Skill/MCP recommendation against the philosophy docs.** A recommendation that contradicts `philosophy-on-skills` or `philosophy-on-mcp` is dropped, or kept with the contradiction spelled out in `philosophy_check` for the reviewer to resolve
 - [ ] **Prioritize.** Every recommendation gets `priority` and a rough `effort`. A report where everything is "high" helps no one
-- [ ] **Dedupe.** The same Skill gap surfacing in five Segments is one recommendation with five `sources`, not five recommendations
-- [ ] Compute the **distance-from-ideal** block from `segments.json` if present (Failure count; Correction triggers split user-source vs agent-source; wall-clock vs counterfactual sum; deterministic-trigger candidates). If `segments.json` is absent, omit the block and say so
-- [ ] Write `findings.report.json` (the `{kind: "report", items: […]}` envelope) and `report.md`. Print both paths to stdout
+- [ ] **Dedupe.** The same Skill gap surfacing in five Segments across three transcripts is one recommendation with five `sources`, not five recommendations
+- [ ] Compute the **distance-from-ideal** block by aggregating across the batch: read each transcript's `segments.json` (prefer `segments.reviewed.json`) and sum Failure counts, Correction triggers (split user-source vs agent-source), wall-clock vs counterfactual sum, and deterministic-trigger candidates over every transcript. If a transcript is missing `segments.json`, note that transcript's omission rather than failing
+- [ ] Write `findings.report.json` (the `{kind: "report", items: […]}` envelope) and `report.md` into `batch_dir`. Print both paths to stdout
 - [ ] Point the user at `review-report` — the leap from findings to recommendations is interpretive and earns a human checkpoint, the same way tier 2 and tier 3 do
 
 ## Out of scope
 
-- Producing the findings — that's the tier-3 analyzers (`analyze-*`), driven by `analyze-agent-transcript`, plus `analyze-cross-transcript-patterns` for the cross-transcript bucket.
-- Driving the pipeline — that's `analyze-agent-transcript`. This skill is the *last* step it drives, not the driver.
-- Human review of the report — that's `review-report`, the tier-4 checkpoint over `findings.report.json`.
+- Producing the findings — that's the tier-3 analyzers (`analyze-*`), driven per transcript by `analyze-agent-transcript`, plus `analyze-cross-transcript-patterns` for the optional `findings.cross-transcript.json`.
+- Deciding the batch is complete — the user signals that (no more transcripts of interest). This skill runs once that has happened.
+- Human review of the report — that's `review-report`, the tier-4 checkpoint over `findings.report.json` in `batch_dir`.
 - Turning review corrections into improvements — that's `learn-from-report-corrections`.
 - Re-deriving anything from `transcript.json` or raw JSONL. This skill reads tier-3 findings (and `segments.json` only for the north-star counts). If a finding is wrong, fix the analyzer that drafted it — don't patch around it here.
 
 ## Notes
 
-- **The leap is the product.** Tier 3 is deliberately conservative — it labels and stops. The value this skill adds is the synthesis: clustering, routing, prioritizing, and the explicit `rationale` + `sources` that make each leap inspectable.
+- **The leap is the product.** Tier 3 is deliberately conservative — it labels and stops. The value this skill adds is the synthesis: clustering across the whole batch, routing, prioritizing, and the explicit `rationale` + `sources` that make each leap inspectable.
 - **Reviewed input beats draft input.** Always prefer `findings.<kind>.reviewed.json`. A report synthesized from human-blessed findings needs less correction than one synthesized from raw drafts.
 - **Same envelope as tier 3, on purpose.** `findings.report.json` is `{kind, items}` so the review subsystem (`review.py` + `review_server.py` + `review_ui.html`) reviews it unchanged — `review-report` is a thin wrapper, not a new UI.
 - **Privacy.** The findings this reads were synthesized from already-redacted Segments upstream (tier 1 redacts at acquire time). This skill writes `findings.report.json` and `report.md` as-is — no redaction pass here.

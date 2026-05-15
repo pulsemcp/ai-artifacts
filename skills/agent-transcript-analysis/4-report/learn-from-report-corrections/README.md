@@ -20,12 +20,14 @@ It has no `main.py`: the work is reading correction logs and writing a proposal,
 ## Input → output
 
 ```
-tmp_dir(s)/
+batch_dir(s)/
   findings.report.reviewed.json   # read: review.log + per-item review verdicts
        │
        ▼
   report-correction-learnings.md  # written: clustered patterns + flagged opportunities
 ```
+
+Each `batch_dir` holds one batch's reviewed report. Run this skill over several of them — the more reviewed batch reports, the stronger the pattern signal.
 
 The output is a **write-up of flagged opportunities for a human**, not an applied change. This skill never edits `synthesize-report` — the skill files it can see are a deployed copy, not the source of truth. It does the analysis that makes a change obvious and well-motivated; a human makes the change, at its source, through the usual PR gate.
 

@@ -23,11 +23,11 @@ Without this skill, review is a one-shot cleanup. With it, every reviewed report
 
 ## Inputs
 
-- One or more `tmp_dir`s, each containing a `findings.report.reviewed.json` (the output of `review-report`). The more reviewed reports, the stronger the pattern signal — a single rejection is an anecdote; the same kind of rejection across five reports is a heuristic.
+- One or more `batch_dir`s, each containing a `findings.report.reviewed.json` (the output of `review-report` over that batch's report). The more reviewed reports, the stronger the pattern signal — a single rejection is an anecdote; the same kind of rejection across five batch reports is a heuristic.
 
 ## Outputs
 
-- **`report-correction-learnings.md`** — written to the first `tmp_dir` (or a path the caller specifies). A write-up of flagged opportunities for a human, not an applied change. It contains:
+- **`report-correction-learnings.md`** — written to the first `batch_dir` (or a path the caller specifies). A write-up of flagged opportunities for a human, not an applied change. It contains:
   - **Correction patterns** — corrections clustered by what they have in common (e.g. "across N reports the reviewer keeps rejecting `skills` recommendations whose `sources` don't actually support the proposed change", or "the reviewer keeps downgrading `priority` from high to medium").
   - **Flagged opportunities** — for each pattern, **how `synthesize-report` appears to be drifting** and **in which direction** (over-reaching the findings / mis-routing into the wrong bucket / over-prioritizing / weak `philosophy_check`), with the corrections that motivate it cited as evidence. Describe the opportunity precisely enough that a human can act on it — but stop there: don't write a ready-to-paste edit, and don't point at skill files by path.
   - **Open questions** — corrections that don't generalize yet, or that conflict with each other, flagged for a human to weigh in.
@@ -36,7 +36,7 @@ This skill **flags; it does not apply.** Whoever picks up the write-up decides w
 
 ## Sequencing checklist
 
-- [ ] Find every `findings.report.reviewed.json` across the given `tmp_dir`s and load each one's `review.log` (the append-only correction log) plus the per-item `review` verdicts
+- [ ] Find every `findings.report.reviewed.json` across the given `batch_dir`s and load each one's `review.log` (the append-only correction log) plus the per-item `review` verdicts
 - [ ] Bucket each log entry by recommendation `bucket` (`prompting` / `skills` / `mcp`) and by type (`approve` / `field` / `reject` / `note`)
 - [ ] **Cluster the corrections.** A `reject` reason that repeats, or a `field` edit with a `before → after` direction that repeats, is a pattern. Read the `note` entries — they are the reviewer's own explanation of *why* the recommendation was wrong, and are the highest-signal input
 - [ ] **Trace each cluster to a synthesis behavior.** Unlike the tier-3 learner, every correction here points back at one skill — `synthesize-report` — so the question is not *which* skill but *which behavior*:

@@ -42,7 +42,7 @@
   },
   "analyze-agent-transcript": {
     "title": "Analyze Agent Transcript",
-    "description": "Orchestrator and entry point of the analyze tier (tier 3). Picks up the Segment tree from decomposition (tier 2), drives the per-Segment analyzers across four buckets, writes the findings.<kind>.json set, then invokes synthesize-report (tier 4) to turn those findings into the consolidated report of actionable recommendations across human prompting, Skills, and MCP servers.",
+    "description": "Orchestrator and entry point of the analyze tier (tier 3). Picks up the Segment tree from decomposition (tier 2), drives the per-Segment analyzers across four buckets, and writes that transcript's findings.<kind>.json set — then stops. Runs per transcript; produces no report and never invokes synthesize-report. Tiers 1-3 repeat per transcript and the findings sets accumulate; turning them into the consolidated report is tier 4's synthesize-report, run once over the whole batch.",
     "path": "agent-transcript-analysis/3-analyze/analyze-agent-transcript",
     "references": ["philosophy-on-skills", "philosophy-on-mcp", "transcript-segment"]
   },
@@ -113,7 +113,7 @@
   },
   "analyze-cross-transcript-patterns": {
     "title": "Analyze Cross-Transcript Patterns",
-    "description": "Cross-cutting analyzer. Given the per-transcript findings.*.json sets of several already-analyzed transcripts (the tier-3 outputs of analyze-agent-transcript, not their synthesized reports), surface patterns no single transcript reveals: hindsight-as-foresight Segment patterns, recurring user prompts, deduped Skill/MCP gaps, and time-spend patterns.",
+    "description": "Cross-cutting analyzer. Given the per-transcript findings.*.json sets of several already-analyzed transcripts (the tier-3 outputs of analyze-agent-transcript), surface patterns no single transcript reveals: hindsight-as-foresight Segment patterns, recurring user prompts, deduped Skill/MCP gaps, and time-spend patterns. Still tier-3 labeling, but runs once over the whole batch — last in tier 3, an optional pre-report augmentation — not interleaved per transcript and not fanned out by the orchestrator. Writes findings.cross-transcript.json into the batch_dir for synthesize-report to pick up.",
     "path": "agent-transcript-analysis/3-analyze/analyze-cross-transcript/analyze-cross-transcript-patterns",
     "references": ["philosophy-on-skills", "philosophy-on-mcp", "transcript-segment"]
   },
@@ -129,7 +129,7 @@
   },
   "synthesize-report": {
     "title": "Synthesize Report",
-    "description": "Tier-4 synthesis. Reads the tier-3 findings for a transcript (findings.<kind>.json, preferring the reviewed siblings) and synthesizes them into one consolidated report of actionable next steps across human prompting, Skills, and MCP servers. Writes findings.report.json (the reviewable recommendation slate) and report.md (the human-readable report, with the distance-from-ideal north-star block). Driven by analyze-agent-transcript for a single session, or invoked directly on a cross-transcript batch.",
+    "description": "Tier-4 synthesis. Runs once over a whole batch of analyzed transcripts: reads every transcript's tier-3 findings (findings.<kind>.json from each per-transcript tmp_dir, preferring the reviewed siblings), plus findings.cross-transcript.json from the batch_dir when present, and synthesizes them into one consolidated report of actionable next steps across human prompting, Skills, and MCP servers. Writes findings.report.json (the reviewable recommendation slate) and report.md (the human-readable report, with the distance-from-ideal north-star block aggregated across the batch) into the batch_dir. Single-mode — a batch of one transcript is valid input, but there is no per-transcript mode; never driven by analyze-agent-transcript.",
     "path": "agent-transcript-analysis/4-report/synthesize-report",
     "references": ["philosophy-on-skills", "philosophy-on-mcp", "transcript-segment"]
   },

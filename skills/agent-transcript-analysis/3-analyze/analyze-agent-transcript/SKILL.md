@@ -6,44 +6,44 @@ description: >
   the Segment tree from decompose-agent-transcript-into-transcript-segments
   (invoking it if the tmp folder doesn't already have one), drives the
   per-Segment analyzers across four buckets (outcomes, prompts, skills, mcp)
-  and writes their conclusions as findings.<kind>.json, then invokes
-  synthesize-report to turn those findings into the consolidated report of
-  actionable recommendations across human prompting, Skills, and MCP servers.
-  Use this skill when the user wants a full single-session analysis, a "how
-  could this have gone better" review, or to surface Skill/MCP opportunities
-  from real usage.
+  and writes their conclusions as findings.<kind>.json — and stops there. It
+  produces only that transcript's four findings files; there is no
+  per-transcript report. The report is a batch-end step: once every transcript
+  of interest has been analyzed, synthesize-report runs once over the whole
+  batch's findings. Use this skill when the user wants a single session
+  analyzed, a "how could this have gone better" review, or to surface
+  Skill/MCP opportunities from real usage.
 user-invocable: true
 ---
 
 # Analyze agent transcript
 
-The orchestrator and the entry point of the analyze tier. One invocation turns a session into an actionable list of changes to the user's prompting habits, the Skill portfolio, and the MCP server portfolio.
+The orchestrator and the entry point of the analyze tier. One invocation turns a session into that transcript's four `findings.*.json` files — the structured, reviewable labels for one session.
 
-It **drives**; it does not itself decompose, analyze, or synthesize. Decomposition (tier 2) runs first and concretely — it builds the Segment tree; the tier-3 analyzers label it; and tier 4's `synthesize-report` makes the leap from those labels to recommendations. This skill picks up `segments.json`, sequences the analyzers, and passes shared context between the tiers.
+It **drives**; it does not itself decompose or analyze, and it has nothing to do with the report. Decomposition (tier 2) runs first and concretely — it builds the Segment tree; this skill then sequences the tier-3 analyzers that label it. Its job ends at well-formed `findings.*.json`. There is no per-transcript report: the report is a batch-level step that runs once, later, over every analyzed transcript's findings — `synthesize-report` (tier 4), which this skill never invokes.
 
 The Transcript Segment is the analysis primitive. See the `transcript-segment` reference for the data model. This skill does not walk raw JSONL — it asks `decompose-agent-transcript-into-transcript-segments` for `segments.json` and reads only from there.
 
 ## Inputs
 
 - `tmp_dir` (required): output of `get-claude-code-transcript-from-local`. Must contain `transcript.json` (an OpenTranscripts `Transcript` document, subagents embedded recursively).
-- `external_context` (optional): `external-context.json` — or `external-context.reviewed.json` — in the same `tmp_dir`, produced by `gather-external-context`. The ticket, PR, and user context behind the session. When present, pass it through to tier 2, the tier-3 analyzers, and `synthesize-report` so Goal/Outcome judgments and recommendations are grounded in *why* the session happened. Best-effort: absent is fine, never fatal.
-- `philosophy_skills` (optional): the `philosophy-on-skills` reference. Defaults to the bundled copy. Passed through to `synthesize-report`.
-- `philosophy_mcp` (optional): the `philosophy-on-mcp` reference. Defaults to the bundled copy. Passed through to `synthesize-report`.
+- `external_context` (optional): `external-context.json` — or `external-context.reviewed.json` — in the same `tmp_dir`, produced by `gather-external-context`. The ticket, PR, and user context behind the session. When present, pass it through to tier 2 and the tier-3 analyzers so Goal/Outcome judgments are grounded in *why* the session happened. Best-effort: absent is fine, never fatal.
+- `philosophy_skills` (optional): the `philosophy-on-skills` reference. Defaults to the bundled copy. Available to the tier-3 analyzers.
+- `philosophy_mcp` (optional): the `philosophy-on-mcp` reference. Defaults to the bundled copy. Available to the tier-3 analyzers.
 - `transcript_segment_spec` (optional): the `transcript-segment` reference. Defaults to the bundled copy.
 
 ## Outputs
 
-This skill's direct outputs are the **four tier-3 findings files** — and, by invoking `synthesize-report` as its last step, the **consolidated report**. It also ensures the **Segment tree** exists as its tier-2 prerequisite. All land in `tmp_dir`:
+This skill's outputs are the **four tier-3 findings files** for this one transcript, and nothing else. It also ensures the **Segment tree** exists as its tier-2 prerequisite. All land in `tmp_dir`:
 
 - `segments.json` + `flamegraph.html` — produced by tier 2 (`decompose-agent-transcript-into-transcript-segments`), the prerequisite this skill bootstraps if it is missing.
-- `findings.outcomes.json`, `findings.prompts.json`, `findings.skills.json`, `findings.mcp.json` — the flat lists of conclusions from the four tier-3 buckets, one file per bucket, in the envelope `{kind, items: [{id, …}]}`. These are the **reviewable intermediate**: `review-analysis` opens any of them in a human-correction UI, and `learn-from-analysis-corrections` turns those corrections into flagged improvement opportunities for the analyzers.
-- `findings.report.json` + `report.md` — produced by tier 4 (`synthesize-report`), invoked by this skill once the findings are written. `findings.report.json` is the reviewable recommendation slate; `report.md` is the human-readable consolidated report, including the distance-from-ideal north-star block.
+- `findings.outcomes.json`, `findings.prompts.json`, `findings.skills.json`, `findings.mcp.json` — the flat lists of conclusions from the four tier-3 buckets, one file per bucket, in the envelope `{kind, items: [{id, …}]}`. These are the **reviewable intermediate**: `review-analysis` opens any of them in a human-correction UI, and `learn-from-analysis-corrections` turns those corrections into flagged improvement opportunities for the analyzers. They are also the **durable substrate** of the pipeline — they accumulate across transcripts and are what the batch-level steps (`analyze-cross-transcript-patterns`, `synthesize-report`) read.
 
-The orchestrator does **not** itself aggregate findings, dedupe recommendations, cross-check against the philosophy docs, or compute the north-star block — that synthesis is `synthesize-report`'s job, given its own tier so the leap from findings to recommendations is reviewable (`review-report`) and improvable (`learn-from-report-corrections`). The orchestrator's responsibility ends at producing well-formed findings and handing them to tier 4.
+This skill does **not** produce a report. There is no per-transcript report, and this skill does not invoke `synthesize-report`. Aggregation, dedup, the philosophy cross-check, the north-star block, and the report itself are all tier 4's job, run once over the whole batch after every transcript has been analyzed. The orchestrator's responsibility begins at `segments.json` and ends at well-formed `findings.*.json`.
 
 ## Sequencing checklist
 
-- [ ] **Pick up external context if it exists.** Check `tmp_dir` for `external-context.json` (prefer `external-context.reviewed.json`). If present, hold it as shared context for tier 2, every tier-3 analyzer, and `synthesize-report`. If absent, proceed — it is best-effort, never required.
+- [ ] **Pick up external context if it exists.** Check `tmp_dir` for `external-context.json` (prefer `external-context.reviewed.json`). If present, hold it as shared context for tier 2 and every tier-3 analyzer. If absent, proceed — it is best-effort, never required.
 - [ ] **Satisfy the decomposition prerequisite (tier 2's job).** If `tmp_dir` doesn't already hold `segments.json`, invoke `decompose-agent-transcript-into-transcript-segments` with `tmp_dir` to produce it (plus `flamegraph.html`). Either way, decomposition runs to completion before any analysis begins. Do **not** walk raw JSONL from this skill — that's tier 2's job, exclusively.
 - [ ] Load `segments.json`. The Segment tree is now the unit of analysis.
 - [ ] For each Segment, in tree order (parent before children, or vice versa — the analyzers don't care, but findings reference Segment ids), run the per-Segment analyzers in this order:
@@ -61,15 +61,14 @@ The orchestrator does **not** itself aggregate findings, dedupe recommendations,
     - [ ] `analyze-mcp-trigger-performance`
     - [ ] `analyze-mcp-action-performance`
     - [ ] `analyze-mcp-gaps` — seeded by any `recommendation_seed` from this Segment's failure hypothesis and any deterministic-trigger candidate from `analyze-prompt-ambition`
-- [ ] Write each bucket's conclusions to `tmp_dir` as `findings.<kind>.json` (`outcomes` / `prompts` / `skills` / `mcp`) — the reviewable intermediate `review-analysis` consumes. Each is the `{kind, items: [{id, …}]}` envelope; every item needs a unique `id` so a finding can be cited as a `source` later
-- [ ] **Hand off to synthesis.** Invoke `synthesize-report` with `tmp_dir` (and the external context + philosophy refs held above). It reads the `findings.<kind>.json` set — preferring any `findings.<kind>.reviewed.json` a human has already produced — and writes `findings.report.json` and `report.md`. This is the orchestrator's last step
-- [ ] Surface the report path to the user, and point them at the optional review checkpoints — `review-analysis` over the `findings.<kind>.json` drafts, `review-report` over `findings.report.json`
+- [ ] Write each bucket's conclusions to `tmp_dir` as `findings.<kind>.json` (`outcomes` / `prompts` / `skills` / `mcp`) — the reviewable intermediate `review-analysis` consumes. Each is the `{kind, items: [{id, …}]}` envelope; every item needs a unique `id` so a finding can be cited as a `source` later. **This is the orchestrator's last step** — it writes the four findings files and stops
+- [ ] Surface the four `findings.*.json` paths to the user, and point them at `review-analysis` — the optional human-review checkpoint over those drafts. Note that the report is a batch-end step: once the user has analyzed every transcript of interest, `analyze-cross-transcript-patterns` (optional) and then `synthesize-report` run once over the whole batch. Do **not** invoke `synthesize-report` from here
 
 ## Out of scope
 
 - Acquiring the transcript — that's `get-claude-code-transcript-from-local`.
 - Producing `segments.json` — that's `decompose-agent-transcript-into-transcript-segments`. This skill requires that output and bootstraps it if absent, but the decomposition work itself is tier 2's, exclusively.
 - The actual per-Segment scoring — that's the tier-3 analyzers this orchestrator drives.
-- **Synthesizing the findings into the consolidated report** — aggregation, dedup, routing into Prompting/Skills/MCP, the philosophy cross-check, the distance-from-ideal north-star block, and the report itself are all `synthesize-report`'s job (tier 4). This skill invokes it; it does not do that work.
-- Human review of the findings or the report — that's `review-analysis` (tier 3) and `review-report` (tier 4).
-- Cross-session patterns — that's `analyze-cross-transcript-patterns`, in tier 3's `analyze-cross-transcript` bucket.
+- **The report — entirely.** There is no per-transcript report. Aggregation, dedup, routing into Prompting/Skills/MCP, the philosophy cross-check, the distance-from-ideal north-star block, `findings.report.json`, and `report.md` are all `synthesize-report`'s job (tier 4), run once over the whole batch. This skill never invokes `synthesize-report` and produces nothing report-shaped.
+- Human review of the findings — that's `review-analysis` (tier 3). Review of the report is `review-report` (tier 4).
+- Cross-session patterns — that's `analyze-cross-transcript-patterns`, in tier 3's `analyze-cross-transcript` bucket, run as a batch-level step over many transcripts' findings.

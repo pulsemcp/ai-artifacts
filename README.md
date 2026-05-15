@@ -87,7 +87,7 @@ The pipeline is built around the **Transcript Segment** — a recursive primitiv
 ┌────────────────────────────────────┐
 │ 3: analyze-agent-transcript        │  Orchestrator. For each Segment runs
 └────────────────┬───────────────────┘  the per-Segment analyzers below,
-                 │                       then aggregates recommendations.
+                 │                       then stops at this transcript's findings.
    ┌───────────┬─┴─┬────────────┬─────────────────┐
    ▼           ▼   ▼            ▼                 ▼
 ┌──────────┐ ┌────────┐ ┌──────────────┐ ┌──────────────┐
@@ -98,15 +98,27 @@ The pipeline is built around the **Transcript Segment** — a recursive primitiv
      │       └───┬────┘ └──────┬───────┘ └──────┬───────┘
      └───────────┴──────────┬──┴────────────────┘
                             ▼
-                Recommendations per session:
+                findings.{outcomes,prompts,skills,mcp}.json
+                  — one set per transcript. Tiers 1-3
+                  repeat per transcript; findings accumulate.
+
+   ── once the batch is complete ──────────────────────────
+
+           ┌────────────────────────────────────┐
+           │ 3: analyze-cross-transcript-       │   Optional. Runs once over all
+           │    patterns                        │   transcripts' findings →
+           └────────────────┬───────────────────┘   findings.cross-transcript.json
+                            │
+                            ▼
+           ┌────────────────────────────────────┐
+           │ 4: synthesize-report               │   Runs once over the whole batch's
+           └────────────────┬───────────────────┘   findings → one final report:
+                            │                        findings.report.json + report.md
+                            ▼
+                One batch-final report:
                   • Prompting changes
                   • Skill: create/modify/delete
                   • MCP:   create/modify/delete
-
-           ┌────────────────────────────────────┐
-           │ 3: analyze-cross-transcript-       │   Aggregate many per-session
-           │    patterns                        │   reports → habit-level
-           └────────────────────────────────────┘   recommendations
 ```
 
 #### Skills bundled by this plugin
@@ -116,7 +128,7 @@ The pipeline is built around the **Transcript Segment** — a recursive primitiv
 | 1 — acquire | [`find-all-claude-code-transcripts-on-local`](skills/agent-transcript-analysis/1-acquire/find-all-claude-code-transcripts-on-local/SKILL.md) | Lists sessions from `~/.claude/projects` and spawns a local UI to pick one. |
 | 1 — acquire | [`get-claude-code-transcript-from-local`](skills/agent-transcript-analysis/1-acquire/get-claude-code-transcript-from-local/SKILL.md) | Given a session id, gathers the main transcript **plus any subagent transcripts** into a single tmp folder. |
 | 2 — decompose | [`decompose-agent-transcript-into-transcript-segments`](skills/agent-transcript-analysis/2-decompose/decompose-agent-transcript-into-transcript-segments/SKILL.md) | Walks the JSONL once and produces the recursive **Transcript Segment** tree (`segments.json`) plus an annotated `flamegraph.html`. Sole producer of the Segment primitive. |
-| 3 — analyze | [`analyze-agent-transcript`](skills/agent-transcript-analysis/3-analyze/analyze-agent-transcript/SKILL.md) | Orchestrator and entry point of the analyze tier. Picks up the Segment tree from tier 2, runs the per-Segment analyzers, and hands their findings to tier 4 for synthesis. |
+| 3 — analyze | [`analyze-agent-transcript`](skills/agent-transcript-analysis/3-analyze/analyze-agent-transcript/SKILL.md) | Orchestrator and entry point of the analyze tier. Picks up the Segment tree from tier 2, runs the per-Segment analyzers, and writes that transcript's findings — then stops. Runs per transcript; produces no report. |
 | 3 — analyze (outcomes) | [`analyze-failure-hypothesis`](skills/agent-transcript-analysis/3-analyze/analyze-outcomes/analyze-failure-hypothesis/SKILL.md) | For every Failure Outcome (and retro-Failure surfaced by a Correction Prompt), produces an improvement hypothesis. |
 | 3 — analyze (outcomes) | [`analyze-segment-efficiency`](skills/agent-transcript-analysis/3-analyze/analyze-outcomes/analyze-segment-efficiency/SKILL.md) | Wall-clock / token spend vs human counterfactual. Flags wasteful branches and model-tier mismatches — including on Successes. |
 | 3 — analyze (prompts) | [`analyze-user-prompt`](skills/agent-transcript-analysis/3-analyze/analyze-prompts/analyze-user-prompt/SKILL.md) | Per-Prompt: question vs delegation, Goal, closed-loop. Feeds the "human prompting" recommendation bucket. |
@@ -128,7 +140,7 @@ The pipeline is built around the **Transcript Segment** — a recursive primitiv
 | 3 — analyze (mcp) | [`analyze-mcp-trigger-performance`](skills/agent-transcript-analysis/3-analyze/analyze-mcp/analyze-mcp-trigger-performance/SKILL.md) | Same as the Skill version, but for MCP servers / tools. |
 | 3 — analyze (mcp) | [`analyze-mcp-action-performance`](skills/agent-transcript-analysis/3-analyze/analyze-mcp/analyze-mcp-action-performance/SKILL.md) | Same as the Skill version, but for MCP servers / tools. |
 | 3 — analyze (mcp) | [`analyze-mcp-gaps`](skills/agent-transcript-analysis/3-analyze/analyze-mcp/analyze-mcp-gaps/SKILL.md) | Same as the Skill version, but for MCP servers / tools. |
-| 3 — analyze (cross-transcript) | [`analyze-cross-transcript-patterns`](skills/agent-transcript-analysis/3-analyze/analyze-cross-transcript/analyze-cross-transcript-patterns/SKILL.md) | Aggregates many per-session reports. Surfaces hindsight-as-foresight Segment patterns, recurring user prompts, deduped Skill/MCP gaps, and time-spend trends. |
+| 3 — analyze (cross-transcript) | [`analyze-cross-transcript-patterns`](skills/agent-transcript-analysis/3-analyze/analyze-cross-transcript/analyze-cross-transcript-patterns/SKILL.md) | Runs once over many transcripts' findings sets — last in tier 3, an optional pre-report step. Surfaces hindsight-as-foresight Segment patterns, recurring user prompts, deduped Skill/MCP gaps, and time-spend trends. |
 
 #### Privacy
 

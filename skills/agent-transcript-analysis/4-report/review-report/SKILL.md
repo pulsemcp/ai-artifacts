@@ -2,20 +2,21 @@
 name: review-report
 description: >
   Open a local browser UI to audit and correct the AI-synthesized tier-4
-  report — findings.report.json, the consolidated recommendation slate
-  synthesize-report produces from the tier-3 findings. The report is a draft:
-  thumbs-up the recommendations you'd act on, correct the ones whose framing or
-  priority is off, reject the ones whose leap from the findings doesn't hold.
-  Saving writes findings.report.reviewed.json next to the draft (the draft is
-  never overwritten) with full correction provenance. Use after
-  synthesize-report and before learn-from-report-corrections. Optional but
-  recommended human checkpoint for tier 4.
+  report — findings.report.json in the batch_dir, the single batch-final
+  recommendation slate synthesize-report produces from the whole batch's
+  tier-3 findings. The report is a draft: thumbs-up the recommendations you'd
+  act on, correct the ones whose framing or priority is off, reject the ones
+  whose leap from the findings doesn't hold. Saving writes
+  findings.report.reviewed.json next to the draft (the draft is never
+  overwritten) with full correction provenance. Use after synthesize-report
+  and before learn-from-report-corrections. Optional but recommended human
+  checkpoint for tier 4.
 user-invocable: true
 ---
 
 # Review report
 
-`synthesize-report` makes the pipeline's one **leap from analysis to recommendations** — it reads the tier-3 findings and synthesizes them into `findings.report.json`, a flat slate of actionable next steps. That leap is interpretive: a recommendation can over-reach what its findings actually support, mis-prioritize, mis-route a finding into the wrong bucket, or contradict team philosophy. The synthesis will get some of them wrong.
+`synthesize-report` makes the pipeline's one **leap from analysis to recommendations** — it reads the whole batch's tier-3 findings and synthesizes them into `findings.report.json`, a flat slate of actionable next steps. That leap is interpretive: a recommendation can over-reach what its findings actually support, mis-prioritize, mis-route a finding into the wrong bucket, or contradict team philosophy. The synthesis will get some of them wrong.
 
 This skill puts the report in front of a human in an editable UI — one recommendation at a time, thumbs-up / correct / reject — and records every correction with enough provenance that `learn-from-report-corrections` can turn the fixes into flagged improvement opportunities for `synthesize-report`.
 
@@ -23,7 +24,7 @@ It is the **review checkpoint for tier 4**, the tier-4 counterpart to `review-tr
 
 ## Inputs
 
-- `tmp_dir` (required): a transcript tmp_dir containing `findings.report.json` (or an existing `findings.report.reviewed.json` to keep iterating), produced by `synthesize-report`.
+- `batch_dir` (required): the batch-level working directory containing `findings.report.json` (or an existing `findings.report.reviewed.json` to keep iterating), produced by `synthesize-report`.
 
 ## The report document
 
@@ -43,7 +44,7 @@ The only guarantees the reviewer (and the bundled `review.py`) rely on: a `kind`
 
 ## Outputs
 
-One file written into `tmp_dir`:
+One file written into `batch_dir`:
 
 - **`findings.report.reviewed.json`** — the human-blessed recommendation slate. **Same schema as `findings.report.json`**, so every downstream reader consumes it transparently (the bundled `review.py` loader prefers the reviewed sibling). It adds:
   - a `review: {verdict, corrections}` block on every item — `verdict` is one of `approved` / `corrected` / `rejected` / `unreviewed`
@@ -54,15 +55,15 @@ One file written into `tmp_dir`:
 ## Invocation
 
 ```
-python main.py --tmp-dir /path/to/transcript-tmp-dir [--port 9853] [--no-browser]
+python main.py --tmp-dir /path/to/batch-dir [--port 9853] [--no-browser]
 ```
 
-`main.py` is a thin wrapper over the review engine bundled alongside it — it picks a `tmp_dir`, pins the `kind` to `report`, and calls `review_server.py::serve()`. The server binds `127.0.0.1:<port>` (default `9853`) and serves `review_ui.html`. Pass `--no-browser` to skip the auto-open on remote / headless hosts. `review_server.py`, `review_ui.html`, and `review.py` are bundled self-contained copies in this skill folder — byte-identical to the engine `review-analysis` carries — so it runs from a deployed `.claude/skills/` directory with no shared import.
+`main.py` is a thin wrapper over the review engine bundled alongside it — it picks a directory (here, the `batch_dir`), pins the `kind` to `report`, and calls `review_server.py::serve()`. The server binds `127.0.0.1:<port>` (default `9853`) and serves `review_ui.html`. Pass `--no-browser` to skip the auto-open on remote / headless hosts. `review_server.py`, `review_ui.html`, and `review.py` are bundled self-contained copies in this skill folder — byte-identical to the engine `review-analysis` carries — so it runs from a deployed `.claude/skills/` directory with no shared import.
 
 ## Sequencing checklist
 
-- [ ] Confirm `tmp_dir` contains `findings.report.json` (or `findings.report.reviewed.json`); if not, run `synthesize-report` first
-- [ ] Start the local UI (`python main.py --tmp-dir <tmp_dir>`, default `localhost:9853`)
+- [ ] Confirm `batch_dir` contains `findings.report.json` (or `findings.report.reviewed.json`); if not, run `synthesize-report` first
+- [ ] Start the local UI (`python main.py --tmp-dir <batch_dir>`, default `localhost:9853`)
 - [ ] The user audits each recommendation against its `sources`: does this recommendation actually follow from the tier-3 findings it cites? Is the `bucket` right? the `priority`? does `philosophy_check` hold up?
 - [ ] For each recommendation the user **Approves** it (thumbs-up), **corrects** the fields that are wrong, or **Rejects** the whole recommendation — and can attach a "why / context" note explaining a rejection or a correction
 - [ ] The user clicks **Save**, which writes `findings.report.reviewed.json` and surfaces any envelope warnings (warnings never block a save — the reviewer's judgment wins)
@@ -78,7 +79,7 @@ python main.py --tmp-dir /path/to/transcript-tmp-dir [--port 9853] [--no-browser
 
 ## How it works
 
-1. `main.py` calls `serve(tmp_dir, "report")`. The bundled `review_server.py` loads the draft (or the reviewed sibling) via `review.py`'s `load_review_bundle`.
+1. `main.py` calls `serve(batch_dir, "report")`. The bundled `review_server.py` loads the draft (or the reviewed sibling) via `review.py`'s `load_review_bundle`.
 2. It serves the single static `review_ui.html` from a localhost HTTP server. No external requests, no CDN.
 3. Every action appends an entry to an in-memory **correction log** — `approve` / `field` / `reject` / `note`. The log is append-only and replayable.
 4. On Save, `POST /api/save` hands the edited document + full log to `review.py`'s `write_reviewed`, which strips any stale `review` stamps, re-derives them from the log, validates the envelope, attaches file-level provenance, and atomically writes `findings.report.reviewed.json`.

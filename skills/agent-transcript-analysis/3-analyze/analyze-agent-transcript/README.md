@@ -1,6 +1,6 @@
 # `analyze-agent-transcript`
 
-The orchestrator — and the entry point of the analyze tier. Use this when you want a full single-session analysis: one invocation drives a transcript through per-Segment analysis (tier 3) and synthesis (tier 4), on top of the Segment tree decomposition (tier 2) produced first.
+The orchestrator — and the entry point of the analyze tier. Use this to analyze one transcript: one invocation drives it through per-Segment analysis (tier 3) on top of the Segment tree decomposition (tier 2) produced first, and ends at that transcript's four `findings.*.json` files. There is no per-transcript report — the report is a batch-end step.
 
 ## How it plugs in
 
@@ -13,18 +13,20 @@ With `segments.json` in hand, it drives, in order:
    - `analyze-prompts/` — `analyze-user-prompt`, `analyze-prompt-ambition`, helper `pull-together-goal-context`.
    - `analyze-skills/` — trigger / action / gaps.
    - `analyze-mcp/` — trigger / action / gaps.
-2. Writes each bucket's conclusions to `tmp_dir` as `findings.{outcomes,prompts,skills,mcp}.json` — the reviewable intermediate `review-analysis` consumes.
-3. **Tier 4**: invokes `synthesize-report` against those findings — its last step. `synthesize-report` makes the leap from findings to recommendations and writes `findings.report.json` (reviewable) and `report.md` (the human-readable consolidated report).
+2. Writes each bucket's conclusions to `tmp_dir` as `findings.{outcomes,prompts,skills,mcp}.json` — the reviewable intermediate `review-analysis` consumes. **That is the last step.** The orchestrator stops here.
 
-Downstream of this orchestrator: `analyze-cross-transcript-patterns` consumes many transcripts' `findings.*.json` sets at once — the per-Segment analyzer outputs this orchestrator writes, not the synthesized `report.md`.
+It does **not** produce a report and does **not** invoke `synthesize-report`. The report is a batch-level artifact: once every transcript of interest has been through tiers 1–3, `analyze-cross-transcript-patterns` (optional) and then `synthesize-report` (tier 4) run once each over the whole batch's findings.
 
-The tier-3 analyzers and `synthesize-report` are not the supported entry point — invoke them directly only when debugging, or when running `synthesize-report` on a cross-transcript batch.
+Downstream of this orchestrator: the per-transcript `findings.*.json` sets accumulate, one set per transcript. `analyze-cross-transcript-patterns` and `synthesize-report` are the batch-level consumers of those sets.
+
+The tier-3 analyzers are not the supported entry point — invoke them directly only when debugging.
 
 ## Design decisions
 
 - **The Transcript Segment is the analysis primitive.** This orchestrator does not walk raw JSONL; it requires `segments.json` from tier 2 and operates on the tree. If the tree is wrong, fix tier 2 — don't paper over it here.
 - **Decomposition is a prerequisite, not something this tier orchestrates.** Tier 2 runs first and concretely. This skill bootstraps it if the tmp folder is missing `segments.json`, but that is satisfying a precondition — the orchestrator's actual job begins once the Segment tree exists. It is the front door of tier 3, not a tier sitting between decompose and analyze.
-- **Drive, don't synthesize.** The orchestrator sequences the analyzers and passes shared context between them. It does not aggregate findings, dedupe recommendations, cross-check philosophy, or compute the north-star block — that synthesis is `synthesize-report`'s job (tier 4), given its own tier so the leap from findings to recommendations gets its own review checkpoint. The orchestrator's responsibility ends at well-formed `findings.<kind>.json`.
+- **Drive, don't synthesize — and don't report.** The orchestrator sequences the analyzers and passes shared context between them. It does not aggregate findings, dedupe recommendations, cross-check philosophy, compute the north-star block, or produce a report — there is no per-transcript report, and this skill never invokes `synthesize-report`. The synthesis is tier 4's job, run once over the whole batch. The orchestrator's responsibility ends at well-formed `findings.<kind>.json`.
+- **Per transcript, not per batch.** This skill runs once per transcript and produces one transcript's findings. You repeat it for every transcript in the batch; the findings sets accumulate. The batch-level steps (`analyze-cross-transcript-patterns`, `synthesize-report`) run later, once, over all of them.
 - **Four buckets in this tier.** The orchestrator drives four tier-3 buckets (`analyze-outcomes`, `analyze-prompts`, `analyze-skills`, `analyze-mcp`). `analyze-outcomes` produces *Segment-shaped* findings (failure hypotheses, efficiency) that carry a `recommendation_route`; `synthesize-report` follows that route when it folds findings into the three output buckets (Prompting / Skills / MCP).
 - **Run efficiency on Successes too.** A 30-minute Success on a 5-minute Goal is the most under-flagged failure mode. The orchestrator runs `analyze-segment-efficiency` on every Segment regardless of Outcome.
 - **Findings carry stable ids.** Every item in a `findings.<kind>.json` gets a unique `id` — `synthesize-report` cites those ids in each recommendation's `sources` list, which is what makes the leap from analysis to recommendations auditable.

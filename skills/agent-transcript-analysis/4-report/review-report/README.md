@@ -4,7 +4,7 @@ The human review checkpoint for tier 4. Opens a localhost UI to audit and correc
 
 ## Why this exists
 
-`synthesize-report` makes the pipeline's one **leap from analysis to recommendations**. Tier 3 only labels; tier 4 decides what to *do* about the labels — and that decision can over-reach. A recommendation can claim more than its `sources` findings support, land in the wrong bucket, mis-prioritize, or contradict team philosophy. A confident-but-wrong recommendation is the one a human acts on and regrets.
+`synthesize-report` makes the pipeline's one **leap from analysis to recommendations** — once, over the whole batch. Tier 3 only labels; tier 4 decides what to *do* about the labels — and that decision can over-reach. A recommendation can claim more than its `sources` findings support, land in the wrong bucket, mis-prioritize, or contradict team philosophy. A confident-but-wrong recommendation is the one a human acts on and regrets.
 
 So `findings.report.json` is treated as a **draft** — the same stance `review-transcript-segments` takes toward the Segment tree and `review-analysis` takes toward the tier-3 findings. This skill is where a human reviews the leap itself: for each recommendation, *does this actually follow from the findings it cites?* Their corrections are captured in a structured, replayable form so `synthesize-report` can be improved.
 
@@ -12,7 +12,7 @@ So `findings.report.json` is treated as a **draft** — the same stance `review-
 
 | File | Role |
 |---|---|
-| `main.py` | Thin wrapper. `--tmp-dir` (required), `--port` (default 9853), `--no-browser`. Picks a `tmp_dir`, pins the `kind` to `report`, and calls `review_server.py`'s `serve()`. |
+| `main.py` | Thin wrapper. `--tmp-dir` (required — pass the `batch_dir`), `--port` (default 9853), `--no-browser`. Picks a directory, pins the `kind` to `report`, and calls `review_server.py`'s `serve()`. |
 | `review_server.py` | The localhost HTTP server — loads a draft, serves the UI, handles save. |
 | `review_ui.html` | The single static review UI, served by `review_server.py`. |
 | `review.py` | The correction-provenance contract — load, validate, stamp, atomic-write. |
@@ -23,7 +23,7 @@ So `findings.report.json` is treated as a **draft** — the same stance `review-
 ## The reviewed sibling
 
 ```
-tmp_dir/
+batch_dir/
   findings.report.json            # synthesize-report draft — never touched
   findings.report.reviewed.json   # written here; same schema + a `review` block
 ```
