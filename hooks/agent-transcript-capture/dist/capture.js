@@ -146,10 +146,10 @@ async function main() {
         }
         // Surface the upload via the adapter so each harness can use its own
         // inline-message mechanism. For Claude Code a plain stdout line from a
-        // Stop hook is only visible in transcript view (Ctrl-R) and never reaches
-        // the agent's context — the Claude adapter emits a JSON envelope with a
-        // `systemMessage` field, which is the documented way to surface a line
-        // both to the human reading the chat and to the agent on next turn.
+        // Stop hook is only visible in transcript view (Ctrl-R); the Claude
+        // adapter emits a JSON envelope with a `systemMessage` field, which is
+        // the documented way for a Stop hook to surface a line inline in the
+        // chat.
         const cliPath = path.resolve(__dirname, "cli.js");
         process.stdout.write(adapter.formatUploadSuccess({
             sessionId: bundle.sessionId,

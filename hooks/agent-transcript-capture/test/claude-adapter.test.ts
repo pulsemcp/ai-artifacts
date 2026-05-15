@@ -167,8 +167,11 @@ describe("ClaudeAdapter", () => {
         cliPath,
       });
       const parsed = JSON.parse(output);
+      // The envelope MUST carry a systemMessage with the upload details. It
+      // MAY carry other documented universal fields in the future (continue,
+      // suppressOutput, etc.) — don't lock the exact key set.
       expect(typeof parsed.systemMessage).toBe("string");
-      expect(Object.keys(parsed)).toEqual(["systemMessage"]);
+      expect(parsed.systemMessage.length).toBeGreaterThan(0);
     });
 
     it("includes both the list AND delete commands with the session id pre-filled", () => {

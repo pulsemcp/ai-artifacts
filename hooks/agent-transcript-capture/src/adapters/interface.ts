@@ -53,8 +53,8 @@ export interface AgentAdapter {
 
   /**
    * Format a successful-upload notice for this harness in whatever shape will
-   * surface inline to the user (and ideally also land in the agent's context).
-   * The returned string is what `capture.ts` writes verbatim to stdout.
+   * surface inline to the user. The returned string is what `capture.ts`
+   * writes verbatim to stdout.
    */
   formatUploadSuccess(notice: UploadSuccessNotice): string;
 }
