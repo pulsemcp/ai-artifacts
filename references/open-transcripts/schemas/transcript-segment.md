@@ -38,14 +38,16 @@ Exactly one per segment. Two kinds:
 
 Outcome is judged against the Goal, not against some abstract notion of quality. A segment whose Goal was "investigate" succeeds when the investigation produces a defensible answer, even if the answer is "no, we shouldn't do this."
 
+**Every Failure requires a one-sentence `outcome.explanation`** — plain language on *what happened in this Segment that left its Goal not achieved*. Without it, a reader of `segments.json` and every downstream artifact built from it sees "Failure" without context, which is exactly the re-spelunking through events the analysis is supposed to spare them from. Required on Failure; omitted on Success.
+
 ### Trigger
 
 Exactly one per segment. The Trigger captures **what caused this Goal to exist**. Two independent dimensions:
 
-**`kind`** — the relationship to the previous segment's work:
+**`kind`** — the relationship to the previous segment's work. The bar for `Correction` is high; `New` is the default.
 
-- **New** — a fresh Goal, not derived from correcting prior work. Either a brand-new line of work, or the next step in a sequence after the previous segment landed cleanly.
-- **Correction** — the Goal exists *because* the previous segment didn't deliver. Course-correcting, retrying with a different framing, undoing damage, fixing what broke.
+- **New** — a fresh Goal, not derived from re-doing prior work. Either a brand-new line of work, or the next step in a sequence after the previous Segment **delivered its own Goal**. Includes: the agent moving to the next step in its plan (self-review, verification, follow-up); the user adding new context or a change in requirements that couldn't have been discerned in advance; surfacing problems in earlier work without re-doing it. A new Segment that *acts on* something the prior Segment produced is `New`, not `Correction`.
+- **Correction** — the previous Segment's *own stated Goal* wasn't delivered, and this Segment exists to fix that. Course-correcting, retrying with a different framing, walking back wrong work, undoing damage. The bar is: would a reader looking at the prior Segment alone say "you didn't do what you said you would"? If yes, this is `Correction`; if the prior Segment in fact did what it set out to do, this is `New` — even if this Segment then surfaces issues with earlier work.
 
 **`source`** — who originated the Goal shift:
 
@@ -57,14 +59,14 @@ The two dimensions are independent. The four cases that matter most:
 
 | `kind` | `source` | Meaning |
 |---|---|---|
-| New | user | What used to be called an **Initial Prompt** — a user message launching a fresh Goal. The deterministic-trigger candidate analysis runs on these. |
-| Correction | user | What used to be called a **Correction Prompt** — strongest retro-Failure signal on the prior segment. The user had to step in. |
-| Correction | agent | The agent noticed it was wrong and pivoted on its own. Softer retro-Failure signal, but still real — the prior segment didn't deliver. |
-| New | agent | The agent moved to the next step in its plan. Normal sequencing, not a Failure signal. |
+| New | user | A user message launching a fresh Goal — "first prompt of a session" or a clean follow-up. Includes the user adding context / changing requirements that weren't discoverable in advance ("oh and also do W"; "actually target staging, not prod"). The deterministic-trigger candidate analysis runs on these. |
+| Correction | user | The user had to intervene because the prior Segment failed to deliver its own Goal — "you broke X", "no, redo that", "that's wrong, the test fails". Strongest retro-Failure signal. |
+| Correction | agent | The agent itself walked back prior work — "that didn't work, let me try a different approach", abandoning a path after a tool error, reverting edits. The prior Segment's Goal wasn't delivered; the agent noticed before the user did. |
+| New | agent | The agent moved to the next step in its plan — including a self-review or follow-up that *surfaces issues* in earlier work without re-doing it. Surfacing an issue is `New`; re-doing the work to fix it is `Correction` only if it walks back the prior Goal. |
 
-The presence of a Correction trigger — from either source — retroactively marks the prior sibling segment as Failure even if the agent didn't itself recognize the failure. User-source Corrections are the stronger signal (the user had to intervene); agent-source Corrections are softer but still inform the failure analysis.
+**Correction implies retro-Failure on the prior Segment — by definition.** If a Segment's `trigger.kind = Correction`, then the prior sibling's `outcome.kind = Failure` (with an `explanation`), because that's what Correction means: the prior didn't deliver its own Goal. The decomposer must keep these consistent — never label a Segment `Correction` while leaving the prior sibling Success. User-source Correction is the stronger signal that this propagation should fire; agent-source Correction is softer (the agent recovered on its own) but still requires the prior Failure label.
 
-**Carve-out — retro-Failure only when the prior segment's *own Goal* wasn't delivered.** Retro-Failure and "Outcome is judged against the Goal" can collide: a Correction can target something the prior segment never claimed to do. Resolve it by the prior segment's *own* stated Goal. If the Correction indicates that Goal was not actually delivered (the work the segment set out to do was wrong or incomplete), the prior segment is retro-marked Failure. But if the prior segment met its literal Goal and the Correction opens a genuinely new or adjacent Goal, the prior segment **stays Success** — the Correction trigger is then just a New-vs-Correction judgment call on the *new* segment, not a retro-Failure signal on the old one. User-source Correction stays the strong signal that *a* Correction happened; this carve-out only governs whether it propagates backward as Failure.
+The flip side — and the most common mis-labeling — is the reverse: when the prior Segment **did** meet its own Goal and the next Segment surfaces problems with earlier work (a self-review after a successful commit, acting on review feedback from a delegated reviewer, a follow-up that finds a bug in code the prior Segment shipped), that next Segment is `New`, not `Correction`. The prior stays Success. Keep the `Correction` bar high — it is reserved for cases where the prior Segment literally didn't do what it said it would do.
 
 ### Children
 
@@ -92,7 +94,7 @@ Three signals that should prompt the decomposer to draw a new Segment:
 
 1. **New `UserMessage` event.** The Goal can change at any user message. The new Segment's `trigger.source = user` with `trigger.event_id` / `trigger.text` set to the `UserMessage`.
    - New line of work → sibling Segment with `trigger.kind = New`.
-   - User steering after seeing the prior Segment's output ("actually do X", "no, I meant Y", "you broke Z") → sibling Segment with `trigger.kind = Correction`. This retroactively marks the prior sibling as Failure.
+   - User steering that says the prior Segment didn't deliver its own Goal ("no, redo that — what you did is wrong", "you broke users.spec.ts:42") → sibling Segment with `trigger.kind = Correction`; the prior sibling's outcome flips to `Failure` with an `explanation`. User steering that adds context or changes requirements that couldn't have been foreseen ("oh and also do W"; "actually target staging not prod") is `kind = New` — the prior Segment met its Goal as it then understood it; the user just opened a new line of work.
    - **Multi-Goal message** (one message asking for two unrelated things — "fix the auth bug, and bump lodash"): draw *one Segment per Goal* as siblings. All siblings share `trigger.event_id` pointing at the same `UserMessage`; their `meta.event_range`s partition the agent's response events by which Goal each addressed.
    - **Continuation-only messages** ("continue", "go on", "yes") do *not* start a new Segment — the Goal is unchanged.
    - **Re-statement with extra context** (the user adds a fact but the Goal is the same) does *not* start a new Segment either; the agent's Goal didn't change, the user just helped.
@@ -108,7 +110,7 @@ Three signals that should prompt the decomposer to draw a new Segment:
 
    A single stray `ToolCall` (e.g. one `Read` while in the middle of editing) is **not** a boundary.
 
-   Classify `trigger.kind` for an agent-source shift as `Correction` when the pivot is clearly a course-correction ("that didn't work, let me try X", agent reads a tool error and abandons the approach, revert of prior edits). Otherwise `New` — the agent is sequencing through its plan.
+   Classify `trigger.kind` for an agent-source shift as `Correction` only when the agent is **walking back prior work** — abandoning an approach after a tool error, reverting edits, retrying with a different framing because the prior attempt didn't deliver. A self-review of work the agent just successfully completed (read-back, verify, follow-up) is `New`, not `Correction` — the prior step did its job; this step is the next one in the plan, even if it surfaces issues. Acting on review feedback returned by a subagent or a reviewer is similarly `New` — the prior delegation delivered (it returned a review); this Segment is *consuming* that result, not correcting the delegation.
 
 ### Leaf-stop rule
 
@@ -170,6 +172,7 @@ The file is a single JSON document whose top-level value is the root Segment of 
   },
   "outcome": {
     "kind":               "Success",                            // "Success" | "Failure"
+    "explanation":        null,                                 // string — REQUIRED, non-empty, when kind == "Failure"; null on Success. One plain-language sentence on what happened that left the Goal not achieved.
     "evidence_event_ids": ["evt_01HXYZ...", "evt_01HXYZ..."]    // events that justify the call; may be empty
   },
   "children": [ /* sub-Segments, same shape; [] is allowed for leaves */ ],
@@ -192,6 +195,8 @@ Rules a Segment tree must satisfy:
 - **Coverage**: a Segment's `children` must collectively cover its `meta.event_range` with no gaps and no overlaps. Leaves have `children: []`.
 - **`id` stability**: ids MUST follow **depth-first positional numbering** — the root is `S0`; every other Segment is `S{parent_id}.{childIndex}` where `childIndex` is its 0-based position in the parent's `children` array (`S0.0`, `S0.1`, `S0.1.0`, …). This positional scheme is what makes ids deterministic for a given input and stable across re-runs — it is normative, not an example. Analyzers reference Segments by `id`; the orchestrator round-trips ids in its report.
 - **Outcome is local to the Goal**: a Success Segment can sit under a Failure parent and vice versa. Do not propagate up.
+- **Failure outcomes carry an explanation**: when `outcome.kind == "Failure"`, `outcome.explanation` is a non-empty plain-language string. A reader of `segments.json` (or any downstream artifact built from it) should see *why* a Goal was not achieved without re-reading the events themselves. Required on Failure; omitted on Success.
+- **Correction ↔ retro-Failure consistency**: when a Segment's `trigger.kind = Correction`, the prior sibling Segment's `outcome.kind = Failure` with an `outcome.explanation`. Conversely, never label a Segment `Correction` while leaving the prior sibling `Success` — if the prior met its Goal, this Segment is `kind = New`, not `Correction`.
 - **`tokens_in` is uncached input, not prompt size**: `tokens_in` sums `AssistantMessage.usage.input_tokens`, but Claude Code logs only the *uncached* input tokens there — the bulk of a turn's real prompt is in `cache_read_tokens`. On a cache-heavy session this sum can be near-zero and is **not** a faithful "prompt size." The definition stands as-is; downstream analyzers should read `tokens_in` as "uncached input tokens" and consult `cache_read_tokens` when they need true context size.
 
 ### Example
@@ -230,7 +235,7 @@ A short session: user asks for an auth middleware, the agent plans, writes the v
       "id": "S0.1",
       "trigger": { "kind": "New",        "source": "agent", "event_id": null, "text": null },
       "goal":    { "text": "Write the JWT validator (first attempt — wrong signature algorithm)", "kind": "Action" },
-      "outcome": { "kind": "Failure", "evidence_event_ids": ["evt_01H16", "evt_01H17"] },
+      "outcome": { "kind": "Failure", "explanation": "validator used HS256 where the existing middleware expects RS256, so verification fails against real tokens", "evidence_event_ids": ["evt_01H16", "evt_01H17"] },
       "meta":    { "event_range": ["evt_01H10", "evt_01H17"], "wall_clock_s": 280, "tokens_in": 2600, "tokens_out": 950,  "model": "claude-sonnet-4-6", "source_transcript_id": "01HXYZ" },
       "children": []
     },
@@ -238,7 +243,7 @@ A short session: user asks for an auth middleware, the agent plans, writes the v
       "id": "S0.2",
       "trigger": { "kind": "Correction", "source": "agent", "event_id": null, "text": null },
       "goal":    { "text": "Rewrite the validator with the correct RS256 algorithm", "kind": "Action" },
-      "outcome": { "kind": "Failure", "evidence_event_ids": ["evt_01H22", "evt_01H24"] },
+      "outcome": { "kind": "Failure", "explanation": "rewrite rejected every request, including valid tokens — the users.spec.ts:42 mock for the missing-token 401 path wasn't accounted for", "evidence_event_ids": ["evt_01H22", "evt_01H24"] },
       "meta":    { "event_range": ["evt_01H18", "evt_01H24"], "wall_clock_s": 340, "tokens_in": 2800, "tokens_out": 1150, "model": "claude-sonnet-4-6", "source_transcript_id": "01HXYZ" },
       "children": []
     },
