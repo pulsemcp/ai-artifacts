@@ -29,10 +29,11 @@ import json
 import os
 import sys
 import tempfile
+from collections import Counter
 from pathlib import Path
 
 from cc_jsonl import list_sessions, parse_session
-from open_transcripts import session_to_transcript
+from open_transcripts import session_to_transcript, validate_transcript
 
 
 def _default_tmp_root() -> Path:
@@ -99,6 +100,20 @@ def main(argv: list[str] | None = None) -> int:
         else:
             json.dump(transcript, f, ensure_ascii=False)
 
+    # Roll up event counts across the whole tree (parent + every nested
+    # subagent) for the run log.
+    def _tree_events(t: dict) -> list[dict]:
+        evs = list(t.get("events") or [])
+        for child in t.get("subagents") or []:
+            evs.extend(_tree_events(child))
+        return evs
+
+    all_events = _tree_events(transcript)
+    type_counts = Counter(e.get("type") for e in all_events)
+    raw = (transcript.get("provider") or {}).get("raw") or {}
+    unmapped = raw.get("unmapped_lines") or []
+    problems = validate_transcript(transcript)
+
     log_path = out_dir / "run.log"
     with log_path.open("w", encoding="utf-8") as f:
         f.write(f"source: {jsonl}\n")
@@ -110,8 +125,25 @@ def main(argv: list[str] | None = None) -> int:
                 f"  - {sub.ref.agent_id} ({sub.ref.agent_type}) "
                 f"{len(sub.lines)} lines from {sub.ref.jsonl_path}\n"
             )
-        f.write(f"events: {len(transcript['events'])}\n")
+        f.write(f"events: {len(transcript['events'])} (tree total: {len(all_events)})\n")
+        f.write(f"event_types: {dict(sorted(type_counts.items()))}\n")
+        f.write(f"unmapped_lines: {len(unmapped)}\n")
         f.write(f"final_metrics: {transcript['final_metrics']}\n")
+        if problems:
+            f.write(f"validation: FAILED ({len(problems)} violation(s))\n")
+            for prob in problems:
+                f.write(f"  - {prob}\n")
+        else:
+            f.write("validation: OK\n")
+
+    if problems:
+        print(
+            f"WARNING: transcript failed {len(problems)} invariant check(s); "
+            f"see {log_path}",
+            file=sys.stderr,
+        )
+        for prob in problems:
+            print(f"  - {prob}", file=sys.stderr)
 
     print(out_dir, flush=True)
     return 0

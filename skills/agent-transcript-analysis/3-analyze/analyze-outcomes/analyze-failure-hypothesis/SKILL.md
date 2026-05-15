@@ -37,7 +37,7 @@ Per-Segment analyzer for Failure Outcomes and retro-Failures.
                      | "prompting_issue" | "user_mistake" | "agent_reasoning_error",
   "evidence": "<turn-level evidence: which assistant turn went wrong, which correction confirmed it (user-source or agent-source)>",
   "hypothesis": "<one-paragraph improvement hypothesis>",
-  "recommendation_route": "prompting" | "skills" | "mcp" | "multi",
+  "recommendation_route": "prompting" | "skills" | "mcp" | "multi" | "none",
   "recommendation_seed": "<short draft of the concrete change — promoted to a full proposal by the matching analyze-{skills,mcp}-gaps skill>"
 }
 ```
@@ -55,7 +55,7 @@ Per-Segment analyzer for Failure Outcomes and retro-Failures.
   3. Was the prompt itself wrong (ambiguous, missing context, asking for the wrong thing)? → `prompting_issue`.
   4. None of the above → `agent_reasoning_error`, then `user_mistake` only when explicitly justified.
 - [ ] Write the **hypothesis** in one paragraph: what would have prevented this exact Segment from failing? Be concrete enough that someone reading it could write the PR or rewrite the prompt.
-- [ ] Set `recommendation_route` to the downstream bucket the hypothesis points at. `multi` is acceptable when prompting *and* a Skill change would both help.
+- [ ] Set `recommendation_route` to the downstream bucket the hypothesis points at — one of `prompting` / `skills` / `mcp` / `multi` / `none`, the shared `outcomes`-bucket enum (identical to `analyze-segment-efficiency`). `multi` is acceptable when prompting *and* a Skill change would both help; `none` is rare here — a Failure almost always implies a fix somewhere — but is kept so both `outcomes` analyzers share one enum.
 - [ ] Write a `recommendation_seed` — one-to-three sentences the matching gap analyzer can promote into a full proposal.
 
 ## Notes

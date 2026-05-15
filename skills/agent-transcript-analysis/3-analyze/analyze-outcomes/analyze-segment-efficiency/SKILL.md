@@ -34,7 +34,7 @@ Per-Segment efficiency check. Runs on every Segment regardless of Outcome — Su
       "kind": "wasteful_branch" | "model_too_large" | "model_too_small" | "well_proportioned",
       "evidence": "<which turns or sub-Segments are the detour, or which turns retried due to model thrash>",
       "hypothesis": "<what would have made this faster / cheaper>",
-      "recommendation_route": "prompting" | "skills" | "mcp" | "none"
+      "recommendation_route": "prompting" | "skills" | "mcp" | "multi" | "none"
     }
   ]
 }
@@ -51,7 +51,7 @@ Per-Segment efficiency check. Runs on every Segment regardless of Outcome — Su
 - [ ] Check **model-tier mismatch**:
   - **model_too_large**: this Segment was rote (deterministic fix, file rename, schema migration with a clear spec). Could a smaller/cheaper model have served? Reference the model id from `meta`
   - **model_too_small**: the Segment thrashed (multiple retries, contradictory turns, abandoned and restarted). A more capable model might have one-shotted it
-- [ ] For each finding, set `recommendation_route` to where the fix would live. `none` is valid for `well_proportioned`
+- [ ] For each finding, set `recommendation_route` to where the fix would live — one of `prompting` / `skills` / `mcp` / `multi` / `none`, the shared `outcomes`-bucket enum (identical to `analyze-failure-hypothesis`, so `synthesize-report` routes both analyzers' findings the same way). `none` is valid for `well_proportioned`; `multi` when the fix spans two buckets
 
 ## Notes
 

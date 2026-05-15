@@ -14,6 +14,7 @@ Conventions enforced here:
 
 from __future__ import annotations
 
+from functools import partial
 from typing import Any
 
 from cc_jsonl import ParsedSession, ParsedSubagent
@@ -68,13 +69,26 @@ def _base_event(
     *,
     id_suffix: str = "",
     parent_override: str | None = None,
+    fallback_id: str = "",
+    ts_override: str | None = None,
 ) -> dict[str, Any]:
-    line_uuid = line.get("uuid") or ""
+    """Build the {id, parent_id, ts, type} base every OT event shares.
+
+    ``fallback_id`` / ``ts_override`` cover CC lines that carry no ``uuid`` /
+    ``timestamp`` (ai-title, last-prompt, pr-link, …): without them every such
+    event collapsed to ``id == ""`` and ``ts == null``, breaking the schema's
+    unique-id and sortable-ts invariants. The caller supplies a stable,
+    deterministic fallback id and the carried-forward timestamp.
+    """
+    line_uuid = line.get("uuid") or fallback_id
     event_id = f"{line_uuid}{':' + id_suffix if id_suffix else ''}"
+    ts = line.get("timestamp")
+    if not (isinstance(ts, str) and ts):
+        ts = ts_override
     return {
         "id": event_id,
         "parent_id": parent_override if parent_override is not None else line.get("parentUuid"),
-        "ts": line.get("timestamp"),
+        "ts": ts,
         "type": event_type,
     }
 
@@ -83,11 +97,24 @@ def _lines_to_events(
     lines: list[dict[str, Any]],
     subagents_by_tool_use_id: dict[str, str],
     subagent_meta_by_id: dict[str, dict[str, Any]],
-) -> list[dict[str, Any]]:
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
     """Walk CC lines and emit OT events. Multiple events per assistant line when it
-    contains thinking/tool_use/Task blocks."""
+    contains thinking/tool_use/Task blocks.
+
+    Returns ``(events, unmapped_lines)``. ``unmapped_lines`` is the drift signal
+    the skill is meant to surface: it holds the redacted original of every line
+    whose CC ``type`` the mapper could not recognize *at all*. A line that maps
+    cleanly is never listed — including one that maps to a ``SystemEvent`` named
+    after a known-but-event-less CC line type (``ai-title``, ``pr-link``, …).
+    That distinction is the whole point: a populated ``unmapped_lines`` should
+    mean the CC format actually drifted, not that the session contained routine
+    metadata lines.
+    """
     events: list[dict[str, Any]] = []
-    for line in lines:
+    unmapped_lines: list[dict[str, Any]] = []
+    last_ts: str | None = None
+
+    for idx, line in enumerate(lines):
         line_type = line.get("type")
         message = line.get("message")
         if not isinstance(message, dict):
@@ -101,6 +128,17 @@ def _lines_to_events(
         else:
             blocks = []
 
+        # Carry the last real timestamp forward: CC writes some metadata lines
+        # (ai-title, last-prompt, pr-link, …) with no ``timestamp``, and an event
+        # with a null ``ts`` can't be ordered. ``cc-line-<idx>`` is the matching
+        # stable id fallback — those same lines also lack a ``uuid``.
+        line_ts = line.get("timestamp")
+        if isinstance(line_ts, str) and line_ts:
+            last_ts = line_ts
+        base = partial(
+            _base_event, line, fallback_id=f"cc-line-{idx}", ts_override=last_ts
+        )
+
         if line_type == "user":
             # Either a regular UserMessage or one or more ToolResults — never both.
             tool_results = [b for b in blocks if b.get("type") == "tool_result"]
@@ -108,7 +146,7 @@ def _lines_to_events(
                 tur = line.get("toolUseResult")
                 for i, b in enumerate(tool_results):
                     suffix = "" if i == 0 else f"toolresult:{i}"
-                    evt = _base_event(line, "ToolResult", id_suffix=suffix)
+                    evt = base("ToolResult", id_suffix=suffix)
                     raw_output = b.get("content")
                     if isinstance(raw_output, str):
                         output = [{"type": "text", "text": raw_output}]
@@ -126,7 +164,7 @@ def _lines_to_events(
                     )
                     events.append(evt)
             else:
-                evt = _base_event(line, "UserMessage")
+                evt = base("UserMessage")
                 evt["content"] = redact(_content_parts_from_blocks(blocks))
                 evt["provider_raw"] = _redact_line(line)
                 events.append(evt)
@@ -137,7 +175,7 @@ def _lines_to_events(
             tool_use_blocks = [b for b in blocks if b.get("type") == "tool_use"]
 
             # Always emit the AssistantMessage (carries the text content + usage + stop_reason).
-            am = _base_event(line, "AssistantMessage")
+            am = base("AssistantMessage")
             am["content"] = redact(_content_parts_from_blocks(text_blocks))
             am["model"] = message.get("model")
             am["stop_reason"] = message.get("stop_reason")
@@ -150,7 +188,7 @@ def _lines_to_events(
             am_id = am["id"]
 
             for i, b in enumerate(thinking_blocks):
-                t = _base_event(line, "Thinking", id_suffix=f"thinking:{i}", parent_override=am_id)
+                t = base("Thinking", id_suffix=f"thinking:{i}", parent_override=am_id)
                 t["text"] = redact(b.get("thinking", b.get("text", "")))
                 t["signature"] = b.get("signature")
                 t["redacted"] = b.get("type") == "redacted_thinking" or bool(b.get("redacted", False))
@@ -158,7 +196,7 @@ def _lines_to_events(
                 events.append(t)
 
             for i, b in enumerate(tool_use_blocks):
-                call = _base_event(line, "ToolCall", id_suffix=f"tool:{i}", parent_override=am_id)
+                call = base("ToolCall", id_suffix=f"tool:{i}", parent_override=am_id)
                 tool_use_id = b.get("id", "")
                 call["tool_call_id"] = tool_use_id
                 call["tool_name"] = b.get("name", "")
@@ -168,7 +206,7 @@ def _lines_to_events(
 
                 if b.get("name") in ("Task", "Agent"):
                     inp = b.get("input") or {}
-                    spawn = _base_event(line, "SubagentSpawn", id_suffix=f"spawn:{i}", parent_override=am_id)
+                    spawn = base("SubagentSpawn", id_suffix=f"spawn:{i}", parent_override=am_id)
                     spawn["tool_call_id"] = tool_use_id
                     spawned_agent_id = subagents_by_tool_use_id.get(tool_use_id)
                     spawn["spawned_transcript_id"] = spawned_agent_id
@@ -180,8 +218,24 @@ def _lines_to_events(
                     events.append(spawn)
 
         elif line_type == "system":
-            text = ""
-            if isinstance(message, dict):
+            if line.get("subtype") == "compact_boundary":
+                # CC's auto/manual context-compaction marker is a first-class OT
+                # event, not a generic SystemEvent: downstream decomposition keys
+                # its "ran out of context mid-Goal" failure heuristic on
+                # Compaction events, so they must actually be emitted as such.
+                cm = line.get("compactMetadata")
+                cm = cm if isinstance(cm, dict) else {}
+                evt = base("Compaction")
+                evt["summary"] = redact(str(line.get("content") or ""))
+                evt["first_kept_event_id"] = None
+                evt["tokens_before"] = cm.get("preTokens")
+                evt["tokens_after"] = cm.get("postTokens")
+                trig = cm.get("trigger")
+                evt["trigger"] = trig if trig in ("auto", "manual") else None
+                evt["provider_raw"] = _redact_line(line)
+                events.append(evt)
+            else:
+                text = ""
                 content_val = message.get("content")
                 if isinstance(content_val, str):
                     text = content_val
@@ -189,32 +243,49 @@ def _lines_to_events(
                     text = " ".join(
                         b.get("text", "") for b in content_val if isinstance(b, dict)
                     )
-            looks_like_error = isinstance(text, str) and (
-                text.startswith("API Error") or "error" in text.lower()[:200]
-            )
-            if looks_like_error:
-                evt = _base_event(line, "Error")
-                evt["code"] = None
-                evt["message"] = redact(text)
-                evt["recoverable"] = True
-                evt["related_event_id"] = None
-                evt["provider_raw"] = _redact_line(line)
-            else:
-                evt = _base_event(line, "SystemEvent")
-                evt["subtype"] = "system"
-                evt["payload"] = _redact_line(line)
-                evt["provider_raw"] = None
-            events.append(evt)
+                looks_like_error = isinstance(text, str) and (
+                    text.startswith("API Error") or "error" in text.lower()[:200]
+                )
+                if looks_like_error:
+                    evt = base("Error")
+                    evt["code"] = None
+                    evt["message"] = redact(text)
+                    evt["recoverable"] = True
+                    evt["related_event_id"] = None
+                    evt["provider_raw"] = _redact_line(line)
+                else:
+                    evt = base("SystemEvent")
+                    evt["subtype"] = "system"
+                    evt["payload"] = _redact_line(line)
+                    evt["provider_raw"] = None
+                events.append(evt)
 
         else:
-            # Any unrecognized line type → SystemEvent with subtype = the line's type.
-            evt = _base_event(line, "SystemEvent")
-            evt["subtype"] = str(line_type) if line_type else "unknown"
+            # A CC line with no dedicated OT event. If it carries a recognizable
+            # ``type``, that's a clean map to a SystemEvent named after the type
+            # — not drift. Only a line with no usable ``type`` at all is
+            # "unmapped", and only that case feeds provider.raw.unmapped_lines[].
+            evt = base("SystemEvent")
+            if isinstance(line_type, str) and line_type:
+                evt["subtype"] = line_type
+            else:
+                evt["subtype"] = "unmapped"
+                unmapped_lines.append(redact(line))
             evt["payload"] = _redact_line(line)
             evt["provider_raw"] = None
             events.append(evt)
 
-    return events
+    # Events from leading lines that preceded the first real timestamp still
+    # carry a null ``ts``; back-fill them with the earliest real one so the
+    # whole array is orderable.
+    first_real_ts = next((e["ts"] for e in events if e["ts"]), None)
+    if first_real_ts is not None:
+        for e in events:
+            if e["ts"]:
+                break
+            e["ts"] = first_real_ts
+
+    return events, unmapped_lines
 
 
 def _final_metrics(events: list[dict[str, Any]], subagents: list[dict[str, Any]]) -> dict[str, Any]:
@@ -274,11 +345,7 @@ def build_transcript(
 ) -> dict[str, Any]:
     """Assemble one OT Transcript document from a list of CC JSONL lines + already-built
     child transcripts."""
-    if not lines:
-        first_line = {}
-    else:
-        first_line = lines[0]
-    last_line = lines[-1] if lines else {}
+    first_line = lines[0] if lines else {}
 
     def _first(field: str) -> Any:
         for ln in lines:
@@ -289,8 +356,6 @@ def build_transcript(
 
     cwd = _first("cwd")
     version = _first("version")
-    created = first_line.get("timestamp") or _first("timestamp")
-    ended = last_line.get("timestamp") or created
 
     model_default = None
     for line in lines:
@@ -300,12 +365,21 @@ def build_transcript(
                 model_default = msg["model"]
                 break
 
-    events = _lines_to_events(lines, subagents_by_tool_use_id, subagent_meta_by_id)
+    events, unmapped_lines = _lines_to_events(
+        lines, subagents_by_tool_use_id, subagent_meta_by_id
+    )
+    # Pass 4: events sorted by ts ascending. The sort is stable, so events that
+    # share a timestamp — an assistant line that expands into several events, or
+    # a metadata line that inherited its ts — keep their document order.
+    events.sort(key=lambda e: e.get("ts") or "")
 
-    unmapped_lines: list[dict[str, Any]] = []
-    for line, evt in zip(lines, events):
-        if evt.get("type") == "SystemEvent" and evt.get("subtype") not in (None, "", "system"):
-            unmapped_lines.append(redact(line))
+    # created_at / ended_at come from the actual event timeline, not the first
+    # and last JSONL lines: CC commonly ends a session file with a metadata line
+    # (ai-title, last-prompt) that has no timestamp, which would otherwise
+    # collapse ended_at onto created_at.
+    event_ts = [e["ts"] for e in events if e.get("ts")]
+    created = event_ts[0] if event_ts else (first_line.get("timestamp") or _first("timestamp"))
+    ended = event_ts[-1] if event_ts else created
 
     transcript: dict[str, Any] = {
         "schema_version": SCHEMA_VERSION,
@@ -365,7 +439,7 @@ def session_to_transcript(session: ParsedSession) -> dict[str, Any]:
     # if any subagent line carries Task calls of its own).
     child_transcripts: list[dict[str, Any]] = []
 
-    parent_events_preview = _lines_to_events(
+    parent_events_preview, _ = _lines_to_events(
         session.parent_lines, subagents_by_tool_use_id, subagent_meta_by_id
     )
     _resolve_spawn_event_for(parent_events_preview)
@@ -425,4 +499,66 @@ def _build_nested_session_from_subagent(sub: ParsedSubagent) -> ParsedSession:
     return nested
 
 
-__all__ = ["session_to_transcript", "build_transcript", "SCHEMA_VERSION"]
+def validate_transcript(transcript: dict[str, Any]) -> list[str]:
+    """Check the OpenTranscripts invariants from the transcript schema.
+
+    Returns a list of human-readable violation strings (empty == valid) and
+    recurses into ``subagents[]``. This is pass 4 of the skill's sequencing
+    checklist: running it on every build means a structurally broken transcript
+    is caught here, not deep inside a downstream analyzer.
+    """
+    from collections import Counter
+
+    problems: list[str] = []
+    tid = transcript.get("transcript_id", "?")
+    events = transcript.get("events") or []
+
+    # events[] sorted by ts ascending, every ts present.
+    tss = [e.get("ts") for e in events]
+    null_ts = sum(t is None for t in tss)
+    if null_ts:
+        problems.append(f"{tid}: {null_ts} event(s) with null ts")
+    present = [t for t in tss if t is not None]
+    if present != sorted(present):
+        problems.append(f"{tid}: events[] not sorted by ts ascending")
+
+    # event ids present and unique.
+    ids = [e.get("id") for e in events]
+    empty_ids = sum(not i for i in ids)
+    if empty_ids:
+        problems.append(f"{tid}: {empty_ids} event(s) with empty id")
+    counts = Counter(ids)
+    dupes = [i for i, n in counts.items() if i and n > 1]
+    if dupes:
+        problems.append(
+            f"{tid}: {len(dupes)} duplicated event id(s) "
+            f"(e.g. {dupes[0]!r} ×{counts[dupes[0]]})"
+        )
+
+    # every SubagentSpawn ↔ a subagents[] entry, and vice versa.
+    spawn_ids = {
+        e.get("spawned_transcript_id")
+        for e in events
+        if e.get("type") == "SubagentSpawn"
+    } - {None}
+    sub_ids = {s.get("transcript_id") for s in transcript.get("subagents") or []} - {None}
+    if spawn_ids - sub_ids:
+        problems.append(
+            f"{tid}: SubagentSpawn with no subagents[] entry: {sorted(spawn_ids - sub_ids)}"
+        )
+    if sub_ids - spawn_ids:
+        problems.append(
+            f"{tid}: subagents[] entry with no SubagentSpawn: {sorted(sub_ids - spawn_ids)}"
+        )
+
+    for sub in transcript.get("subagents") or []:
+        problems.extend(validate_transcript(sub))
+    return problems
+
+
+__all__ = [
+    "session_to_transcript",
+    "build_transcript",
+    "validate_transcript",
+    "SCHEMA_VERSION",
+]
