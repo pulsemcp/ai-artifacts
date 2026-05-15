@@ -31,6 +31,15 @@ export interface SessionBundle {
   files: SessionFile[];
 }
 
+/** Information the upload step hands back to the adapter for user-facing surfacing. */
+export interface UploadSuccessNotice {
+  sessionId: string;
+  /** Provider-canonical URI of the uploaded archive (gs://... / s3://...). */
+  objectUrl: string;
+  /** Absolute path to the CLI script (for the list / delete commands). */
+  cliPath: string;
+}
+
 /** Adapter for a specific coding agent's transcript format. */
 export interface AgentAdapter {
   /** Human-readable name for manifests and logs. */
@@ -41,6 +50,13 @@ export interface AgentAdapter {
    * Returns a bundle ready for redaction and archiving.
    */
   collectSession(hookInput: HookInput): Promise<SessionBundle>;
+
+  /**
+   * Format a successful-upload notice for this harness in whatever shape will
+   * surface inline to the user (and ideally also land in the agent's context).
+   * The returned string is what `capture.ts` writes verbatim to stdout.
+   */
+  formatUploadSuccess(notice: UploadSuccessNotice): string;
 }
 
 // ---------------------------------------------------------------------------

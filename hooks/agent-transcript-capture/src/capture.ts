@@ -6,6 +6,7 @@
  * uploads it to cloud storage via an unauthenticated PUT.
  */
 
+import * as path from "path";
 import { HookInput, detectAgent } from "./adapters/interface";
 import { createBackend } from "./backends/interface";
 import { loadConfig, toBackendConfig } from "./config";
@@ -142,10 +143,19 @@ async function main(): Promise<void> {
       // Manifest failure must not fail the hook.
     }
 
-    // Claude Code shows stdout (not stderr) to the user for exit-0 hooks.
+    // Surface the upload via the adapter so each harness can use its own
+    // inline-message mechanism. For Claude Code a plain stdout line from a
+    // Stop hook is only visible in transcript view (Ctrl-R) and never reaches
+    // the agent's context — the Claude adapter emits a JSON envelope with a
+    // `systemMessage` field, which is the documented way to surface a line
+    // both to the human reading the chat and to the agent on next turn.
+    const cliPath = path.resolve(__dirname, "cli.js");
     process.stdout.write(
-      `agent-transcript-capture: uploaded session ${bundle.sessionId} (${backend.objectUrl(key)})\n` +
-        `  Run: node hooks/agent-transcript-capture/dist/cli.js list\n`
+      adapter.formatUploadSuccess({
+        sessionId: bundle.sessionId,
+        objectUrl: backend.objectUrl(key),
+        cliPath,
+      })
     );
     process.exit(0);
   }

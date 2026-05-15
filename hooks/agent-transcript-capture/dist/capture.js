@@ -6,7 +6,31 @@
  * files, optionally redacts sensitive content, builds a tar.gz archive, and
  * uploads it to cloud storage via an unauthenticated PUT.
  */
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || function (mod) {
+    if (mod && mod.__esModule) return mod;
+    var result = {};
+    if (mod != null) for (var k in mod) if (k !== "default" && Object.prototype.hasOwnProperty.call(mod, k)) __createBinding(result, mod, k);
+    __setModuleDefault(result, mod);
+    return result;
+};
 Object.defineProperty(exports, "__esModule", { value: true });
+const path = __importStar(require("path"));
 const interface_1 = require("./adapters/interface");
 const interface_2 = require("./backends/interface");
 const config_1 = require("./config");
@@ -120,9 +144,18 @@ async function main() {
         catch {
             // Manifest failure must not fail the hook.
         }
-        // Claude Code shows stdout (not stderr) to the user for exit-0 hooks.
-        process.stdout.write(`agent-transcript-capture: uploaded session ${bundle.sessionId} (${backend.objectUrl(key)})\n` +
-            `  Run: node hooks/agent-transcript-capture/dist/cli.js list\n`);
+        // Surface the upload via the adapter so each harness can use its own
+        // inline-message mechanism. For Claude Code a plain stdout line from a
+        // Stop hook is only visible in transcript view (Ctrl-R) and never reaches
+        // the agent's context — the Claude adapter emits a JSON envelope with a
+        // `systemMessage` field, which is the documented way to surface a line
+        // both to the human reading the chat and to the agent on next turn.
+        const cliPath = path.resolve(__dirname, "cli.js");
+        process.stdout.write(adapter.formatUploadSuccess({
+            sessionId: bundle.sessionId,
+            objectUrl: backend.objectUrl(key),
+            cliPath,
+        }));
         process.exit(0);
     }
     // 9. Loud failure.
