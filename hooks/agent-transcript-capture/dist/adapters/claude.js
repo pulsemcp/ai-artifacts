@@ -111,5 +111,28 @@ class ClaudeAdapter {
         }
         return { sessionId, files };
     }
+    /**
+     * Format the upload-success notice as a Claude Code Stop-hook JSON envelope
+     * with a `systemMessage` field. Plain stdout from a Stop hook is buried in
+     * transcript view (Ctrl-R); the JSON envelope is the documented way to make
+     * a Stop hook surface a line inline in the chat the human sees during
+     * normal scrolling. (Whether the model also reads `systemMessage` into its
+     * next-turn context depends on the Claude Code version — Stop hooks do not
+     * support the `additionalContext` field that explicitly injects context,
+     * so we rely on `systemMessage` being part of the chat transcript.)
+     *
+     * The `systemMessage` body shows both the `list` and `delete` commands, with
+     * a short session-id prefix already filled into `delete` so the agent can
+     * run it immediately when the user follows up with "delete that transcript".
+     */
+    formatUploadSuccess(notice) {
+        const shortId = notice.sessionId.length > 8
+            ? notice.sessionId.slice(0, 8)
+            : notice.sessionId;
+        const systemMessage = `Uploaded session ${shortId} → ${notice.objectUrl}\n` +
+            `  List uploads:  node ${notice.cliPath} list\n` +
+            `  Delete this:   node ${notice.cliPath} delete ${shortId}`;
+        return JSON.stringify({ systemMessage }) + "\n";
+    }
 }
 exports.ClaudeAdapter = ClaudeAdapter;

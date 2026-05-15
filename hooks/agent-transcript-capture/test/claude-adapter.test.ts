@@ -140,4 +140,79 @@ describe("ClaudeAdapter", () => {
       "Parent transcript not found"
     );
   });
+
+  describe("formatUploadSuccess", () => {
+    const cliPath = "/abs/path/to/dist/cli.js";
+
+    it("returns a single line of valid JSON terminated with a newline", () => {
+      const output = adapter.formatUploadSuccess({
+        sessionId: "578d166c-aaaa-bbbb-cccc-dddddddddddd",
+        objectUrl: "gs://bucket/2026/05/15/578d166c.tar.gz",
+        cliPath,
+      });
+      expect(output.endsWith("\n")).toBe(true);
+      // Should be a single line of JSON — no embedded newlines outside the
+      // string value, since Claude Code requires "stdout must contain only
+      // the JSON object".
+      const trimmed = output.trimEnd();
+      expect(trimmed.split("\n")).toHaveLength(1);
+      // Parses cleanly.
+      expect(() => JSON.parse(trimmed)).not.toThrow();
+    });
+
+    it("emits the JSON envelope Claude Code surfaces inline (systemMessage)", () => {
+      const output = adapter.formatUploadSuccess({
+        sessionId: "578d166c-aaaa-bbbb-cccc-dddddddddddd",
+        objectUrl: "gs://bucket/2026/05/15/578d166c.tar.gz",
+        cliPath,
+      });
+      const parsed = JSON.parse(output);
+      // The envelope MUST carry a systemMessage with the upload details. It
+      // MAY carry other documented universal fields in the future (continue,
+      // suppressOutput, etc.) — don't lock the exact key set.
+      expect(typeof parsed.systemMessage).toBe("string");
+      expect(parsed.systemMessage.length).toBeGreaterThan(0);
+    });
+
+    it("includes both the list AND delete commands with the session id pre-filled", () => {
+      const output = adapter.formatUploadSuccess({
+        sessionId: "578d166c-aaaa-bbbb-cccc-dddddddddddd",
+        objectUrl: "gs://bucket/2026/05/15/578d166c.tar.gz",
+        cliPath,
+      });
+      const msg = (JSON.parse(output) as { systemMessage: string })
+        .systemMessage;
+
+      expect(msg).toContain(`node ${cliPath} list`);
+      expect(msg).toContain(`node ${cliPath} delete 578d166c`);
+      expect(msg).toContain("578d166c");
+      expect(msg).toContain("gs://bucket/2026/05/15/578d166c.tar.gz");
+    });
+
+    it("shortens long session ids to an 8-char prefix in the delete command", () => {
+      const fullId = "578d166c-aaaa-bbbb-cccc-dddddddddddd";
+      const output = adapter.formatUploadSuccess({
+        sessionId: fullId,
+        objectUrl: "gs://bucket/x.tar.gz",
+        cliPath,
+      });
+      const msg = (JSON.parse(output) as { systemMessage: string })
+        .systemMessage;
+
+      expect(msg).toContain("delete 578d166c");
+      // The full id should NOT appear unshortened in the delete command line.
+      expect(msg).not.toContain(`delete ${fullId}`);
+    });
+
+    it("passes short session ids through unchanged", () => {
+      const output = adapter.formatUploadSuccess({
+        sessionId: "abc123",
+        objectUrl: "gs://bucket/x.tar.gz",
+        cliPath,
+      });
+      const msg = (JSON.parse(output) as { systemMessage: string })
+        .systemMessage;
+      expect(msg).toContain("delete abc123");
+    });
+  });
 });
