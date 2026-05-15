@@ -112,24 +112,28 @@ Two files written into `batch_dir`:
     ### <problem headline> — `<subject>` · <bucket> · <action>
 
   ## Key stats
-    Five numbers, aggregated across the whole batch:
+    Seven numbers, aggregated across the whole batch. Render times in
+    `report.md` and the HTML companion using a humanized format:
+    < 60 s ⇒ `<N>s`; ≥ 60 s ⇒ `<M>m<SS>s`. `findings.report.json` stores
+    raw seconds (ints).
+    - **transcripts_analyzed**: number of transcripts in the batch.
     - **transcript_segments**: total Segments across every transcript's
       segments.json (count nodes in the tree).
     - **goals_achieved_without_intervention_pct**: of all Segments, the
       percentage whose `outcome.kind == "Success"` AND whose subtree
       contains no user-source Correction trigger. Agent-source Corrections
-      do NOT disqualify — if the agent fixed it itself, the goal still
-      counts as achieved without human intervention.
+      do not disqualify.
     - **goals_achieved_overall_pct**: of all Segments, the percentage
-      whose `outcome.kind == "Success"`, regardless of who corrected.
-      Always ≥ goals_achieved_without_intervention_pct.
+      whose `outcome.kind == "Success"`. Always ≥
+      `goals_achieved_without_intervention_pct`.
+    - **total_interventions**: count of Segments across the batch whose
+      `trigger.kind == "Correction" AND trigger.source == "user"`. The
+      raw count of times the user had to step in.
     - **median_active_time_between_prompts_s** and
       **max_active_time_between_prompts_s**: for each consecutive pair of
       UserMessage events (across all transcripts), active_time = (ts of
       the last non-UserMessage event before the next UserMessage) − (ts
-      of the current UserMessage). This is the time the agent spent
-      actively working on a prompt; user think-time between turns is
-      explicitly discarded.
+      of the current UserMessage). Wall-time minus user think-time.
   ```
 
   The `report.md` structure used to carry a `## Provenance` block and a closing pointer to `review-report` — both have been removed. Provenance was metadata about *the report's construction* (which findings draft was used, what was dropped at the philosophy gate, etc.) and read as bookkeeping noise to the actual reader; if a downstream consumer needs that metadata, it lives in `findings.report.json` (the source of truth) where it belongs. The closing "next step is `review-report`" pointer was a CLI hint that didn't earn its slot on a navigable report page.
@@ -154,11 +158,13 @@ Two files written into `batch_dir`:
   4. **The `proposed_change`** as a syntax-highlighted code block — a unified diff for `modify` actions, a draft for `create` actions. This is concrete starting material, not decoration: the reader either accepts the sketch, edits it inline, or rejects it.
   5. The `rationale`.
   6. **Inspiring transcript moments**: one card per `inspiring_segments[*]`. Each card has the segment summary up top, then two `<details>` blocks (collapsed by default) for the `before_evidence` and `after_evidence` chains.
-  7. **A pre-filled follow-up prompt** at the bottom of the page with a "Copy to clipboard" button. Text template: `"I have a follow-up question about <rec_id> (<problem>) that came from <transcript_id> segment(s) <segment_id_list>. <cursor>"` — the reader hits Copy, pastes into a fresh chat, types their question after the prefilled context. JS is allowed *here* and only here (vanilla `navigator.clipboard.writeText`); the rest of the site stays JS-free.
+  7. **A pre-filled follow-up prompt** at the bottom of the page with a "Copy to clipboard" button. Text template: `"I have a follow-up question about <rec_id> (<problem>) that came from <transcript_id> segment(s) <segment_id_list>. <cursor>"`. The helper text next to the button points the reader at the **originating Claude Code session** — the session that ran `synthesize-report` and produced this artifact (e.g. `"Paste into Claude Code session <session_id> (which generated this report) to keep digging"`). That session has the warm context — the segments, the findings, the philosophy gate decisions — so the follow-up lands somewhere that can already answer it. The synthesizer records its own session id at build time and embeds it. JS is allowed here and only here (vanilla `navigator.clipboard.writeText`); the rest of the site stays JS-free.
 
   **Each session page** renders the session header, an inline flamegraph from `segments.json`, the segment tree (collapsible), and event play-by-play per segment (collapsed by default).
 
   **Flamegraph layout rule.** The inline flamegraph must place every Segment at its **tree depth** on the Y axis (root at depth 0, root's children at depth 1, grandchildren at depth 2, …) and over its **actual `meta.event_range` time window** on the X axis. So a Segment like `S0.5.5` sits at depth 2, horizontally inside `S0.5`'s time window (which itself sits at depth 1, inside `S0`'s window at depth 0). A subagent or grandchild Segment can never visually appear "under" a sibling of its parent — its X position is governed by its real timestamps, and its Y row is governed by its tree depth. (Bugs in earlier implementations rendered descendants in sibling rows because Y was assigned by traversal order instead of by depth. Don't.)
+
+  **Flamegraph width rule.** Compute width so smaller Segments stay readable rather than smushed: aim for a **minimum of ~2.5 px per second** of session wall-clock, and let the flamegraph scroll horizontally inside a `overflow-x: auto` container when that pushes it past the viewport. A long session (say 38 min ≈ 2280 s) renders ~5700 px wide; the reader scrolls. Smushing a 38-minute session into a single 600 px panel hides the sub-second sibling structure the reader needs to see — scroll beats smush.
 
   **Click targets get highlighted on the destination page.** When the reader clicks a `before_evidence` event link and lands on the session page at `#evt-<uuid>`, that event must be visibly highlighted (browser's `:target` pseudo-class with a clear background tint is sufficient — no JS needed). Same for segment anchors (`#seg-S0.7`): clicking a segment reference must land the reader visibly on the segment, not just at it. The whole point of evidence-link drill-down is verifiability; if a click teleports the reader to a wall of text without telling them what they were just citing, the trust never builds.
 
@@ -183,11 +189,13 @@ Two files written into `batch_dir`:
 - [ ] **Dedupe.** The same Skill gap surfacing in five Segments across three transcripts is one recommendation with five `inspiring_segments`, not five recommendations
 - [ ] **Populate `inspiring_segments` on every recommendation, with before/after evidence chains.** Pick 1–3 Segments (more for cross-transcript clusters) whose findings most directly motivated this recommendation; for each, write a short `summary` of what happened (per the Context-rebuild rule), then a `before_evidence` chain (3–6 real events from `transcript.json` showing the problem playing out — each as `{event_id, snippet}`) and an `after_evidence` chain (the same 3–6 moments, *abbreviated*, as they would look with the recommendation already in place — same `event_id`s where they still apply, new `snippet`s elsewhere). These chains replace long-prose explanation: a reader expands the chains and sees the actual events that justify the rec
 - [ ] Compute the **key stats** block by aggregating across the batch:
+  - `transcripts_analyzed` — number of transcripts in the batch (literal count).
   - `transcript_segments` — count every Segment node across every transcript's `segments.json` (recurse the tree).
   - `goals_achieved_without_intervention_pct` — for each Segment, classify "without intervention" as: `outcome.kind == "Success"` AND (recursively) no descendant Segment has a `trigger.kind == "Correction" AND trigger.source == "user"`. Compute (count_without_intervention / total_segments) * 100.
   - `goals_achieved_overall_pct` — count Segments with `outcome.kind == "Success"`, divide by total, * 100. Always ≥ the previous number.
-  - `median_active_time_between_prompts_s` / `max_active_time_between_prompts_s` — for each transcript, walk the projected events; for each `UserMessage` event, find the *next* `UserMessage` and compute `active_time = (ts of the LAST non-UserMessage event with ts < next_user_ts) − (current_user_ts)`. This is wall-time minus user think-time. Collect all such intervals across the batch, report the median and the max. If there's only one UserMessage in a transcript, it contributes nothing to either stat.
-  - Each stat is required; report `null` for the two time stats only if there are zero qualifying pairs in the whole batch
+  - `total_interventions` — count of Segments with `trigger.kind == "Correction" AND trigger.source == "user"` across the batch. The raw count of times the user had to step in.
+  - `median_active_time_between_prompts_s` / `max_active_time_between_prompts_s` — for each transcript, walk the projected events; for each `UserMessage` event, find the *next* `UserMessage` and compute `active_time = (ts of the LAST non-UserMessage event with ts < next_user_ts) − (current_user_ts)`. This is wall-time minus user think-time. Collect all such intervals across the batch, report the median and the max in **raw seconds (ints)** in JSON; render with humanized format (`<N>s` if < 60, `<M>m<SS>s` if ≥ 60) in `report.md` and HTML. If there's only one UserMessage in a transcript, it contributes nothing to either stat.
+  - All seven fields are required; report `null` for the two time stats only if there are zero qualifying pairs in the whole batch
 - [ ] Build a **`proposed_change`** for every recommendation: a short diff for `modify` actions (unified-diff format against the existing artifact's source), a short draft for `create` actions (Skill SKILL.md frontmatter + first sections, or mcp.json entry + sketched tool surface). 10–40 lines, intentionally not exhaustive. State this as a starting point a reviewer can amend, not as a final spec
 - [ ] Write `findings.report.json` (the `{kind: "report", items: […]}` envelope) and `report.md` into `batch_dir`. Write the HTML companion as a **multi-page static site** also under `batch_dir`: `report.html` (landing) + `recommendations/rec-NNN.html` per recommendation + `sessions/<short-tag>.html` per transcript. All artifacts carry the same recommendations; if a discrepancy ever exists `findings.report.json` is source of truth. Print all paths to stdout
 - [ ] **Hyperlink every reference, everywhere.** In `report.md` and the HTML site: PR / issue / commit / docs URLs (from `external-context.json`) link externally; recommendation ids link to `recommendations/rec-NNN.html`; transcript ids and segment ids link to `sessions/<short-tag>.html` (segment ids anchored within that page); finding ids open inline detail on the rec page. References like `(S2, ee234e49)` or `S0.7` in prose are real links — the reader should not have to copy a PR number into GitHub or grep `segments.json` for `S0.7`
