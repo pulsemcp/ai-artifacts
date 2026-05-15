@@ -8,8 +8,8 @@ description: >
   final report of actionable next steps across three buckets: human prompting,
   Skills (create/modify/delete), and MCP servers (create/modify/delete). Writes
   findings.report.json (the reviewable recommendation slate) and report.md (the
-  human-readable report grouped by priority, including the distance-from-ideal
-  north-star block aggregated across the batch), and a multi-page HTML site
+  human-readable report grouped by priority, including a key-stats block
+  aggregated across the batch), and a multi-page HTML site
   (report.html landing + recommendations/rec-NNN.html per rec + sessions/<tag>.html
   per transcript) into a batch_dir. Use once the user has finished analyzing
   every transcript of interest — a batch of one transcript is valid input too.
@@ -30,7 +30,7 @@ This is the one place the pipeline makes the **leap from analysis to recommendat
 - `transcripts` (required): the list of per-transcript `tmp_dir`s that make up the batch — each one a folder `analyze-agent-transcript` ran over. From each, this skill reads the phase-3 findings set: `findings.outcomes.json`, `findings.prompts.json`, `findings.skills.json`, `findings.mcp.json`, preferring the `.reviewed.json` sibling of any file when it exists — a human-blessed finding is stronger input than a raw draft. A batch of one `tmp_dir` is valid; it is still "the batch," not a distinct single-transcript mode. Every findings item carries `id` (unique within its file), `segment_id`, `analyzer`, plus analyzer-specific fields, in the shared `{kind, items: […]}` envelope; evidence references are OpenTranscripts event ids, never integer turn indices. Item id schemes may diverge across transcripts (different orchestrator runs number differently) — that's fine, the synthesis stage doesn't surface finding ids in the report anyway (recommendations cite real Segments + raw event evidence chains, not finding-id lists).
 - `batch_dir` (optional): a batch-level working directory, distinct from any single transcript's `tmp_dir`. The report artifacts are written here. Defaults to a new tmp dir created for the batch.
 - `findings.cross-transcript.json` (optional): when `analyze-cross-transcript-patterns` has been run over the batch, it lands in `batch_dir` — read it alongside the per-transcript findings. Absent is fine: the report simply has no cross-transcript findings folded in.
-- `segments.json` (optional, in each transcript's `tmp_dir`): the Segment tree, used only for the distance-from-ideal north-star block, which aggregates across the batch. Prefer `segments.reviewed.json` when present. If a transcript is missing `segments.json`, note the omission for that transcript rather than failing.
+- `segments.json` (optional, in each transcript's `tmp_dir`): the Segment tree, used for the key-stats block (segment count, goal achievement rates, time-between-prompts), and as the structural source for the HTML companion's session pages and inline flamegraphs. Prefer `segments.reviewed.json` when present. If a transcript is missing `segments.json`, note the omission for that transcript rather than failing.
 - `external_context` (optional, in each transcript's `tmp_dir`): `external-context.json` or `external-context.reviewed.json`. The ticket / PR / user context behind a session — used to judge whether a recommendation is worth the user's time given what they were actually trying to do.
 - `philosophy_skills` / `philosophy_mcp` (optional): the `philosophy-on-skills` and `philosophy-on-mcp` references. Default to the bundled copies. Every Skill/MCP recommendation is cross-checked against them before it lands in the report.
 
@@ -53,6 +53,11 @@ Two files written into `batch_dir`:
         "problem":        "<the failure / issue, stated as the headline — what went wrong, in plain language>",
         "recommendation": "<the proposed fix — may be revised by review>",
         "rationale":      "<the leap: how the findings imply this recommendation>",
+        "proposed_change": {
+          "kind":   "diff | draft",
+          "format": "unified-diff | skill-md | mcp-json | prompt-snippet",
+          "body":   "<short, digestible sketch — a unified diff for `modify` actions; a draft (Skill SKILL.md frontmatter + first sections, or mcp.json entry + proposed tool surface) for `create` actions. 10–40 lines, intentionally not exhaustive — the real change covers more edge cases.>"
+        },
         "inspiring_segments": [
           {
             "transcript_id": "<transcript_id from segments.json>",
@@ -86,6 +91,8 @@ Two files written into `batch_dir`:
 
   Both chains are kept short and concrete — the HTML companion renders them collapsed by default. The two chains together replace what used to be prose `change_contours` / `expected_after_state` fields: a reader who wants to inspect a recommendation reads the problem, then the recommendation, then expands the before/after chains for one or two inspiring segments. No long-form description needed; the events speak.
 
+  `proposed_change` is **the rec's concrete starting point**. For a `modify` action: a short unified diff on the artifact's actual source (Skill `SKILL.md`, mcp.json, etc.). For a `create` action: a short draft of what the new artifact would look like (Skill frontmatter + first body sections; or an `mcp.json` entry + a sketched tool surface). Intentionally short — 10 to 40 lines — because the real change will cover more edge cases the synthesizer can't see. The point is to make the recommendation acceptable-or-rejectable in one read, not to spec the implementation.
+
   Fields that used to exist and were removed: `title` (replaced by `problem`), `effort` (estimates were noise — drop), `philosophy_check` (philosophy is now an under-the-hood **gate**, not a surfaced field — see Sequencing checklist), `sources` (replaced by `inspiring_segments` with real evidence chains — finding-id lists were unverifiable noise to a reader).
 
 - **`report.md`** — the **human-readable final report**. Structure (grouped by **priority** — the lens that matters most — not by bucket; bucket appears as a small label on each rec):
@@ -104,27 +111,28 @@ Two files written into `batch_dir`:
   ## Low
     ### <problem headline> — `<subject>` · <bucket> · <action>
 
-  ## Distance from ideal end-state
-    Single paragraph, aggregated across the whole batch: how many Failure
-    Outcomes, how many Correction triggers (broken out by user-source vs
-    agent-source), total wall-clock vs sum of human counterfactuals, count of
-    user-source New triggers flagged as deterministic-trigger candidates —
-    summed across every transcript in the batch. The north-star, measured.
-    Sources differ by quantity: Failure / Correction / wall-clock counts come
-    from each transcript's segments.json (prefer segments.reviewed.json); the
-    human-counterfactual sum comes from the efficiency findings in each
-    transcript's findings.outcomes.json (where human_counterfactual_s lives —
-    it is NOT in segments.json). Sum only root-segment-level counterfactuals:
-    child-segment counterfactuals roll up into their parent, so summing every
-    segment double-counts. If a transcript is missing segments.json, note that
-    transcript's omission rather than failing.
-
-  ## Provenance
-    Which transcripts, and which findings files (draft or reviewed) from each,
-    fed this report; whether findings.cross-transcript.json was present;
-    which recommendations were **dropped at the philosophy gate** (one line each,
-    with the rule that fired).
+  ## Key stats
+    Five numbers, aggregated across the whole batch:
+    - **transcript_segments**: total Segments across every transcript's
+      segments.json (count nodes in the tree).
+    - **goals_achieved_without_intervention_pct**: of all Segments, the
+      percentage whose `outcome.kind == "Success"` AND whose subtree
+      contains no user-source Correction trigger. Agent-source Corrections
+      do NOT disqualify — if the agent fixed it itself, the goal still
+      counts as achieved without human intervention.
+    - **goals_achieved_overall_pct**: of all Segments, the percentage
+      whose `outcome.kind == "Success"`, regardless of who corrected.
+      Always ≥ goals_achieved_without_intervention_pct.
+    - **median_active_time_between_prompts_s** and
+      **max_active_time_between_prompts_s**: for each consecutive pair of
+      UserMessage events (across all transcripts), active_time = (ts of
+      the last non-UserMessage event before the next UserMessage) − (ts
+      of the current UserMessage). This is the time the agent spent
+      actively working on a prompt; user think-time between turns is
+      explicitly discarded.
   ```
+
+  The `report.md` structure used to carry a `## Provenance` block and a closing pointer to `review-report` — both have been removed. Provenance was metadata about *the report's construction* (which findings draft was used, what was dropped at the philosophy gate, etc.) and read as bookkeeping noise to the actual reader; if a downstream consumer needs that metadata, it lives in `findings.report.json` (the source of truth) where it belongs. The closing "next step is `review-report`" pointer was a CLI hint that didn't earn its slot on a navigable report page.
 
   **Everything that can be a link, is a link.** PR / issue / commit / docs URLs link to the external resource (sourced from `external-context.json`); finding ids and `inspiring_segments` segment ids link to the matching pages in the HTML companion. The reader should not be re-typing a PR number into GitHub or grepping `segments.json` for `S0.7` — every reference is one click.
 
@@ -137,7 +145,20 @@ Two files written into `batch_dir`:
     sessions/<short-tag>.html        # one per transcript — detail page
   ```
 
-  Each file is a small standalone HTML page with relative-href links to the others. No CDN, no build step; opening `report.html` from the filesystem (or via `python3 -m http.server` in `batch_dir` if the browser blocks `file://` cross-page navigation) gives the reader a navigable site. Pages cross-link freely: every `rec-NNN` chip on the landing page is a real `<a href="recommendations/rec-NNN.html">`; every `(S1, e2cdbb98)` or segment id is a real link to that session's page (with the segment anchored). Each recommendation page renders the `problem` headline, the **`subject` as a prominent badge** (so the reader instantly knows the rec is about `wait-for-ci` vs `ao-router-route-request` vs `agent-orchestrator`), the `recommendation`, the `inspiring_segments` cards (each card has the `before_evidence` / `after_evidence` chains as collapsible `<details>` blocks). Each session page renders the session header, an inline flamegraph from `segments.json`, the segment tree (collapsible), and event play-by-play per segment (collapsed by default).
+  Each file is a small standalone HTML page with relative-href links to the others. No CDN, no build step; opening `report.html` from the filesystem (or via `python3 -m http.server` in `batch_dir` if the browser blocks `file://` cross-page navigation) gives the reader a navigable site. Pages cross-link freely: every `rec-NNN` chip on the landing page is a real `<a href="recommendations/rec-NNN.html">`; every `(S1, e2cdbb98)` or segment id is a real link to that session's page (with the segment anchored).
+
+  **Each recommendation page** renders, in this order:
+  1. **The `subject` badge** + a **type badge** next to it carrying `<bucket> · <action>` (e.g. `Skill · modify`, `MCP · create`). Two badges, side by side, both load-bearing. The reader knows at a glance: "this is about `agent-orchestrator`; it's an MCP modify." Bucket is rendered in a Skill / MCP / Prompting word, not the raw enum value.
+  2. The `problem` as the page title (h1), with a small priority text-label and the meta line below.
+  3. The `recommendation` paragraph.
+  4. **The `proposed_change`** as a syntax-highlighted code block — a unified diff for `modify` actions, a draft for `create` actions. This is concrete starting material, not decoration: the reader either accepts the sketch, edits it inline, or rejects it.
+  5. The `rationale`.
+  6. **Inspiring transcript moments**: one card per `inspiring_segments[*]`. Each card has the segment summary up top, then two `<details>` blocks (collapsed by default) for the `before_evidence` and `after_evidence` chains.
+  7. **A pre-filled follow-up prompt** at the bottom of the page with a "Copy to clipboard" button. Text template: `"I have a follow-up question about <rec_id> (<problem>) that came from <transcript_id> segment(s) <segment_id_list>. <cursor>"` — the reader hits Copy, pastes into a fresh chat, types their question after the prefilled context. JS is allowed *here* and only here (vanilla `navigator.clipboard.writeText`); the rest of the site stays JS-free.
+
+  **Each session page** renders the session header, an inline flamegraph from `segments.json`, the segment tree (collapsible), and event play-by-play per segment (collapsed by default).
+
+  **Flamegraph layout rule.** The inline flamegraph must place every Segment at its **tree depth** on the Y axis (root at depth 0, root's children at depth 1, grandchildren at depth 2, …) and over its **actual `meta.event_range` time window** on the X axis. So a Segment like `S0.5.5` sits at depth 2, horizontally inside `S0.5`'s time window (which itself sits at depth 1, inside `S0`'s window at depth 0). A subagent or grandchild Segment can never visually appear "under" a sibling of its parent — its X position is governed by its real timestamps, and its Y row is governed by its tree depth. (Bugs in earlier implementations rendered descendants in sibling rows because Y was assigned by traversal order instead of by depth. Don't.)
 
   **Click targets get highlighted on the destination page.** When the reader clicks a `before_evidence` event link and lands on the session page at `#evt-<uuid>`, that event must be visibly highlighted (browser's `:target` pseudo-class with a clear background tint is sufficient — no JS needed). Same for segment anchors (`#seg-S0.7`): clicking a segment reference must land the reader visibly on the segment, not just at it. The whole point of evidence-link drill-down is verifiability; if a click teleports the reader to a wall of text without telling them what they were just citing, the trust never builds.
 
@@ -161,10 +182,16 @@ Two files written into `batch_dir`:
 - [ ] **Prioritize per the four-level semantics.** Walk the new `priority` definitions in the Outputs section. `critical` requires the underlying problem to recur across multiple instances *and* each instance to have been high-impact; `high` is a Failure the agent couldn't self-recover from; `medium` is a Failure the agent self-corrected; `low` is cost / efficiency / clarity. Do not estimate effort — `effort` is not a field
 - [ ] **Dedupe.** The same Skill gap surfacing in five Segments across three transcripts is one recommendation with five `inspiring_segments`, not five recommendations
 - [ ] **Populate `inspiring_segments` on every recommendation, with before/after evidence chains.** Pick 1–3 Segments (more for cross-transcript clusters) whose findings most directly motivated this recommendation; for each, write a short `summary` of what happened (per the Context-rebuild rule), then a `before_evidence` chain (3–6 real events from `transcript.json` showing the problem playing out — each as `{event_id, snippet}`) and an `after_evidence` chain (the same 3–6 moments, *abbreviated*, as they would look with the recommendation already in place — same `event_id`s where they still apply, new `snippet`s elsewhere). These chains replace long-prose explanation: a reader expands the chains and sees the actual events that justify the rec
-- [ ] Compute the **distance-from-ideal** block by aggregating across the batch. Failure counts, Correction triggers (split user-source vs agent-source), wall-clock totals, and deterministic-trigger candidates come from each transcript's `segments.json` (prefer `segments.reviewed.json`). The human-counterfactual sum does **not** — `human_counterfactual_s` lives in the efficiency findings of each transcript's `findings.outcomes.json`; pull it from there. Sum only **root-segment-level** counterfactuals: a child segment's counterfactual rolls up into its parent, so summing every segment double-counts. Sum each quantity over every transcript. If a transcript is missing `segments.json`, note that transcript's omission rather than failing
+- [ ] Compute the **key stats** block by aggregating across the batch:
+  - `transcript_segments` — count every Segment node across every transcript's `segments.json` (recurse the tree).
+  - `goals_achieved_without_intervention_pct` — for each Segment, classify "without intervention" as: `outcome.kind == "Success"` AND (recursively) no descendant Segment has a `trigger.kind == "Correction" AND trigger.source == "user"`. Compute (count_without_intervention / total_segments) * 100.
+  - `goals_achieved_overall_pct` — count Segments with `outcome.kind == "Success"`, divide by total, * 100. Always ≥ the previous number.
+  - `median_active_time_between_prompts_s` / `max_active_time_between_prompts_s` — for each transcript, walk the projected events; for each `UserMessage` event, find the *next* `UserMessage` and compute `active_time = (ts of the LAST non-UserMessage event with ts < next_user_ts) − (current_user_ts)`. This is wall-time minus user think-time. Collect all such intervals across the batch, report the median and the max. If there's only one UserMessage in a transcript, it contributes nothing to either stat.
+  - Each stat is required; report `null` for the two time stats only if there are zero qualifying pairs in the whole batch
+- [ ] Build a **`proposed_change`** for every recommendation: a short diff for `modify` actions (unified-diff format against the existing artifact's source), a short draft for `create` actions (Skill SKILL.md frontmatter + first sections, or mcp.json entry + sketched tool surface). 10–40 lines, intentionally not exhaustive. State this as a starting point a reviewer can amend, not as a final spec
 - [ ] Write `findings.report.json` (the `{kind: "report", items: […]}` envelope) and `report.md` into `batch_dir`. Write the HTML companion as a **multi-page static site** also under `batch_dir`: `report.html` (landing) + `recommendations/rec-NNN.html` per recommendation + `sessions/<short-tag>.html` per transcript. All artifacts carry the same recommendations; if a discrepancy ever exists `findings.report.json` is source of truth. Print all paths to stdout
 - [ ] **Hyperlink every reference, everywhere.** In `report.md` and the HTML site: PR / issue / commit / docs URLs (from `external-context.json`) link externally; recommendation ids link to `recommendations/rec-NNN.html`; transcript ids and segment ids link to `sessions/<short-tag>.html` (segment ids anchored within that page); finding ids open inline detail on the rec page. References like `(S2, ee234e49)` or `S0.7` in prose are real links — the reader should not have to copy a PR number into GitHub or grep `segments.json` for `S0.7`
-- [ ] Point the user at `review-report` — the leap from findings to recommendations is interpretive and earns a human checkpoint, the same way phase 2 and phase 3 do
+- [ ] `review-report` is the canonical human checkpoint over the recommendation slate, run when the user wants to correct/reject items in `findings.report.json`. **Do not** end the report itself with a pointer at `review-report` — that's a CLI hint that doesn't earn its slot on a navigable report page.
 
 ## Out of scope
 
