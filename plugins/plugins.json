@@ -1,0 +1,49 @@
+{
+  "$schema": "https://raw.githubusercontent.com/pulsemcp/air/main/schemas/plugins.schema.json",
+  "agent-transcript-analysis": {
+    "title": "Agent Transcript Analysis",
+    "description": "Inspect, redact, and analyze coding agent session transcripts to surface actionable advice on human prompting, Skills (create/modify/delete), and MCP servers (create/modify/delete).",
+    "version": "0.0.1",
+    "skills": [
+      "find-all-claude-code-transcripts-on-local",
+      "get-claude-code-transcript-from-local",
+      "gather-agent-transcript-external-context",
+      "review-agent-transcript-external-context",
+      "decompose-agent-transcript-into-transcript-segments",
+      "review-agent-transcript-segments",
+      "learn-from-agent-transcript-segment-corrections",
+      "analyze-agent-transcript",
+      "analyze-agent-transcript-failure-hypothesis",
+      "analyze-agent-transcript-segment-efficiency",
+      "analyze-agent-transcript-user-prompt",
+      "analyze-agent-transcript-prompt-ambition",
+      "pull-together-agent-transcript-goal-context",
+      "analyze-agent-transcript-skill-trigger-performance",
+      "analyze-agent-transcript-skill-action-performance",
+      "analyze-agent-transcript-skill-gaps",
+      "analyze-agent-transcript-mcp-trigger-performance",
+      "analyze-agent-transcript-mcp-action-performance",
+      "analyze-agent-transcript-mcp-gaps",
+      "analyze-cross-agent-transcript-patterns",
+      "review-agent-transcript-analysis",
+      "learn-from-agent-transcript-analysis-corrections",
+      "synthesize-agent-transcript-analysis-report",
+      "review-agent-transcript-analysis-report",
+      "learn-from-agent-transcript-analysis-report-corrections"
+    ],
+    "mcp_servers": [],
+    "hooks": [],
+    "license": "MIT"
+  },
+  "agent-transcript-capture": {
+    "title": "Agent Transcript Capture",
+    "description": "Stop-event hook that captures complete agent session archives (transcripts, subagents, tool results) to cloud storage on task completion. Bundles a single hook and nothing else.",
+    "version": "0.0.1",
+    "skills": [],
+    "mcp_servers": [],
+    "hooks": [
+      "agent-transcript-capture"
+    ],
+    "license": "MIT"
+  }
+}

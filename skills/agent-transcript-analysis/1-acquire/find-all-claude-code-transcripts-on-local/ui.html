@@ -1,0 +1,668 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Pick a Claude Code transcript</title>
+<style>
+  :root {
+    color-scheme: light dark;
+    --fg: #111; --bg: #fff; --muted: #666; --accent: #0a6; --accent-fg: #fff;
+    --border: #e3e3e3; --row-hover: #f4f4f4; --code: #f6f8fa; --warn: #c33;
+    --banner-bg: #f0f7f3; --pill-bg: #eef2f1;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --fg: #eee; --bg: #0e0e0e; --muted: #999; --accent: #5cf;
+            --accent-fg: #001;
+            --border: #2a2a2a; --row-hover: #1c1c1c; --code: #1a1a1a; --warn: #f88;
+            --banner-bg: #11201a; --pill-bg: #1a1a1a; }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; padding: 1rem 1.5rem 6rem; font: 14px/1.45 -apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif;
+         color: var(--fg); background: var(--bg); }
+  header { display: flex; align-items: baseline; gap: 1rem; margin-bottom: .75rem; flex-wrap: wrap; }
+  h1 { margin: 0; font-size: 1.1rem; font-weight: 600; }
+  .stats { color: var(--muted); font-size: 12.5px; }
+  .stats b { color: var(--fg); font-weight: 600; }
+  .stats .sep { margin: 0 .5rem; opacity: .5; }
+  .index-pill { font-size: 11.5px; padding: .15rem .5rem; background: var(--pill-bg);
+                color: var(--muted); border-radius: 999px; margin-left: .25rem; }
+
+  .banner { background: var(--banner-bg); border: 1px solid var(--border);
+            border-left: 3px solid var(--accent);
+            padding: .7rem 1rem; border-radius: 6px; margin-bottom: 1rem;
+            font-size: 13.5px; line-height: 1.5; }
+  .banner code { background: var(--code); padding: 1px 5px; border-radius: 3px;
+                 font: 12.5px ui-monospace, SFMono-Regular, Menlo, monospace; }
+  .banner ol { margin: .35rem 0 0 1.1rem; padding: 0; }
+  .banner li { margin: .15rem 0; }
+
+  .filters { display: grid; grid-template-columns: 2fr 0.7fr 0.7fr 1fr 1fr 0.9fr auto;
+             gap: .5rem; margin: 0 0 .75rem; align-items: end; }
+  .filters input, .filters select {
+    width: 100%; padding: .42rem .55rem; border: 1px solid var(--border);
+    background: var(--bg); color: var(--fg); border-radius: 6px; font-size: 13px;
+    font-family: inherit;
+  }
+  .filters input[type=number] { padding-right: .25rem; }
+  .filters label { font-size: 11px; color: var(--muted); text-transform: uppercase;
+                   letter-spacing: .03em; display: block; margin-bottom: 2px; }
+  .filters .group { display: flex; flex-direction: column; }
+  .filters button.reset { padding: .42rem .7rem; border: 1px solid var(--border);
+                          border-radius: 6px; background: var(--bg); color: var(--fg);
+                          font-size: 12.5px; cursor: pointer; height: 30.5px; }
+  .filters button.reset:hover { border-color: var(--accent); color: var(--accent); }
+
+  table { width: 100%; border-collapse: collapse; font-size: 13px; table-layout: fixed; }
+  th, td { text-align: left; padding: .5rem .55rem; border-bottom: 1px solid var(--border);
+           vertical-align: top; }
+  th { font-weight: 600; color: var(--muted); user-select: none; font-size: 11.5px;
+       text-transform: uppercase; letter-spacing: .03em;
+       border-bottom: 2px solid var(--border); }
+  th.sortable { cursor: pointer; }
+  th.sortable:hover { color: var(--fg); }
+  th .arrow { display: inline-block; width: 10px; opacity: .5; margin-left: 2px; }
+  th.sort-active { color: var(--fg); }
+  th.sort-active .arrow { opacity: 1; }
+
+  th.col-check, td.check { width: 28px; padding-right: 0; }
+  th.col-project, td.project { width: 260px; color: var(--muted); overflow: hidden; }
+  /* Project slugs and branch names matter most at their tail end, so clip the
+     FRONT: direction:rtl moves the ellipsis to the start of the line while the
+     ASCII content itself still renders left-to-right. */
+  td.project .plabel { display: block; overflow: hidden; text-overflow: ellipsis;
+                       white-space: nowrap; direction: rtl; text-align: left; }
+  td.project .branch { display: block; font-size: 11px; color: var(--accent);
+                       font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+                       overflow: hidden; text-overflow: ellipsis;
+                       white-space: nowrap; direction: rtl; text-align: left; }
+  td.snippet .first { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  td.snippet .last { display: block; color: var(--muted); font-style: italic; margin-top: 2px;
+                     overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  td.snippet .placeholder { color: var(--muted); opacity: .5; }
+  th.col-turns, td.turns { width: 70px; text-align: right; font-variant-numeric: tabular-nums; }
+  th.col-tokens, td.tokens { width: 88px; text-align: right; font-variant-numeric: tabular-nums; }
+  th.col-when, td.when { width: 100px; white-space: nowrap; color: var(--muted); font-size: 12px; }
+  th.col-actions, td.actions { width: 84px; white-space: nowrap; text-align: right; }
+  td.turns.dim, td.tokens.dim { color: var(--muted); opacity: .55; }
+
+  tbody tr { cursor: pointer; }
+  tbody tr:hover { background: var(--row-hover); }
+  tbody tr.selected { background: color-mix(in srgb, var(--accent) 12%, transparent); }
+
+  button { padding: .3rem .65rem; border: 1px solid var(--border); border-radius: 5px;
+           background: var(--bg); color: var(--fg); cursor: pointer; font-size: 12px;
+           font-family: inherit; }
+  button:hover { border-color: var(--accent); color: var(--accent); }
+  button.primary { background: var(--accent); color: var(--accent-fg); border-color: var(--accent); }
+  button.primary:hover { filter: brightness(1.1); }
+  button.copied { background: var(--accent); color: var(--accent-fg); border-color: var(--accent); }
+
+  .selbar { position: fixed; bottom: 0; left: 0; right: 0; background: var(--bg);
+            border-top: 1px solid var(--border); padding: .7rem 1.5rem;
+            display: flex; gap: .75rem; align-items: center; transform: translateY(100%);
+            transition: transform .18s ease; z-index: 10;
+            box-shadow: 0 -4px 14px rgba(0,0,0,.06); }
+  .selbar.open { transform: translateY(0); }
+  .selbar .count-pill { font-size: 13px; padding: .25rem .55rem; background: var(--accent);
+                        color: var(--accent-fg); border-radius: 999px; font-weight: 600; }
+  .selbar textarea { flex: 1; resize: none; padding: .45rem .6rem; border: 1px solid var(--border);
+                     border-radius: 6px; background: var(--code); color: var(--fg);
+                     font: 12.5px ui-monospace, SFMono-Regular, Menlo, monospace;
+                     height: 2.2rem; min-height: 2.2rem; }
+
+  .checkbox { width: 16px; height: 16px; accent-color: var(--accent); cursor: pointer; }
+
+  #empty { padding: 2rem; text-align: center; color: var(--muted); }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Claude Code transcripts</h1>
+  <span class="stats" id="stats">loading…</span>
+  <span class="index-pill" id="index-pill" style="display:none"></span>
+</header>
+
+<div class="banner">
+  <strong>This UI just picks transcripts.</strong> The actual analysis runs inside Claude Code (Skills can't be invoked from a browser). To analyze:
+  <ol>
+    <li>Filter / sort to find the sessions you care about (column headers sort; the bar below filters). <em>Defaults to the last 7 days with ≥200k tokens — hit Reset to see everything.</em></li>
+    <li>Tick the boxes (or click rows) for the transcripts you want.</li>
+    <li>Copy the prompt from the bar at the bottom and paste it into a Claude Code session with this plugin installed.</li>
+  </ol>
+</div>
+
+<div class="filters">
+  <div class="group">
+    <label for="f-search">Search</label>
+    <input type="search" id="f-search" placeholder="project, session id, snippet, model…" autofocus>
+  </div>
+  <div class="group">
+    <label for="f-min-turns">Min turns</label>
+    <input type="number" id="f-min-turns" min="0" step="1" placeholder="any">
+  </div>
+  <div class="group">
+    <label for="f-min-tokens">Min tokens</label>
+    <input type="number" id="f-min-tokens" min="0" step="1000" placeholder="any">
+  </div>
+  <div class="group">
+    <label for="f-project">Project</label>
+    <select id="f-project"><option value="">all</option></select>
+  </div>
+  <div class="group">
+    <label for="f-branch">Branch</label>
+    <select id="f-branch"><option value="">all</option></select>
+  </div>
+  <div class="group">
+    <label for="f-since">Since</label>
+    <input type="date" id="f-since">
+  </div>
+  <button class="reset" id="f-reset" title="Reset filters to defaults (last 7 days, substantive sessions)">Reset</button>
+</div>
+
+<table>
+  <thead>
+    <tr>
+      <th class="col-check"><input type="checkbox" class="checkbox" id="check-all" title="select all visible"></th>
+      <th class="col-project sortable" data-sort="project">Project / Branch<span class="arrow"></span></th>
+      <th class="col-snippet">Snippet</th>
+      <th class="col-turns sortable" data-sort="turns" title="user + assistant turns">Turns<span class="arrow"></span></th>
+      <th class="col-tokens sortable" data-sort="tokens" title="input + output + cache tokens">Tokens<span class="arrow"></span></th>
+      <th class="col-when sortable sort-active" data-sort="when">When<span class="arrow">↓</span></th>
+      <th class="col-actions"></th>
+    </tr>
+  </thead>
+  <tbody id="rows"></tbody>
+</table>
+<div id="empty" style="display:none">no sessions match your filters</div>
+
+<div class="selbar" id="selbar">
+  <span class="count-pill" id="selcount">0</span>
+  <textarea id="prompt-template" readonly></textarea>
+  <button id="copy-prompt" class="primary">Copy prompt</button>
+  <button id="copy-ids">Copy IDs</button>
+  <button id="clear-sel">Clear</button>
+</div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const $rows = $('rows');
+const $stats = $('stats');
+const $indexPill = $('index-pill');
+const $empty = $('empty');
+const $selbar = $('selbar');
+const $selcount = $('selcount');
+const $prompt = $('prompt-template');
+const $copyPrompt = $('copy-prompt');
+const $copyIds = $('copy-ids');
+const $clearSel = $('clear-sel');
+const $checkAll = $('check-all');
+
+const $fSearch = $('f-search');
+const $fMinTurns = $('f-min-turns');
+const $fMinTokens = $('f-min-tokens');
+const $fProject = $('f-project');
+const $fBranch = $('f-branch');
+const $fSince = $('f-since');
+const $fReset = $('f-reset');
+
+let SESSIONS = [];
+let PREVIEWS = new Map();
+let SELECTED = new Set();
+let VISIBLE = [];
+const RENDER_LIMIT = 500;
+
+// Default view: recent, substantive sessions only — keeps junk (quick `whoami`
+// checks, aborted starts) out of the way. Almost every session sits at a ~42k
+// token floor (the cached system prompt), so the meaningful "real work" cut is
+// well above that — 50k. The Reset button restores these defaults.
+const DEFAULT_SINCE_DAYS = 7;
+const DEFAULT_MIN_TOKENS = 200000;
+
+let SORT = { key: 'when', dir: 'desc' };
+
+function fmtSize(n) {
+  if (n == null) return '—';
+  if (n < 1024) return n + ' B';
+  if (n < 1024*1024) return (n/1024).toFixed(1) + ' KiB';
+  return (n/1024/1024).toFixed(1) + ' MiB';
+}
+function fmtNum(n) {
+  if (n == null) return '—';
+  if (n < 1000) return String(n);
+  if (n < 1000000) return (n/1000).toFixed(n < 10000 ? 1 : 0) + 'k';
+  return (n/1000000).toFixed(1) + 'M';
+}
+function fmtNumLong(n) {
+  if (n == null) return '—';
+  return n.toLocaleString();
+}
+function fmtWhen(iso, fallbackEpoch) {
+  const d = iso ? new Date(iso) : (fallbackEpoch ? new Date(fallbackEpoch * 1000) : null);
+  if (!d || Number.isNaN(+d)) return '—';
+  const diff = (Date.now() - +d) / 1000;
+  if (diff < 60) return Math.floor(diff) + 's ago';
+  if (diff < 3600) return Math.floor(diff/60) + 'm ago';
+  if (diff < 86400) return Math.floor(diff/3600) + 'h ago';
+  if (diff < 86400*7) return Math.floor(diff/86400) + 'd ago';
+  return d.toISOString().slice(0,10);
+}
+function escapeHTML(s) {
+  return String(s).replace(/[&<>"']/g, c => ({
+    '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
+  }[c]));
+}
+
+// Per-session derived fields are computed ONCE in indexSession() and then
+// stamped onto the session object as ``_tokens / _turns / _branch /
+// _whenEpoch / _search``. Filter and sort hot paths then read these
+// directly with no Map lookups, no string allocations, and no DOM reads.
+
+function indexSession(s) {
+  const p = PREVIEWS.get(s.session_id);
+  if (p) {
+    s._turns = p.message_count ?? null;
+    s._tokens = (p.input_tokens || 0) + (p.output_tokens || 0)
+              + (p.cache_creation_tokens || 0) + (p.cache_read_tokens || 0);
+    s._branch = p.git_branch || '';
+    if (p.started_at) {
+      const t = +new Date(p.started_at);
+      s._whenEpoch = Number.isNaN(t) ? s.mtime : t / 1000;
+    } else {
+      s._whenEpoch = s.mtime;
+    }
+    s._search = [
+      s.session_id, s.project_label || '', s.project_slug,
+      p.first_prompt || '', p.last_response || '', p.model || '', p.git_branch || '',
+    ].join(' ').toLowerCase();
+  } else {
+    s._turns = null; s._tokens = null; s._branch = '';
+    s._whenEpoch = s.mtime;
+    s._search = (s.session_id + ' ' + (s.project_label || '') + ' ' + s.project_slug).toLowerCase();
+  }
+}
+
+function reindexAllSessions() {
+  for (const s of SESSIONS) indexSession(s);
+}
+
+function previewOf(s) { return PREVIEWS.get(s.session_id); }
+
+// Build a frozen "filter spec" once per render — passesFilters then has no
+// DOM reads or repeated parsing in the hot loop.
+function readFilterSpec() {
+  const sinceVal = $fSince.value;
+  let sinceEpoch = null;
+  if (sinceVal) {
+    const d = +new Date(sinceVal);
+    if (!Number.isNaN(d)) sinceEpoch = d / 1000;
+  }
+  const minT = parseInt($fMinTurns.value, 10);
+  const minK = parseInt($fMinTokens.value, 10);
+  return {
+    q: $fSearch.value.toLowerCase().trim(),
+    minTurns: Number.isNaN(minT) ? null : minT,
+    minTokens: Number.isNaN(minK) ? null : minK,
+    project: $fProject.value,
+    branch: $fBranch.value,
+    sinceEpoch,
+  };
+}
+
+function passesFilters(s, f) {
+  if (f.q && !s._search.includes(f.q)) return false;
+  if (f.minTurns != null && s._turns != null && s._turns < f.minTurns) return false;
+  if (f.minTokens != null && s._tokens != null && s._tokens < f.minTokens) return false;
+  if (f.project && s.project_slug !== f.project) return false;
+  if (f.branch) {
+    if (!s._branch) return false;
+    if (s._branch !== f.branch) return false;
+  }
+  if (f.sinceEpoch != null && s._whenEpoch < f.sinceEpoch) return false;
+  return true;
+}
+
+function sortRows(rows) {
+  const { key, dir } = SORT;
+  const mul = dir === 'asc' ? 1 : -1;
+  const cmp = (va, vb) => {
+    if (va == null && vb == null) return 0;
+    if (va == null) return 1;     // missing always sinks to bottom regardless of direction
+    if (vb == null) return -1;
+    if (va < vb) return -1 * mul;
+    if (va > vb) return 1 * mul;
+    return 0;
+  };
+  const accessor = {
+    project: (s) => (s.project_label || s.project_slug || '').toLowerCase(),
+    turns: (s) => s._turns,
+    tokens: (s) => s._tokens,
+    when: (s) => s._whenEpoch,
+  }[key] || ((s) => s.mtime);
+  rows.sort((a, b) => cmp(accessor(a), accessor(b)));
+}
+
+function rebuildProjectOptions() {
+  const cur = $fProject.value;
+  const slugs = new Map();
+  for (const s of SESSIONS) {
+    if (!slugs.has(s.project_slug)) slugs.set(s.project_slug, s.project_label || s.project_slug);
+  }
+  const sorted = [...slugs.entries()].sort((a, b) => a[1].localeCompare(b[1]));
+  $fProject.innerHTML = '<option value="">all</option>'
+    + sorted.map(([slug, label]) =>
+        `<option value="${escapeHTML(slug)}">${escapeHTML(label)}</option>`).join('');
+  if (slugs.has(cur)) $fProject.value = cur;
+}
+
+function rebuildBranchOptions() {
+  const cur = $fBranch.value;
+  const set = new Set();
+  for (const p of PREVIEWS.values()) {
+    if (p && p.git_branch) set.add(p.git_branch);
+  }
+  const sorted = [...set].sort((a, b) => a.localeCompare(b));
+  $fBranch.innerHTML = '<option value="">all</option>'
+    + sorted.map(b => `<option value="${escapeHTML(b)}">${escapeHTML(b)}</option>`).join('');
+  if (set.has(cur)) $fBranch.value = cur;
+}
+
+function updateStats(filteredRows) {
+  let totalTurns = 0, totalTokens = 0, totalSize = 0;
+  for (const s of filteredRows) {
+    totalSize += s.size_bytes || 0;
+    if (s._turns != null) totalTurns += s._turns;
+    if (s._tokens != null) totalTokens += s._tokens;
+  }
+  const filteredCount = filteredRows.length;
+  const truncated = filteredCount > RENDER_LIMIT
+    ? ` (showing first ${RENDER_LIMIT})` : '';
+  $stats.innerHTML =
+    `<b>${filteredCount}</b> of ${SESSIONS.length} sessions${truncated}` +
+    `<span class="sep">•</span><b>${fmtNumLong(totalTurns)}</b> turns` +
+    `<span class="sep">•</span><b>${fmtNumLong(totalTokens)}</b> tokens` +
+    `<span class="sep">•</span><b>${fmtSize(totalSize)}</b>`;
+  const indexed = PREVIEWS.size;
+  if (indexed < SESSIONS.length) {
+    $indexPill.style.display = '';
+    $indexPill.textContent = `indexed ${indexed}/${SESSIONS.length}`;
+  } else {
+    $indexPill.style.display = 'none';
+  }
+}
+
+function renderRow(s) {
+  const tr = document.createElement('tr');
+  tr.dataset.id = s.session_id;
+  if (SELECTED.has(s.session_id)) tr.classList.add('selected');
+  patchRow(tr, s);
+  return tr;
+}
+
+function patchRow(tr, s) {
+  const p = previewOf(s);
+  const first = p ? escapeHTML(p.first_prompt || '') : '';
+  const last = p ? escapeHTML(p.last_response || '') : '';
+  const snippetHTML = p
+    ? (first ? `<span class="first">${first}</span>` : '<span class="first placeholder">(no user text)</span>') +
+      (last ? `<span class="last">↳ ${last}</span>` : '')
+    : '<span class="placeholder">loading…</span>';
+  const branchPill = p && p.git_branch
+    ? `<span class="branch" title="${escapeHTML(p.git_branch)}">⎇ ${escapeHTML(p.git_branch)}</span>`
+    : '';
+  const turns = s._turns;
+  const tokens = s._tokens;
+  const whenStr = fmtWhen(p && p.started_at ? p.started_at : null, s.mtime);
+  const turnsTitle = p ? `${p.user_turns ?? '?'} user / ${p.assistant_turns ?? '?'} assistant` : '';
+  const tokensTitle = p
+    ? `in ${fmtNumLong(p.input_tokens)} / out ${fmtNumLong(p.output_tokens)} / cache_c ${fmtNumLong(p.cache_creation_tokens)} / cache_r ${fmtNumLong(p.cache_read_tokens)}${p.model ? ` • ${p.model}` : ''}`
+    : '';
+
+  const projLabel = escapeHTML(s.project_label || s.project_slug);
+  tr.innerHTML = `
+    <td class="check"><input type="checkbox" class="checkbox row-check" ${SELECTED.has(s.session_id) ? 'checked' : ''}></td>
+    <td class="project" title="${projLabel}">
+      <span class="plabel">${projLabel}</span>${branchPill}
+    </td>
+    <td class="snippet">${snippetHTML}</td>
+    <td class="turns ${turns == null ? 'dim' : ''}" title="${turnsTitle}">${fmtNum(turns)}</td>
+    <td class="tokens ${tokens == null ? 'dim' : ''}" title="${tokensTitle}">${fmtNum(tokens)}</td>
+    <td class="when" title="${p && p.started_at ? p.started_at : new Date(s.mtime*1000).toISOString()}">${whenStr}</td>
+    <td class="actions"><button class="copy-id" title="${escapeHTML(s.session_id)}">Copy ID</button></td>
+  `;
+}
+
+function render() {
+  const spec = readFilterSpec();
+  const rows = [];
+  for (const s of SESSIONS) {
+    if (passesFilters(s, spec)) rows.push(s);
+  }
+  sortRows(rows);
+  VISIBLE = rows.slice(0, RENDER_LIMIT);
+
+  const frag = document.createDocumentFragment();
+  for (const s of VISIBLE) frag.appendChild(renderRow(s));
+  $rows.replaceChildren(frag);
+  $empty.style.display = VISIBLE.length === 0 ? '' : 'none';
+
+  updateStats(rows);
+  updateSortIndicators();
+  updateSelectionBar();
+}
+
+function updateSortIndicators() {
+  document.querySelectorAll('th.sortable').forEach(th => {
+    th.classList.remove('sort-active');
+    th.querySelector('.arrow').textContent = '';
+    if (th.dataset.sort === SORT.key) {
+      th.classList.add('sort-active');
+      th.querySelector('.arrow').textContent = SORT.dir === 'asc' ? '↑' : '↓';
+    }
+  });
+}
+
+const PREVIEW_FIELDS = [
+  'first_prompt', 'last_response', 'started_at', 'ended_at',
+  'user_turns', 'assistant_turns', 'message_count',
+  'input_tokens', 'output_tokens', 'cache_creation_tokens', 'cache_read_tokens',
+  'git_branch', 'model',
+];
+
+function hydratePreviewsFromSessions() {
+  for (const s of SESSIONS) {
+    if (!s.indexed) continue;
+    const p = {};
+    for (const f of PREVIEW_FIELDS) p[f] = s[f];
+    PREVIEWS.set(s.session_id, p);
+  }
+}
+
+function selectedIds() { return [...SELECTED]; }
+
+function updateSelectionBar() {
+  const ids = selectedIds();
+  $selcount.textContent = ids.length;
+  if (ids.length === 0) {
+    $selbar.classList.remove('open');
+    $checkAll.checked = false; $checkAll.indeterminate = false;
+    return;
+  }
+  $selbar.classList.add('open');
+  if (ids.length === 1) {
+    $prompt.value = `Proceed with session ID: ${ids[0]}`;
+  } else {
+    $prompt.value = `Proceed with session IDs: ${ids.join(', ')}`;
+  }
+  const visibleIds = VISIBLE.map(s => s.session_id);
+  const allChecked = visibleIds.length > 0 && visibleIds.every(id => SELECTED.has(id));
+  const someChecked = visibleIds.some(id => SELECTED.has(id));
+  $checkAll.checked = allChecked;
+  $checkAll.indeterminate = !allChecked && someChecked;
+}
+
+function toggle(id) {
+  if (SELECTED.has(id)) SELECTED.delete(id); else SELECTED.add(id);
+  const tr = $rows.querySelector(`tr[data-id="${id}"]`);
+  if (tr) {
+    tr.classList.toggle('selected', SELECTED.has(id));
+    const cb = tr.querySelector('.row-check');
+    if (cb) cb.checked = SELECTED.has(id);
+  }
+  updateSelectionBar();
+}
+
+$rows.addEventListener('click', (e) => {
+  const btn = e.target.closest('button.copy-id');
+  if (btn) {
+    e.stopPropagation();
+    const tr = btn.closest('tr');
+    const id = tr.dataset.id;
+    navigator.clipboard.writeText(id).then(() => {
+      btn.classList.add('copied');
+      const orig = btn.textContent;
+      btn.textContent = 'Copied ✓';
+      setTimeout(() => { btn.classList.remove('copied'); btn.textContent = orig; }, 1100);
+    });
+    return;
+  }
+  const tr = e.target.closest('tr[data-id]');
+  if (!tr) return;
+  toggle(tr.dataset.id);
+});
+
+$checkAll.addEventListener('change', () => {
+  const wantSelect = $checkAll.checked;
+  for (const s of VISIBLE) {
+    if (wantSelect) SELECTED.add(s.session_id);
+    else SELECTED.delete(s.session_id);
+  }
+  render();
+});
+
+document.querySelectorAll('th.sortable').forEach(th => {
+  th.addEventListener('click', () => {
+    const key = th.dataset.sort;
+    if (SORT.key === key) {
+      SORT.dir = SORT.dir === 'asc' ? 'desc' : 'asc';
+    } else {
+      SORT.key = key;
+      SORT.dir = key === 'project' ? 'asc' : 'desc';
+    }
+    render();
+  });
+});
+
+$copyPrompt.addEventListener('click', () => {
+  navigator.clipboard.writeText($prompt.value).then(() => {
+    const orig = $copyPrompt.textContent;
+    $copyPrompt.textContent = 'Copied ✓';
+    setTimeout(() => $copyPrompt.textContent = orig, 1100);
+  });
+});
+$copyIds.addEventListener('click', () => {
+  const ids = selectedIds().join(',');
+  navigator.clipboard.writeText(ids).then(() => {
+    const orig = $copyIds.textContent;
+    $copyIds.textContent = 'Copied ✓';
+    setTimeout(() => $copyIds.textContent = orig, 1100);
+  });
+});
+$clearSel.addEventListener('click', () => { SELECTED.clear(); render(); });
+
+let filterTimer = 0;
+function onFilterChange() {
+  clearTimeout(filterTimer);
+  filterTimer = setTimeout(render, 90);
+}
+$fSearch.addEventListener('input', onFilterChange);
+$fMinTurns.addEventListener('input', onFilterChange);
+$fMinTokens.addEventListener('input', onFilterChange);
+$fProject.addEventListener('change', render);
+$fBranch.addEventListener('change', render);
+$fSince.addEventListener('change', render);
+$fReset.addEventListener('click', () => {
+  applyDefaultFilters();
+  render();
+});
+
+// Seed the filter bar with the default view before the first fetch, so the
+// initial render is already scoped to recent + substantive sessions. Also used
+// by the Reset button — "reset" means back to defaults, not back to nothing.
+function applyDefaultFilters() {
+  $fSearch.value = '';
+  $fMinTurns.value = '';
+  $fProject.value = '';
+  $fBranch.value = '';
+  const since = new Date(Date.now() - DEFAULT_SINCE_DAYS * 86400 * 1000);
+  $fSince.value = since.toISOString().slice(0, 10);
+  $fMinTokens.value = String(DEFAULT_MIN_TOKENS);
+}
+
+async function loadSessions() {
+  try {
+    const r = await fetch('/api/sessions');
+    const data = await r.json();
+    SESSIONS = data.sessions || [];
+    PREVIEWS = new Map();
+    hydratePreviewsFromSessions();
+    reindexAllSessions();
+    rebuildProjectOptions();
+    rebuildBranchOptions();
+    render();
+  } catch (e) {
+    $stats.textContent = 'failed to load: ' + e;
+    return;
+  }
+  scheduleRefresh();
+}
+
+// Pull a fresh /api/sessions snapshot and re-render in place. Selection and
+// filter state live in JS, not the DOM, so they survive the re-render.
+async function refreshSessions() {
+  try {
+    const r = await fetch('/api/sessions');
+    const data = await r.json();
+    SESSIONS = data.sessions || SESSIONS;
+    PREVIEWS = new Map();
+    hydratePreviewsFromSessions();
+    reindexAllSessions();
+    rebuildBranchOptions();
+    render();
+  } catch (e) {
+    // transient — the next tick will try again
+  }
+}
+
+// The machine is live: sessions get created and appended to while this UI is
+// open, and the server builds previews for new/active ones a beat after they
+// first show up in the listing. So the UI never stops refreshing — it only
+// adapts cadence: fast while any row is still un-indexed (a freshly-spawned
+// session the server hasn't previewed yet), relaxed once everything has
+// settled (still polling, to discover new sessions and age the timestamps).
+// Skipped while the tab is hidden so a backgrounded picker costs nothing.
+let refreshTimer = 0;
+function scheduleRefresh() {
+  clearTimeout(refreshTimer);
+  let pending = 0;
+  for (const s of SESSIONS) if (!s.indexed) pending++;
+  const delay = pending > 0 ? 1800 : 10000;
+  refreshTimer = setTimeout(async () => {
+    if (!document.hidden) await refreshSessions();
+    scheduleRefresh();
+  }, delay);
+}
+
+// Coming back to a backgrounded tab: refresh now instead of waiting out the tick.
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden) {
+    clearTimeout(refreshTimer);
+    refreshTimer = setTimeout(async () => { await refreshSessions(); scheduleRefresh(); }, 120);
+  }
+});
+
+applyDefaultFilters();
+loadSessions();
+</script>
+</body>
+</html>

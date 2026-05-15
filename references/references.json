@@ -1,0 +1,38 @@
+{
+  "$schema": "https://raw.githubusercontent.com/pulsemcp/air/main/schemas/references.schema.json",
+  "philosophy-on-skills": {
+    "title": "Philosophy on Skills",
+    "description": "Team stance on when a Skill is the right answer — and when it isn't. When to create, modify, or delete a Skill.",
+    "path": "philosophy-on-skills.md"
+  },
+  "philosophy-on-mcp": {
+    "title": "Philosophy on MCP",
+    "description": "Team stance on when an MCP server is the right answer — and when it isn't. When to create, modify, or delete an MCP server.",
+    "path": "philosophy-on-mcp.md"
+  },
+  "open-transcripts": {
+    "title": "OpenTranscripts",
+    "description": "Vendor-neutral data model for coding-agent transcripts. The Transcript wrapper, the event catalog, and the Transcript Segment analysis layer.",
+    "path": "open-transcripts/README.md"
+  },
+  "open-transcripts-transcript": {
+    "title": "OpenTranscripts — Transcript wrapper",
+    "description": "Top-level Transcript shape: schema_version, transcript_id, parent linkage, agent/cwd/timestamps, events, subagents, final_metrics, provider. Cited field-by-field.",
+    "path": "open-transcripts/schemas/transcript.md"
+  },
+  "open-transcripts-events": {
+    "title": "OpenTranscripts — Event catalog",
+    "description": "The nine event types (UserMessage, AssistantMessage, Thinking, ToolCall, ToolResult, SubagentSpawn, Compaction, Error, SystemEvent) plus supporting types. Cited field-by-field.",
+    "path": "open-transcripts/schemas/events.md"
+  },
+  "transcript-segment": {
+    "title": "Transcript Segment",
+    "description": "The analysis primitive of the agent-transcript-analysis plugin. Trigger → Goal → Outcome tree built over a Transcript.",
+    "path": "open-transcripts/schemas/transcript-segment.md"
+  },
+  "open-transcripts-claude-code-mapping": {
+    "title": "OpenTranscripts — Claude Code mapping",
+    "description": "Field-by-field mapping from Claude Code's JSONL files into a Transcript. Source of truth for the CC→OT transformation skills.",
+    "path": "open-transcripts/mappings/claude-code.md"
+  }
+}

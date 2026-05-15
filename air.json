@@ -1,0 +1,9 @@
+{
+  "$schema": "https://raw.githubusercontent.com/pulsemcp/air/main/schemas/air.schema.json",
+  "name": "agent-transcript-analysis",
+  "description": "Inspect, redact, and analyze Claude Code session transcripts to surface actionable advice on prompting, Skills, and MCP servers.",
+  "skills": ["./skills/skills.json"],
+  "references": ["./references/references.json"],
+  "plugins": ["./plugins/plugins.json"],
+  "hooks": ["./hooks/hooks.json"]
+}

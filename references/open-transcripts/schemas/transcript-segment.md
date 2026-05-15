@@ -1,0 +1,331 @@
+# Transcript Segment
+
+The analysis primitive of the `agent-transcript-analysis` plugin. Every analysis skill consumes a Segment tree built over a [`Transcript`](./transcript.md), never raw vendor JSONL.
+
+A Segment is a coherent unit of agent work — Trigger → Goal → Outcome. The Transcript layer below (its `events[]` and `subagents[]`) is just the source material; the Segment tree is where analysis happens.
+
+## Definition
+
+A **Transcript Segment** is a coherent unit of agent work. Recursively defined:
+
+```
+Segment {
+  trigger:   Trigger        // exactly 1 — what caused this Goal to exist
+  goal:      Goal           // exactly 1
+  outcome:   Outcome        // exactly 1
+  children:  Segment[]      // 1 or more sub-segments
+  meta:      { event_range, wall_clock, tokens_in, tokens_out, model, source_transcript_id, ... }
+}
+```
+
+The triplet **Trigger → Goal → Outcome** is the spine: cause, intent, result. A full Transcript is itself a Transcript Segment (the root). It has children, and so on, down to leaf segments whose `children` is empty (or a single trivially-atomic action).
+
+### Goal
+
+Exactly one per segment. Two kinds:
+
+- **Plan** — figuring out what to do or how to do it. Reading code, searching, asking clarifying questions, drafting an approach.
+- **Action** — doing the thing. Editing files, running commands that change state, opening PRs.
+
+A segment's Goal is named in one sentence: *"plan the migration"*, *"add the auth middleware"*, etc.
+
+### Outcome
+
+Exactly one per segment. Two kinds:
+
+- **Success** — the Goal was achieved.
+- **Failure** — the Goal was not achieved (got the wrong answer, broke the build, gave up, ran out of context, etc.).
+
+Outcome is judged against the Goal, not against some abstract notion of quality. A segment whose Goal was "investigate" succeeds when the investigation produces a defensible answer, even if the answer is "no, we shouldn't do this."
+
+**Every Failure requires a one-sentence `outcome.explanation`** — plain language on *what happened in this Segment that left its Goal not achieved*. Without it, a reader of `segments.json` and every downstream artifact built from it sees "Failure" without context, which is exactly the re-spelunking through events the analysis is supposed to spare them from. Required on Failure; omitted on Success.
+
+### Trigger
+
+Exactly one per segment. The Trigger captures **what caused this Goal to exist**. Two independent dimensions:
+
+**`kind`** — the relationship to the previous segment's work. The bar for `Correction` is high; `New` is the default.
+
+- **New** — a fresh Goal, not derived from re-doing prior work. Either a brand-new line of work, or the next step in a sequence after the previous Segment **delivered its own Goal**. Includes: the agent moving to the next step in its plan (self-review, verification, follow-up); the user adding new context or a change in requirements that couldn't have been discerned in advance; surfacing problems in earlier work without re-doing it. A new Segment that *acts on* something the prior Segment produced is `New`, not `Correction`.
+- **Correction** — the previous Segment's *own stated Goal* wasn't delivered, and this Segment exists to fix that. Course-correcting, retrying with a different framing, walking back wrong work, undoing damage. The bar is: would a reader looking at the prior Segment alone say "you didn't do what you said you would"? If yes, this is `Correction`; if the prior Segment in fact did what it set out to do, this is `New` — even if this Segment then surfaces issues with earlier work.
+
+**`source`** — who originated the Goal shift:
+
+- **user** — a `UserMessage` event defined the new Goal. `trigger.event_id` and `trigger.text` are populated with the message.
+- **agent** — the main-thread agent pivoted on its own, with no `UserMessage` in between. `event_id` / `text` are absent.
+- **subagent** — a parent agent's `SubagentSpawn` event spawned this segment. `trigger.event_id` points at the `SubagentSpawn` in the parent's `events[]` and `trigger.text` is the prompt passed to the subagent (`SubagentSpawn.prompt`).
+
+The two dimensions are independent. The four cases that matter most:
+
+| `kind` | `source` | Meaning |
+|---|---|---|
+| New | user | A user message launching a fresh Goal — "first prompt of a session" or a clean follow-up. Includes the user adding context / changing requirements that weren't discoverable in advance ("oh and also do W"; "actually target staging, not prod"). The deterministic-trigger candidate analysis runs on these. |
+| Correction | user | The user had to intervene because the prior Segment failed to deliver its own Goal — "you broke X", "no, redo that", "that's wrong, the test fails". Strongest retro-Failure signal. |
+| Correction | agent | The agent itself walked back prior work — "that didn't work, let me try a different approach", abandoning a path after a tool error, reverting edits. The prior Segment's Goal wasn't delivered; the agent noticed before the user did. |
+| New | agent | The agent moved to the next step in its plan — including a self-review or follow-up that *surfaces issues* in earlier work without re-doing it. Surfacing an issue is `New`; re-doing the work to fix it is `Correction` only if it walks back the prior Goal. |
+
+**Correction implies retro-Failure on the prior Segment — by definition.** If a Segment's `trigger.kind = Correction`, then the prior sibling's `outcome.kind = Failure` (with an `explanation`), because that's what Correction means: the prior didn't deliver its own Goal. The decomposer must keep these consistent — never label a Segment `Correction` while leaving the prior sibling Success. User-source Correction is the stronger signal that this propagation should fire; agent-source Correction is softer (the agent recovered on its own) but still requires the prior Failure label.
+
+The flip side — and the most common mis-labeling — is the reverse: when the prior Segment **did** meet its own Goal and the next Segment surfaces problems with earlier work (a self-review after a successful commit, acting on review feedback from a delegated reviewer, a follow-up that finds a bug in code the prior Segment shipped), that next Segment is `New`, not `Correction`. The prior stays Success. Keep the `Correction` bar high — it is reserved for cases where the prior Segment literally didn't do what it said it would do.
+
+### Children
+
+One or more sub-segments. A segment's children must collectively account for everything between the segment's start and end events. Leaf segments may have a single trivially-atomic action as their sole "child" or, by convention, an empty list.
+
+## Ideal end-state
+
+The north star a Transcript should be measured against — not because real transcripts hit it, but because deviations are where the analyzers focus:
+
+- **Root segment**: 1 Goal, `trigger.kind = New` with `source = user`, 1 Success Outcome.
+- **Children**: a mix of Plan and Action segments, **all with Success Outcomes**.
+- **No** Failure Outcomes anywhere in the tree.
+- **No** Correction triggers anywhere in the tree — neither user-source (user had to step in) nor agent-source (the agent pivoted off a wrong path).
+- Achieved in the minimum token-spend and wall-clock time that's reasonable for the work.
+
+End-state for the *root* user-source New trigger in particular: it should originate from a **deterministic trigger reacting to an external event** (alerts, schedule, PR opening, etc.) rather than ad-hoc human typing. Ad-hoc human-typed roots are accepted but counted; the trend should be down over time.
+
+## Segmentation methodology
+
+A Segment boundary is exactly where the **Goal changes**. Every rule below is a way of detecting that change. If a heuristic fires but the Goal hasn't actually shifted, don't draw a boundary — keep the work in the current Segment.
+
+### Boundary triggers
+
+Three signals that should prompt the decomposer to draw a new Segment:
+
+1. **New `UserMessage` event.** The Goal can change at any user message. The new Segment's `trigger.source = user` with `trigger.event_id` / `trigger.text` set to the `UserMessage`.
+   - New line of work → sibling Segment with `trigger.kind = New`.
+   - User steering that says the prior Segment didn't deliver its own Goal ("no, redo that — what you did is wrong", "you broke users.spec.ts:42") → sibling Segment with `trigger.kind = Correction`; the prior sibling's outcome flips to `Failure` with an `explanation`. User steering that adds context or changes requirements that couldn't have been foreseen ("oh and also do W"; "actually target staging not prod") is `kind = New` — the prior Segment met its Goal as it then understood it; the user just opened a new line of work.
+   - **Multi-Goal message** (one message asking for two unrelated things — "fix the auth bug, and bump lodash"): draw *one Segment per Goal* as siblings. All siblings share `trigger.event_id` pointing at the same `UserMessage`; their `meta.event_range`s partition the agent's response events by which Goal each addressed.
+   - **Continuation-only messages** ("continue", "go on", "yes") do *not* start a new Segment — the Goal is unchanged.
+   - **Re-statement with extra context** (the user adds a fact but the Goal is the same) does *not* start a new Segment either; the agent's Goal didn't change, the user just helped.
+   - **Skill-injected / harness-synthesized messages.** A `UserMessage` that carries an injected skill body or a tool/harness-synthesized prompt (e.g. a `wait-for-ci` skill body delivered as a `UserMessage`, not human-typed) does *not* by itself start a new Segment. Judge it the same way as a continuation message — by whether the *Goal* actually changed — not by the fact that a `UserMessage` event appeared.
+
+2. **`SubagentSpawn` event.** A `SubagentSpawn` always starts a child Segment with `trigger.source = subagent`, `trigger.event_id` pointing at the `SubagentSpawn` in the parent's `events[]`, and `trigger.text` set to `SubagentSpawn.prompt`. `meta.source_transcript_id` is the subagent's `Transcript.transcript_id`. The child's `trigger.kind` is almost always `New` (the parent is delegating fresh work); use `Correction` only if the parent explicitly framed the spawn as fixing a prior subagent run. The child's lifetime is the subagent transcript's full `events[]` range; control returns to the parent at the next main-thread event.
+   - **Interleaved spawns and the coverage rule.** When a parent spawns several subagents with main-thread work between them, a strict reading of Coverage ("children tile the parent with no gaps") would force a tiny sub-threshold filler Segment around each spawn — fighting the leaf-stop rule and the "bias toward fewer Segments" guidance. The intended resolution: a subagent child Segment's `event_range` may **absorb the adjacent main-thread events that set up and consume that spawn** (the parent reading inputs for the delegation, then folding the subagent's result back in). Those setup/teardown events belong to the spawn's child Segment, not to a separate filler sibling. The parent's children still tile cleanly, with no sub-threshold filler — that absorption is how the tension resolves.
+
+3. **Topic / file shift within a single agent turn-run.** Between two `UserMessage` events, the agent can pivot to a new Goal on its own ("now let me run the tests" after the edits land). New Segment's `trigger.source = agent`; no `event_id`/`text`. Draw a child Segment only when *all three* hold:
+   - The agent verbalizes the shift, **or** the tool-call mode changes (read-only ↔ state-mutating).
+   - The targets (files, commands, MCP tools) are disjoint from the prior run's targets.
+   - The next several events continue on the new target — not one stray `ToolCall` before returning.
+
+   A single stray `ToolCall` (e.g. one `Read` while in the middle of editing) is **not** a boundary.
+
+   Classify `trigger.kind` for an agent-source shift as `Correction` only when the agent is **walking back prior work** — abandoning an approach after a tool error, reverting edits, retrying with a different framing because the prior attempt didn't deliver. A self-review of work the agent just successfully completed (read-back, verify, follow-up) is `New`, not `Correction` — the prior step did its job; this step is the next one in the plan, even if it surfaces issues. Acting on review feedback returned by a subagent or a reviewer is similarly `New` — the prior delegation delivered (it returned a review); this Segment is *consuming* that result, not correcting the delegation.
+
+### Leaf-stop rule
+
+Stop subdividing when **any** of:
+
+- The candidate sub-Segment is short enough that splitting it out carries no analytical signal (heuristic: < ~5 events or < ~30 s wall-clock).
+- The Segment serves a single narrowly-scoped Goal that can't be meaningfully split ("write this one function").
+- Further decomposition would produce mechanical sub-steps ("call the function", "check the return value") rather than Goals an analyzer would attach a recommendation to.
+
+Bias toward fewer, more meaningful Segments. Every Segment costs an analyzer pass per phase-4 bucket; a Segment that produces zero findings across all buckets is a sign it shouldn't have been split out.
+
+### What a Segment is *not*
+
+- A single `ToolCall` in isolation (unless its corresponding event is a `SubagentSpawn`).
+- A pure `Thinking` event with no `ToolCall` and no state change.
+- The agent's own retries of the same operation — those stay inside the current Segment; the retries are part of the Goal's effort.
+
+### When in doubt
+
+The decomposer's worst failure mode is **over-segmentation** — a tree so fine-grained that every analyzer fires on noise. If you can't name the Goal change in one sentence, there isn't one. Keep the work in the current Segment.
+
+## Per-segment failure stack
+
+When analyzing a Segment, look for these in order. Anything that fires becomes an improvement hypothesis attached to the Segment.
+
+1. **Failure Outcome** — must produce an improvement hypothesis. Always.
+2. **Correction trigger** at the head of (or following) the Segment — must produce an improvement hypothesis. Stronger for `source: user`, softer but still actionable for `source: agent`. Unless explicitly classified as a user mistake ("do better, human"), the hypothesis defaults to one of:
+   - missing Skill (no Skill existed to prevent the wrong turn)
+   - non-triggering Skill (a Skill existed but its description didn't fire)
+3. **Unambitious user-source New trigger** — Success Outcome but short wall-clock and followed by another user-source New trigger soon after. Likely the user split work that could have been one ambitious prompt.
+4. **Wasteful branches** — the Segment spent time on detours that, in hindsight, weren't on the critical path. Where did the time go? Was there a different framing that would have skipped the detour?
+5. **Model-size mismatch** — could a smaller model have served this Segment without quality loss? Or was the model too small and the Segment thrashed?
+
+## Output contract
+
+`decompose-agent-transcript-into-transcript-segments` consumes a `Transcript` (the JSON document defined by [`transcript.md`](./transcript.md)) and emits **both**:
+
+1. **`segments.json`** — the structured tree. Every analyzer in phase 4 reads this and dereferences event ids into the Transcript as needed. Schema and example below.
+2. **`flamegraph.html`** — annotated visualization. The X axis is wall-clock time; the Y axis is Segment depth. Each block is color-coded by Outcome (green = Success, red = Failure) with a badge for any Correction trigger at the Segment's head (badge variant indicates `source: user` vs `source: agent`). Hover/click reveals the Goal text and meta.
+
+Both must agree. Downstream analyzers read `segments.json`; the flamegraph is for humans reviewing the report.
+
+### `segments.json` schema
+
+The file is a single JSON document whose top-level value is the root Segment of the Transcript. Every Segment carries the same shape:
+
+```jsonc
+{
+  "id":      "S0",                          // string, unique within the file, stable across re-runs
+  "trigger": {
+    "kind":     "New",                      // "New" | "Correction"
+    "source":   "user",                     // "user" | "agent" | "subagent"
+    "event_id": "evt_01HABC...",            // id of the originating event; null when source = agent
+    "text":     "add auth middleware that validates JWTs..."  // null when source = agent
+  },
+  "goal": {
+    "text":  "Add auth middleware to the Express app",
+    "kind":  "Action"                       // "Plan" | "Action"
+  },
+  "outcome": {
+    "kind":               "Success",                            // "Success" | "Failure"
+    "explanation":        null,                                 // string — REQUIRED, non-empty, when kind == "Failure"; null on Success. One plain-language sentence on what happened that left the Goal not achieved.
+    "evidence_event_ids": ["evt_01HXYZ...", "evt_01HXYZ..."]    // events that justify the call; may be empty
+  },
+  "children": [ /* sub-Segments, same shape; [] is allowed for leaves */ ],
+  "meta": {
+    "event_range":          ["evt_01HABC...", "evt_01HXYZ..."], // first/last event ids in this segment (inclusive)
+    "wall_clock_s":         1820,
+    "tokens_in":            18200,                              // sum of AssistantMessage.usage.input_tokens — uncached input only; see note below
+    "tokens_out":            6400,
+    "model":                "claude-sonnet-4-6",
+    "source_transcript_id": "01HXYZ..."                         // which Transcript this Segment's events live in
+  }
+}
+```
+
+Rules a Segment tree must satisfy:
+
+- **Exactly one `trigger`, one `goal`, one `outcome`** per Segment.
+- **Trigger consistency**: when `trigger.source` is `user` or `subagent`, both `trigger.event_id` and `trigger.text` are populated. For `source = user`, `trigger.event_id` refers to a `UserMessage` event in the segment's `source_transcript_id`. For `source = subagent`, `trigger.event_id` refers to a `SubagentSpawn` event in the **parent's** Transcript. When `trigger.source = agent`, both `event_id` and `text` are `null`.
+- **Root rule**: the root Segment's `trigger.source` is `user` (or `subagent` if this whole transcript is itself a delegated run); `trigger.kind` is `New`.
+- **Coverage**: a Segment's `children` must collectively cover its `meta.event_range` with no gaps and no overlaps. Leaves have `children: []`.
+- **`id` stability**: ids MUST follow **depth-first positional numbering** — the root is `S0`; every other Segment is `S{parent_id}.{childIndex}` where `childIndex` is its 0-based position in the parent's `children` array (`S0.0`, `S0.1`, `S0.1.0`, …). This positional scheme is what makes ids deterministic for a given input and stable across re-runs — it is normative, not an example. Analyzers reference Segments by `id`; the orchestrator round-trips ids in its report.
+- **Outcome is local to the Goal**: a Success Segment can sit under a Failure parent and vice versa. Do not propagate up.
+- **Failure outcomes carry an explanation**: when `outcome.kind == "Failure"`, `outcome.explanation` is a non-empty plain-language string. A reader of `segments.json` (or any downstream artifact built from it) should see *why* a Goal was not achieved without re-reading the events themselves. Required on Failure; omitted on Success.
+- **Correction ↔ retro-Failure consistency**: when a Segment's `trigger.kind = Correction`, the prior sibling Segment's `outcome.kind = Failure` with an `outcome.explanation`. Conversely, never label a Segment `Correction` while leaving the prior sibling `Success` — if the prior met its Goal, this Segment is `kind = New`, not `Correction`.
+- **`tokens_in` is uncached input, not prompt size**: `tokens_in` sums `AssistantMessage.usage.input_tokens`, but Claude Code logs only the *uncached* input tokens there — the bulk of a turn's real prompt is in `cache_read_tokens`. On a cache-heavy session this sum can be near-zero and is **not** a faithful "prompt size." The definition stands as-is; downstream analyzers should read `tokens_in` as "uncached input tokens" and consult `cache_read_tokens` when they need true context size.
+
+### Example
+
+A short session: user asks for an auth middleware, the agent plans, writes the validator (breaks a test), is Corrected by the user, fixes it, then wires it up. The example exercises all four Trigger cases: user-source New (root), agent-source New (sequencing), agent-source Correction (agent self-corrected mid-edit), and user-source Correction (user stepped in).
+
+```json
+{
+  "id": "S0",
+  "trigger": {
+    "kind": "New",
+    "source": "user",
+    "event_id": "evt_01H0",
+    "text": "Add auth middleware that validates JWTs from the Authorization header and rejects expired tokens. Wire it into app.ts before the routes."
+  },
+  "goal":    { "text": "Add JWT auth middleware to the Express app", "kind": "Action" },
+  "outcome": { "kind": "Success", "evidence_event_ids": ["evt_01H46", "evt_01H47"] },
+  "meta": {
+    "event_range": ["evt_01H0", "evt_01H47"],
+    "wall_clock_s": 1820,
+    "tokens_in": 18200,
+    "tokens_out": 6400,
+    "model": "claude-sonnet-4-6",
+    "source_transcript_id": "01HXYZ"
+  },
+  "children": [
+    {
+      "id": "S0.0",
+      "trigger": { "kind": "New",        "source": "agent", "event_id": null, "text": null },
+      "goal":    { "text": "Read the existing middleware stack", "kind": "Plan" },
+      "outcome": { "kind": "Success", "evidence_event_ids": ["evt_01H4", "evt_01H9"] },
+      "meta":    { "event_range": ["evt_01H1", "evt_01H9"],  "wall_clock_s": 140, "tokens_in": 2100, "tokens_out": 350,  "model": "claude-sonnet-4-6", "source_transcript_id": "01HXYZ" },
+      "children": []
+    },
+    {
+      "id": "S0.1",
+      "trigger": { "kind": "New",        "source": "agent", "event_id": null, "text": null },
+      "goal":    { "text": "Write the JWT validator (first attempt — wrong signature algorithm)", "kind": "Action" },
+      "outcome": { "kind": "Failure", "explanation": "validator used HS256 where the existing middleware expects RS256, so verification fails against real tokens", "evidence_event_ids": ["evt_01H16", "evt_01H17"] },
+      "meta":    { "event_range": ["evt_01H10", "evt_01H17"], "wall_clock_s": 280, "tokens_in": 2600, "tokens_out": 950,  "model": "claude-sonnet-4-6", "source_transcript_id": "01HXYZ" },
+      "children": []
+    },
+    {
+      "id": "S0.2",
+      "trigger": { "kind": "Correction", "source": "agent", "event_id": null, "text": null },
+      "goal":    { "text": "Rewrite the validator with the correct RS256 algorithm", "kind": "Action" },
+      "outcome": { "kind": "Failure", "explanation": "rewrite rejected every request, including valid tokens — the users.spec.ts:42 mock for the missing-token 401 path wasn't accounted for", "evidence_event_ids": ["evt_01H22", "evt_01H24"] },
+      "meta":    { "event_range": ["evt_01H18", "evt_01H24"], "wall_clock_s": 340, "tokens_in": 2800, "tokens_out": 1150, "model": "claude-sonnet-4-6", "source_transcript_id": "01HXYZ" },
+      "children": []
+    },
+    {
+      "id": "S0.3",
+      "trigger": {
+        "kind": "Correction",
+        "source": "user",
+        "event_id": "evt_01H25",
+        "text": "you broke users.spec.ts:42 — the test asserts a 401 when the token is missing; fix it"
+      },
+      "goal":    { "text": "Fix the broken users.spec.ts:42 auth test", "kind": "Action" },
+      "outcome": { "kind": "Success", "evidence_event_ids": ["evt_01H38", "evt_01H40"] },
+      "meta":    { "event_range": ["evt_01H25", "evt_01H40"], "wall_clock_s": 720, "tokens_in": 7300, "tokens_out": 2900, "model": "claude-sonnet-4-6", "source_transcript_id": "01HXYZ" },
+      "children": []
+    },
+    {
+      "id": "S0.4",
+      "trigger": { "kind": "New",        "source": "agent", "event_id": null, "text": null },
+      "goal":    { "text": "Wire middleware into app.ts before the route mounts", "kind": "Action" },
+      "outcome": { "kind": "Success", "evidence_event_ids": ["evt_01H46", "evt_01H47"] },
+      "meta":    { "event_range": ["evt_01H41", "evt_01H47"], "wall_clock_s": 340, "tokens_in": 3400, "tokens_out": 1050, "model": "claude-sonnet-4-6", "source_transcript_id": "01HXYZ" },
+      "children": []
+    }
+  ]
+}
+```
+
+What this example demonstrates:
+
+- **All four Trigger cases.** Root is user-source New. `S0.0`, `S0.1`, `S0.4` are agent-source New (the agent sequencing through its plan). `S0.2` is agent-source Correction (the agent noticed its own wrong algorithm choice and rewrote). `S0.3` is user-source Correction (the user had to step in about the broken test).
+- **Both Correction sources produce retro-Failure signals.** `S0.1` is `Failure` because `S0.2`'s agent-source Correction trigger retroactively confirms the validator was wrong. `S0.2` is `Failure` because `S0.3`'s user-source Correction trigger retroactively confirms even the rewrite wasn't right. User-source Correction is the stronger signal — the agent didn't self-recover.
+- **Local Outcome.** `S0.1` and `S0.2` are both `Failure` even though their parent `S0` is `Success`. Failures do not propagate up.
+- **Coverage.** Event ranges partition the root's range. No gaps, no overlaps.
+- **Plan vs Action.** `S0.0` (read-only investigation) is Plan; the writes that follow are Action.
+
+## `segments.reviewed.json` — the reviewed sibling
+
+`segments.json` is an **AI draft**. Decomposition is the most interpretive step in the pipeline — where a Goal changes, whether a Segment was a Failure, whether a Trigger was a Correction — so the draft is meant to be reviewed by a human. `2-decompose/review-agent-transcript-segments` opens a UI for that review and writes `segments.reviewed.json` **next to** `segments.json` (the draft is never overwritten).
+
+`segments.reviewed.json` is **schema-compatible with `segments.json`** — its top-level value is the root Segment, with the exact same shape — so every downstream analyzer reads it transparently. It adds a `review` block in two places:
+
+**On every Segment the human touched:**
+
+```jsonc
+"review": {
+  "edited": true,
+  "corrections": [ /* the log entries that targeted this Segment */ ]
+}
+```
+
+**On the root Segment, additionally**, file-level provenance:
+
+```jsonc
+"review": {
+  "edited": true,                    // present only if the root itself was edited
+  "corrections": [ /* ... */ ],       // present only if the root itself was edited
+  "reviewed_at": "2026-05-14T15:34:11Z",
+  "reviewer":    "user",
+  "base":        "draft",             // "draft" | "reviewed" — what this review was built on
+  "log":         [ /* the full append-only correction log */ ],
+  "warnings":    [ /* validator warnings at save time; never blocks a save */ ]
+}
+```
+
+### Correction log
+
+`review.log` is a flat, time-ordered, append-only list. Each entry records one human action and is replayable — `write_reviewed` strips stale `review` stamps and re-derives them from the log on every save, so the log alone is the source of truth for provenance. Entry types:
+
+| `type` | Shape | Meaning |
+|---|---|---|
+| `field` | `{type, segment_id, field, before, after, note, at}` | One field changed. `field` is a dotted path (`goal.text`, `trigger.kind`, `meta.event_range.0`, …). |
+| `split` | `{type, segment_id, result_ids, note, at}` | A leaf Segment was split into children — the decomposer under-segmented. |
+| `merge` | `{type, segment_ids, result_id, note, at}` | Adjacent siblings were merged — the decomposer over-segmented. |
+| `note` | `{type, segment_id, note, at}` | A free-text "why / context" note on a Segment. |
+
+### Reader rule
+
+Downstream skills go through `_lib/segment_review.py::load_bundle`, which **prefers `segments.reviewed.json` when it exists** and falls back to `segments.json`. Analyzers never need to branch on whether a tree was reviewed — they just read the resolved tree. `learn-from-agent-transcript-segment-corrections` is the one consumer that reads `review.log` specifically, to cluster corrections into flagged improvement opportunities for the decomposer.
+
+## Notes for analyzer authors
+
+- **The Segment is the analysis unit, not the event.** Don't write analyzers that walk a Transcript's `events[]` directly; ask the orchestrator for the relevant Segment(s) and dereference event ids only as needed for evidence.
+- **Recursion is real.** A Failure inside a Success is common (the agent recovered). Don't collapse trees prematurely.
+- **Outcome is per-Goal.** A Segment that "shipped the wrong feature" had Success on its stated Goal and a Failure higher up the tree. Don't propagate failures up automatically — that's the orchestrator's call.

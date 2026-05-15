@@ -1,0 +1,5 @@
+.env
+.npm-cache
+.mcp.json
+.claude
+claude_stderr.log
