@@ -490,15 +490,9 @@ function updateSelectionBar() {
   }
   $selbar.classList.add('open');
   if (ids.length === 1) {
-    $prompt.value =
-      `Run the analyze-agent-transcript skill on session ${ids[0]}` +
-      `. That runs tiers 1-3 and stops at this transcript's findings.*.json set` +
-      `; the report is a separate batch-end step (synthesize-report), run once when you have no more transcripts to analyze.`;
+    $prompt.value = `Proceed with session ID: ${ids[0]}`;
   } else {
-    $prompt.value =
-      `Run the analyze-agent-transcript skill on each of these sessions: ${ids.join(', ')}` +
-      `. Each run produces that transcript's findings.*.json set. When all are done, run analyze-cross-transcript-patterns once over all those transcripts' findings.*.json sets` +
-      `, then run synthesize-report once over the whole batch to produce the single final report.`;
+    $prompt.value = `Proceed with session IDs: ${ids.join(', ')}`;
   }
   const visibleIds = VISIBLE.map(s => s.session_id);
   const allChecked = visibleIds.length > 0 && visibleIds.every(id => SELECTED.has(id));
