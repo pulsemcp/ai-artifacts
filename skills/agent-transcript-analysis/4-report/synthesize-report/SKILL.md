@@ -8,10 +8,12 @@ description: >
   final report of actionable next steps across three buckets: human prompting,
   Skills (create/modify/delete), and MCP servers (create/modify/delete). Writes
   findings.report.json (the reviewable recommendation slate) and report.md (the
-  human-readable report, including the distance-from-ideal north-star block
-  aggregated across the batch) into a batch_dir. Use once the user has finished
-  analyzing every transcript of interest — a batch of one transcript is valid
-  input too. Never driven by analyze-agent-transcript.
+  human-readable report grouped by priority, including the distance-from-ideal
+  north-star block aggregated across the batch), and a multi-page HTML site
+  (report.html landing + recommendations/rec-NNN.html per rec + sessions/<tag>.html
+  per transcript) into a batch_dir. Use once the user has finished analyzing
+  every transcript of interest — a batch of one transcript is valid input too.
+  Never driven by analyze-agent-transcript.
 user-invocable: true
 ---
 
@@ -44,46 +46,65 @@ Two files written into `batch_dir`:
     "items": [
       {
         "id": "rec-001",
+        "priority": "critical | high | medium | low",
         "bucket": "prompting | skills | mcp",
         "action": "create | modify | delete | adopt | stop",
-        "title": "<short actionable headline>",
-        "recommendation": "<the next step, specific enough to act on>",
-        "rationale": "<the leap: why these findings imply this recommendation>",
-        "sources": ["<finding id>", "..."],
+        "problem":        "<the failure / issue, stated as the headline — what went wrong, in plain language>",
+        "recommendation": "<the proposed fix — may be revised by review>",
+        "rationale":      "<the leap: how the findings imply this recommendation>",
+        "sources":        ["<finding id>", "..."],
         "inspiring_segments": [
           {
             "transcript_id": "<transcript_id from segments.json>",
             "segment_id":    "<S0.X>",
-            "summary":       "<one-sentence what-happened-here, no jargon, reader has no memory of the session>"
+            "summary":       "<one short sentence — what happened here, plain language>",
+            "before_evidence": [
+              { "event_id": "<id from transcript.json>", "snippet": "<short raw quote / tool name / outcome>" }
+            ],
+            "after_evidence": [
+              { "snippet": "<what this same moment would look like with the fix in place — short, abbreviated>" }
+            ]
           }
-        ],
-        "change_contours":      "<2-3 sentences — what the change actually does: scope, behavior delta, where it lives (Skill file / MCP server / prompt habit)>",
-        "expected_after_state": "<2-3 sentences — what would have happened in the inspiring segments if this recommendation had already been in place>",
-        "priority": "high | medium | low",
-        "effort":   "<rough sizing — a sentence is fine>",
-        "philosophy_check": "<how it squares with philosophy-on-skills / -mcp, or 'n/a'>"
+        ]
       }
     ]
   }
   ```
 
-  `sources` is what makes the leap auditable: it points back at the exact phase-3 finding ids a recommendation was synthesized from, so `review-report` can check whether the recommendation actually follows from them. A `source` id may come from any transcript in the batch (or from `findings.cross-transcript.json`).
+  The schema is deliberately tight: **headline first** is the `problem`, not the fix — readers should see what went wrong before they see what to do about it. Plenty of recommendations get revised at the review step; problem statements rarely do.
 
-  `inspiring_segments` is the **reader's bridge into the actual work** behind the recommendation — usually 1–3 entries (more for cross-transcript clusters). Each entry names a real Segment in a transcript's `segments.json` and carries a one-sentence summary the reader can read *without* digging into events. `change_contours` and `expected_after_state` together tell the reader what the change does and what would have looked different had it already existed — closing the loop from "you should do X" to "and here's what X would have done in this specific case." All three fields are required, and all three feed the `report.html` companion's per-recommendation detail page.
+  `priority` is fixed semantics, not vibes:
+  - **critical** — the underlying problem **recurs across multiple instances** (segments / transcripts) AND each instance was high-impact. Two High-priority recs that instantiate the same cross-transcript pattern can both be Critical.
+  - **high** — the problem **impacted overall Success vs Failure** on its own — a Failure the agent couldn't self-recover from, or a Correction the agent couldn't shake.
+  - **medium** — a Segment hit Failure but the **agent (or a subagent) self-corrected** without user intervention. The system worked, even if it cost some turns.
+  - **low** — cost / efficiency / clarity optimization. **Not a capability gap.** The agent succeeded; this would have made it cheaper or sharper.
 
-- **`report.md`** — the **human-readable final report**. Structure:
+  `sources` is the auditable trace: phase-3 finding ids the recommendation was synthesized from. A `source` id may come from any transcript in the batch (or from `findings.cross-transcript.json`).
+
+  `inspiring_segments` is the **reader's bridge into the actual work** behind the recommendation — usually 1–3 entries (more for cross-transcript clusters). Each entry names a real Segment in a transcript's `segments.json` and carries:
+  - a one-sentence `summary` of what happened in that Segment, plain language
+  - a `before_evidence` chain — the 3–6 raw events (`event_id` + short `snippet`) from `transcript.json` that show the problem actually playing out
+  - an `after_evidence` chain — the same moment, *abbreviated*, as it would have looked with the recommendation already in place (a hypothetical-but-grounded counterfactual: same `event_id`s where they still apply, new `snippet`s elsewhere)
+
+  Both chains are kept short and concrete — the HTML companion renders them collapsed by default. The two chains together replace what used to be prose `change_contours` / `expected_after_state` fields: a reader who wants to inspect a recommendation reads the problem, then the recommendation, then expands the before/after chains for one or two inspiring segments. No long-form description needed; the events speak.
+
+  Fields that used to exist and were removed: `title` (replaced by `problem`), `effort` (estimates were noise — drop), `philosophy_check` (philosophy is now an under-the-hood **gate**, not a surfaced field — see Sequencing checklist).
+
+- **`report.md`** — the **human-readable final report**. Structure (grouped by **priority** — the lens that matters most — not by bucket; bucket appears as a small label on each rec):
 
   ```
-  # Batch report over <N> transcript(s)
+  # Recommendations — <N> rec(s) over <M> transcript(s)
 
-  ## Recommendations
-    ### Prompting
-      - <recommendation> — <priority> — sources: <linked finding ids>
-        <one-paragraph context-rebuild + change_contours + expected_after_state>
-    ### Skills
-      - create / modify / delete <recommendation> — <priority> — sources: …
-    ### MCP
-      - create / modify / delete <recommendation> — <priority> — sources: …
+  ## Critical
+    ### <problem headline> — <bucket> · <action> — sources: <linked finding ids>
+      <recommendation: 1–2 sentences>
+      <→ link to recommendation detail page (inspiring segments + before/after evidence chains)>
+  ## High
+    ### <problem headline> — <bucket> · <action> — sources: …
+  ## Medium
+    ### <problem headline> — <bucket> · <action> — sources: …
+  ## Low
+    ### <problem headline> — <bucket> · <action> — sources: …
 
   ## Distance from ideal end-state
     Single paragraph, aggregated across the whole batch: how many Failure
@@ -102,14 +123,25 @@ Two files written into `batch_dir`:
 
   ## Provenance
     Which transcripts, and which findings files (draft or reviewed) from each,
-    fed this report; whether findings.cross-transcript.json was present.
+    fed this report; whether findings.cross-transcript.json was present;
+    which recommendations were **dropped at the philosophy gate** (one line each,
+    with the rule that fired).
   ```
 
-  **Everything that can be a link, is a link.** PR / issue / commit / docs URLs link to the external resource (sourced from `external-context.json`); finding ids and `inspiring_segments` segment ids link to in-document anchors (when rendered next to `report.html`, those anchors resolve to the rich detail pages in the companion). The reader should not be re-typing a PR number into GitHub or grepping `segments.json` for `S0.7` — every reference is one click.
+  **Everything that can be a link, is a link.** PR / issue / commit / docs URLs link to the external resource (sourced from `external-context.json`); finding ids and `inspiring_segments` segment ids link to the matching pages in the HTML companion. The reader should not be re-typing a PR number into GitHub or grepping `segments.json` for `S0.7` — every reference is one click.
 
-- **`report.html`** — a **single self-contained interactive companion** to `report.md`. Same recommendations and same numbers, but rendered as a navigable page: per-session detail pages (embedded flamegraph, summary metadata, links to the PR / issue / external context, and a segment + event play-by-play drill-down), per-recommendation detail pages (the `inspiring_segments`, `change_contours`, and `expected_after_state` rendered prominently, with all `sources` chips clickable into the underlying finding's detail), and full hyperlinking — every segment id, finding id, and PR/issue number is a link. No CDN; data embedded inline. `report.md` is the canonical text artifact, `findings.report.json` is the source of truth, and `report.html` is the rich-format reader-friendly view — all three must round-trip the same recommendations.
+- **`report.html`** + companion pages — a **multi-page static site** (not a single SPA) written into `batch_dir`:
 
-`report.md` is the artifact a human reads in a terminal; `report.html` is the artifact they share with someone who isn't going to grep through JSON; `findings.report.json` is the artifact `review-report` corrects. They carry the same recommendations — if they ever disagree, `findings.report.json` is the source of truth and the other two are re-rendered from it.
+  ```
+  batch_dir/
+    report.html                      # landing — recs grouped by priority, terse
+    recommendations/rec-<NNN>.html   # one per recommendation — detail page
+    sessions/<short-tag>.html        # one per transcript — detail page
+  ```
+
+  Each file is a small standalone HTML page with relative-href links to the others. No CDN, no build step; opening `report.html` from the filesystem (or via `python3 -m http.server` in `batch_dir` if the browser blocks `file://` cross-page navigation) gives the reader a navigable site. Pages cross-link freely: every `rec-NNN` chip on the landing page is a real `<a href="recommendations/rec-NNN.html">`; every `(S1, e2cdbb98)` or segment id is a real link to that session's page (with the segment anchored). Each recommendation page renders the `problem` headline, the `recommendation`, the `inspiring_segments` cards (each card has the `before_evidence` / `after_evidence` chains as collapsible `<details>` blocks). Each session page renders the session header, an inline flamegraph from `segments.json`, the segment tree (collapsible), and event play-by-play per segment (collapsed by default). Keep the visual chrome quiet — terse text, sparse badges, raw evidence over decoration.
+
+  Round-trip rule: `findings.report.json` is source of truth; `report.md` is the canonical text artifact; the HTML pages are the rich-format reader-friendly view. All three carry the same recommendations — if they disagree, JSON wins and the others re-render.
 
 ## One report, over the batch
 
@@ -123,13 +155,13 @@ Two files written into `batch_dir`:
 - [ ] Read every finding across every transcript. Drop items stamped `review.verdict == "rejected"` — a human already threw them out
 - [ ] **Synthesize, don't restate.** Cluster findings that point at the same change — across transcripts, not just within one. A recommendation usually draws on several findings. Each recommendation gets a `sources` list naming the finding ids it came from
 - [ ] **Route into three buckets.** `outcomes` findings carry a `recommendation_route` — follow it. `prompts` findings feed Prompting; `skills` feed Skills; `mcp` feed MCP. No cross-bucket invention
-- [ ] **Cross-check every Skill/MCP recommendation against the philosophy docs.** A recommendation that contradicts `philosophy-on-skills` or `philosophy-on-mcp` is dropped, or kept with the contradiction spelled out in `philosophy_check` for the reviewer to resolve
-- [ ] **Prioritize.** Every recommendation gets `priority` and a rough `effort`. A report where everything is "high" helps no one
+- [ ] **Philosophy gate — drop, don't surface.** Before a recommendation ships, cross-check it against `philosophy-on-skills` and `philosophy-on-mcp`. A rec that **contradicts the philosophy is dropped** — the philosophy docs already say what the right shape is (Skills are for judgment-bearing guidance; deterministic capabilities belong in MCP; hard-rule-on-every-event lives in hooks / CI checks but **those are not a recommendation type at this stage**). If the dropped rec's underlying problem can be cleanly rerouted to a different bucket within `prompting | skills | mcp` (e.g. a deterministic-config Skill recommendation reroutable to a CLAUDE.md prompting nudge), reroute it; otherwise drop and record in the Provenance section with the rule that fired. **The philosophy check is a gate, not a surfaced field** — no `philosophy_check` field exists on `findings.report.json` items
+- [ ] **Prioritize per the four-level semantics.** Walk the new `priority` definitions in the Outputs section. `critical` requires the underlying problem to recur across multiple instances *and* each instance to have been high-impact; `high` is a Failure the agent couldn't self-recover from; `medium` is a Failure the agent self-corrected; `low` is cost / efficiency / clarity. Do not estimate effort — `effort` is not a field
 - [ ] **Dedupe.** The same Skill gap surfacing in five Segments across three transcripts is one recommendation with five `sources`, not five recommendations
-- [ ] **Populate `inspiring_segments`, `change_contours`, and `expected_after_state` on every recommendation.** Pick 1–3 Segments (more for cross-transcript clusters) whose findings most directly motivated this recommendation; for each, write a one-sentence `summary` of *what happened in that Segment* (per the Context-rebuild rule). Then write `change_contours` — what the change does, in 2–3 plain sentences — and `expected_after_state` — what would have looked different in those inspiring Segments had the change already been in place. These are the bridge from "you should do X" to "here's what X would have done in this specific session."
+- [ ] **Populate `inspiring_segments` on every recommendation, with before/after evidence chains.** Pick 1–3 Segments (more for cross-transcript clusters) whose findings most directly motivated this recommendation; for each, write a short `summary` of what happened (per the Context-rebuild rule), then a `before_evidence` chain (3–6 real events from `transcript.json` showing the problem playing out — each as `{event_id, snippet}`) and an `after_evidence` chain (the same 3–6 moments, *abbreviated*, as they would look with the recommendation already in place — same `event_id`s where they still apply, new `snippet`s elsewhere). These chains replace long-prose explanation: a reader expands the chains and sees the actual events that justify the rec
 - [ ] Compute the **distance-from-ideal** block by aggregating across the batch. Failure counts, Correction triggers (split user-source vs agent-source), wall-clock totals, and deterministic-trigger candidates come from each transcript's `segments.json` (prefer `segments.reviewed.json`). The human-counterfactual sum does **not** — `human_counterfactual_s` lives in the efficiency findings of each transcript's `findings.outcomes.json`; pull it from there. Sum only **root-segment-level** counterfactuals: a child segment's counterfactual rolls up into its parent, so summing every segment double-counts. Sum each quantity over every transcript. If a transcript is missing `segments.json`, note that transcript's omission rather than failing
-- [ ] Write `findings.report.json` (the `{kind: "report", items: […]}` envelope), `report.md`, and `report.html` into `batch_dir`. All three carry the same recommendations; if a discrepancy ever exists `findings.report.json` is source of truth. Print all paths to stdout
-- [ ] In `report.md` and `report.html`, **hyperlink every reference**: PR / issue / commit / docs URLs (from `external-context.json`) link externally; segment ids, finding ids, recommendation ids link to in-document anchors / detail pages in `report.html`. The reader should not have to copy a PR number into GitHub or grep `segments.json` for `S0.7`
+- [ ] Write `findings.report.json` (the `{kind: "report", items: […]}` envelope) and `report.md` into `batch_dir`. Write the HTML companion as a **multi-page static site** also under `batch_dir`: `report.html` (landing) + `recommendations/rec-NNN.html` per recommendation + `sessions/<short-tag>.html` per transcript. All artifacts carry the same recommendations; if a discrepancy ever exists `findings.report.json` is source of truth. Print all paths to stdout
+- [ ] **Hyperlink every reference, everywhere.** In `report.md` and the HTML site: PR / issue / commit / docs URLs (from `external-context.json`) link externally; recommendation ids link to `recommendations/rec-NNN.html`; transcript ids and segment ids link to `sessions/<short-tag>.html` (segment ids anchored within that page); finding ids open inline detail on the rec page. References like `(S2, ee234e49)` or `S0.7` in prose are real links — the reader should not have to copy a PR number into GitHub or grep `segments.json` for `S0.7`
 - [ ] Point the user at `review-report` — the leap from findings to recommendations is interpretive and earns a human checkpoint, the same way phase 2 and phase 3 do
 
 ## Out of scope
@@ -142,8 +174,8 @@ Two files written into `batch_dir`:
 
 ## Notes
 
-- **The leap is the product.** Phase 3 is deliberately conservative — it labels and stops. The value this skill adds is the synthesis: clustering across the whole batch, routing, prioritizing, and the explicit `rationale` + `sources` + `inspiring_segments` + `change_contours` + `expected_after_state` that together make each leap inspectable.
-- **Context-rebuild rule.** Write every `title`, `recommendation`, `rationale`, `change_contours`, `expected_after_state`, and `inspiring_segments[*].summary` assuming the reader has **no memory of the session**. The session is a specific incident the reader hasn't seen and won't remember a week later. Recreate the necessary context inline — name the Skill or tool by its actual name (in backticks), say which kind of failure happened, name the user-visible symptom — so the recommendation is understandable on its own. `inspiring_segments[*].summary` is the cheapest place to do this: one sentence per Segment, plain language, no jargon, so the reader can ground a recommendation without spelunking through transcript events.
+- **The leap is the product.** Phase 3 is deliberately conservative — it labels and stops. The value this skill adds is the synthesis: clustering across the whole batch, routing, prioritizing, and the explicit `rationale` + `sources` + `inspiring_segments` (with before/after evidence chains) that together make each leap inspectable.
+- **Context-rebuild rule.** Write every `problem`, `recommendation`, `rationale`, and `inspiring_segments[*].summary` assuming the reader has **no memory of the session**. The session is a specific incident the reader hasn't seen and won't remember a week later. Recreate the necessary context inline — name the Skill or tool by its actual name (in backticks), say which kind of failure happened, name the user-visible symptom — so the recommendation is understandable on its own. Use **short sentences**; raw evidence over decoration; if a sentence is over two clauses, split it. `inspiring_segments[*].summary` is the cheapest place to ground: one short sentence per Segment, plain language, no jargon. Heavy lifting goes into the `before_evidence` / `after_evidence` chains, which are real events — they speak louder than prose.
 - **Reviewed input beats draft input.** Always prefer `findings.<kind>.reviewed.json`. A report synthesized from human-blessed findings needs less correction than one synthesized from raw drafts.
 - **Same envelope as phase 3, on purpose.** `findings.report.json` is `{kind, items}` so the review subsystem (`review.py` + `review_server.py` + `review_ui.html`) reviews it unchanged — `review-report` is a thin wrapper, not a new UI.
 - **Privacy.** The findings this reads were synthesized from already-redacted Segments upstream (phase 1 redacts at acquire time). This skill writes `findings.report.json` and `report.md` as-is — no redaction pass here.
