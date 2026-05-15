@@ -24,7 +24,7 @@ So `external-context.json` is treated as a **draft**, not an answer — the same
 
 ```
 tmp_dir/
-  transcript.json                    # tier 1 — never touched
+  transcript.json                    # phase 1 — never touched
   external-context.json              # gather-external-context draft — never touched
   external-context.reviewed.json     # written here; same schema + a `review` block
 ```

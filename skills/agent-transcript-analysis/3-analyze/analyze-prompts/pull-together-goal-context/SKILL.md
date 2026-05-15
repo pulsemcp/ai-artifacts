@@ -16,9 +16,9 @@ Helper for `analyze-user-prompt`. Pulls just enough external context to make a l
 
 ## Inputs
 
-- `segment`: the Segment whose Goal needs disambiguation. The user message lives in `segment.trigger.text` (when `trigger.source == "user"`); turn_range lives in `segment.meta.turn_range`
-- `segment_turns`: the raw turns within `segment.meta.turn_range` — surrounding turns may name a file, a PR, an issue, a service, etc.
-- `manifest`: gives `project_path`, branch (if recorded), session timestamps
+- `segment`: the Segment whose Goal needs disambiguation. The user message lives in `segment.trigger.text` (when `trigger.source == "user"`); the event span lives in `segment.meta.event_range`.
+- `transcript.json`: the OpenTranscripts `Transcript` document. Dereference event ids from `segment.meta.event_range` into `transcript.json` `events[]` for the surrounding events — they may name a file, a PR, an issue, a service, etc.
+- `external_context` (optional): `external-context.json` if present — supplies `project`, branch, ticket, and session-timing context, often resolving the Goal without any external pull.
 
 ## Output
 
@@ -33,9 +33,11 @@ Helper for `analyze-user-prompt`. Pulls just enough external context to make a l
 }
 ```
 
+This is a helper invoked by `analyze-user-prompt`, not an analyzer the orchestrator writes into a `findings.<kind>.json` — its output is consumed in-process, so it carries no `id` / `segment_id` / `analyzer` wrapper.
+
 ## Sequencing checklist
 
-- [ ] Inventory the references in `segment.trigger.text` and `segment_turns` (file paths, PR/issue numbers, branch names, service names, commit shas, ticket ids)
+- [ ] Inventory the references in `segment.trigger.text`, `external_context`, and the events in `segment.meta.event_range` (file paths, PR/issue numbers, branch names, service names, commit shas, ticket ids)
 - [ ] For each reference, pull the smallest amount of external context that resolves the ambiguity:
   - **Git**: `git log` around the session timestamp, `git show <sha>`, the diff on the branch at that time
   - **GitHub PRs/issues**: `gh pr view`, `gh issue view`, including the description and the most recent few comments

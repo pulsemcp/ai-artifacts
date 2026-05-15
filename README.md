@@ -9,11 +9,11 @@ The repo is a single [pulsemcp/AIR](https://github.com/pulsemcp/air) catalog: an
 ├── air.json                       # AIR root config — points at the per-type index files
 ├── skills/
 │   ├── skills.json                # AIR skills index (flat — every skill listed by id)
-│   └── <plugin-id>/               # plugin grouping — numbered tier folders inside
-│       ├── 1-<tier>/              # grouping folders are non-Skills (no SKILL.md)
+│   └── <plugin-id>/               # plugin grouping — numbered phase folders inside
+│       ├── 1-<phase>/              # grouping folders are non-Skills (no SKILL.md)
 │       │   └── <skill-id>/SKILL.md
-│       ├── 2-<tier>/...
-│       └── N-<tier>/...
+│       ├── 2-<phase>/...
+│       └── N-<phase>/...
 ├── references/
 │   ├── references.json            # AIR references index
 │   ├── philosophy-on-skills.md
@@ -65,7 +65,7 @@ Every analysis skill should consult these before recommending a create/modify/de
 
 #### Workflow
 
-The pipeline is built around the **Transcript Segment** — a recursive primitive (one Goal, one Outcome, optional Prompt, sub-Segments). See [`references/transcript-segment.md`](references/transcript-segment.md). Tier 2 produces the Segment tree; everything downstream reads it.
+The pipeline is built around the **Transcript Segment** — a recursive primitive (one Goal, one Outcome, optional Prompt, sub-Segments). See [`references/transcript-segment.md`](references/transcript-segment.md). Phase 2 produces the Segment tree; everything downstream reads it.
 
 ```
 ┌────────────────────────────────────┐
@@ -99,7 +99,7 @@ The pipeline is built around the **Transcript Segment** — a recursive primitiv
      └───────────┴──────────┬──┴────────────────┘
                             ▼
                 findings.{outcomes,prompts,skills,mcp}.json
-                  — one set per transcript. Tiers 1-3
+                  — one set per transcript. Phases 1-3
                   repeat per transcript; findings accumulate.
 
    ── once the batch is complete ──────────────────────────
@@ -123,14 +123,14 @@ The pipeline is built around the **Transcript Segment** — a recursive primitiv
 
 #### Skills bundled by this plugin
 
-| Tier | Skill | Role |
+| Phase | Skill | Role |
 |---|---|---|
 | 1 — acquire | [`find-all-claude-code-transcripts-on-local`](skills/agent-transcript-analysis/1-acquire/find-all-claude-code-transcripts-on-local/SKILL.md) | Lists sessions from `~/.claude/projects` and spawns a local UI to pick one. |
 | 1 — acquire | [`get-claude-code-transcript-from-local`](skills/agent-transcript-analysis/1-acquire/get-claude-code-transcript-from-local/SKILL.md) | Given a session id, gathers the main transcript **plus any subagent transcripts** into a single tmp folder. |
 | 2 — decompose | [`decompose-agent-transcript-into-transcript-segments`](skills/agent-transcript-analysis/2-decompose/decompose-agent-transcript-into-transcript-segments/SKILL.md) | Walks the JSONL once and produces the recursive **Transcript Segment** tree (`segments.json`) plus an annotated `flamegraph.html`. Sole producer of the Segment primitive. |
-| 3 — analyze | [`analyze-agent-transcript`](skills/agent-transcript-analysis/3-analyze/analyze-agent-transcript/SKILL.md) | Orchestrator and entry point of the analyze tier. Picks up the Segment tree from tier 2, runs the per-Segment analyzers, and writes that transcript's findings — then stops. Runs per transcript; produces no report. |
+| 3 — analyze | [`analyze-agent-transcript`](skills/agent-transcript-analysis/3-analyze/analyze-agent-transcript/SKILL.md) | Orchestrator and entry point of the analyze phase. Picks up the Segment tree from phase 2, runs the per-Segment analyzers, and writes that transcript's findings — then stops. Runs per transcript; produces no report. |
 | 3 — analyze (outcomes) | [`analyze-failure-hypothesis`](skills/agent-transcript-analysis/3-analyze/analyze-outcomes/analyze-failure-hypothesis/SKILL.md) | For every Failure Outcome (and retro-Failure surfaced by a Correction Prompt), produces an improvement hypothesis. |
-| 3 — analyze (outcomes) | [`analyze-segment-efficiency`](skills/agent-transcript-analysis/3-analyze/analyze-outcomes/analyze-segment-efficiency/SKILL.md) | Wall-clock / token spend vs human counterfactual. Flags wasteful branches and model-tier mismatches — including on Successes. |
+| 3 — analyze (outcomes) | [`analyze-segment-efficiency`](skills/agent-transcript-analysis/3-analyze/analyze-outcomes/analyze-segment-efficiency/SKILL.md) | Wall-clock / token spend vs human counterfactual. Flags wasteful branches and model-phase mismatches — including on Successes. |
 | 3 — analyze (prompts) | [`analyze-user-prompt`](skills/agent-transcript-analysis/3-analyze/analyze-prompts/analyze-user-prompt/SKILL.md) | Per-Prompt: question vs delegation, Goal, closed-loop. Feeds the "human prompting" recommendation bucket. |
 | 3 — analyze (prompts) | [`analyze-prompt-ambition`](skills/agent-transcript-analysis/3-analyze/analyze-prompts/analyze-prompt-ambition/SKILL.md) | Per-Initial-Prompt: was it scoped right, should a deterministic trigger have fired it. |
 | 3 — analyze (prompts) | [`pull-together-goal-context`](skills/agent-transcript-analysis/3-analyze/analyze-prompts/pull-together-goal-context/SKILL.md) | Reaches into git repos / external systems when a Prompt's Goal isn't self-evident. Helper for `analyze-user-prompt`. |
@@ -140,7 +140,7 @@ The pipeline is built around the **Transcript Segment** — a recursive primitiv
 | 3 — analyze (mcp) | [`analyze-mcp-trigger-performance`](skills/agent-transcript-analysis/3-analyze/analyze-mcp/analyze-mcp-trigger-performance/SKILL.md) | Same as the Skill version, but for MCP servers / tools. |
 | 3 — analyze (mcp) | [`analyze-mcp-action-performance`](skills/agent-transcript-analysis/3-analyze/analyze-mcp/analyze-mcp-action-performance/SKILL.md) | Same as the Skill version, but for MCP servers / tools. |
 | 3 — analyze (mcp) | [`analyze-mcp-gaps`](skills/agent-transcript-analysis/3-analyze/analyze-mcp/analyze-mcp-gaps/SKILL.md) | Same as the Skill version, but for MCP servers / tools. |
-| 3 — analyze (cross-transcript) | [`analyze-cross-transcript-patterns`](skills/agent-transcript-analysis/3-analyze/analyze-cross-transcript/analyze-cross-transcript-patterns/SKILL.md) | Runs once over many transcripts' findings sets — last in tier 3, an optional pre-report step. Surfaces hindsight-as-foresight Segment patterns, recurring user prompts, deduped Skill/MCP gaps, and time-spend trends. |
+| 3 — analyze (cross-transcript) | [`analyze-cross-transcript-patterns`](skills/agent-transcript-analysis/3-analyze/analyze-cross-transcript/analyze-cross-transcript-patterns/SKILL.md) | Runs once over many transcripts' findings sets — last in phase 3, an optional pre-report step. Surfaces hindsight-as-foresight Segment patterns, recurring user prompts, deduped Skill/MCP gaps, and time-spend trends. |
 
 #### Privacy
 

@@ -27,6 +27,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 import sys
 import tempfile
 from collections import Counter
@@ -114,6 +115,15 @@ def main(argv: list[str] | None = None) -> int:
     unmapped = raw.get("unmapped_lines") or []
     problems = validate_transcript(transcript)
 
+    # Redaction-counts-by-pattern come from scanning the final transcript JSON
+    # for the `<REDACTED:LABEL>` markers the redaction patterns inject. This
+    # captures every redaction across the tree (parent + nested subagents),
+    # by definition matches what landed on disk, and avoids threading a tally
+    # dict through every redact() call site.
+    _redaction_pat = re.compile(r"<REDACTED:([A-Z_]+)>")
+    transcript_blob = json.dumps(transcript, ensure_ascii=False)
+    redaction_counts = Counter(_redaction_pat.findall(transcript_blob))
+
     log_path = out_dir / "run.log"
     with log_path.open("w", encoding="utf-8") as f:
         f.write(f"source: {jsonl}\n")
@@ -128,6 +138,10 @@ def main(argv: list[str] | None = None) -> int:
         f.write(f"events: {len(transcript['events'])} (tree total: {len(all_events)})\n")
         f.write(f"event_types: {dict(sorted(type_counts.items()))}\n")
         f.write(f"unmapped_lines: {len(unmapped)}\n")
+        if redaction_counts:
+            f.write(f"redaction_counts: {dict(sorted(redaction_counts.items()))}\n")
+        else:
+            f.write("redaction_counts: {} (no secrets matched)\n")
         f.write(f"final_metrics: {transcript['final_metrics']}\n")
         if problems:
             f.write(f"validation: FAILED ({len(problems)} violation(s))\n")

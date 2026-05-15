@@ -1,10 +1,10 @@
-"""Reusable localhost review server for tier-3 findings.
+"""Reusable localhost review server for phase-3 findings.
 
 This is the engine behind the plugin's "one unified review UI, re-used across
 every category" design. The review skill (`review-analysis`) is a thin wrapper:
 it picks a `tmp_dir` and a `kind` and calls `serve()`. The server, the static UI
 (`review_ui.html`), and the provenance contract (`review.py`) are all shared —
-a new reviewable category (a future tier-4 report reviewer, say) needs *no new
+a new reviewable category (a future phase-4 report reviewer, say) needs *no new
 server code and no new UI*, only a `kind` string.
 
 Privacy contract (identical to the rest of the plugin): localhost binding only,

@@ -2,25 +2,25 @@
 name: review-analysis
 description: >
   Open a local browser UI to audit and correct the AI-drafted findings a
-  tier-3 analyzer produced — findings.<kind>.json, one flat list of
+  phase-3 analyzer produced — findings.<kind>.json, one flat list of
   conclusions per bucket (outcomes, prompts, skills, mcp, cross-transcript).
   Every analyzer's output is a draft: thumbs-up the findings you agree with,
   correct the fields it got wrong, reject the ones that miss. Saving writes
   findings.<kind>.reviewed.json next to the draft (the draft is never
-  overwritten) with full correction provenance. Use after the tier-3
+  overwritten) with full correction provenance. Use after the phase-3
   analyzers run (driven by analyze-agent-transcript, or by
   analyze-cross-transcript-patterns) and before learn-from-analysis-corrections.
-  Optional but recommended human checkpoint for tier 3.
+  Optional but recommended human checkpoint for phase 3.
 user-invocable: true
 ---
 
 # Review analysis
 
-The tier-3 analyzers turn a transcript into findings — flat lists of conclusions about Outcomes, Prompts, Skills, MCP servers, and cross-transcript patterns. Each list lands in `tmp_dir` as a `findings.<kind>.json` draft. Those conclusions are **judgment calls**: was this Segment really a Failure? was that Skill a false positive? is this proposed MCP tool actually missing? The analyzer will get some of them wrong.
+The phase-3 analyzers turn a transcript into findings — flat lists of conclusions about Outcomes, Prompts, Skills, MCP servers, and cross-transcript patterns. Each list lands in `tmp_dir` as a `findings.<kind>.json` draft. Those conclusions are **judgment calls**: was this Segment really a Failure? was that Skill a false positive? is this proposed MCP tool actually missing? The analyzer will get some of them wrong.
 
 This skill puts one bucket's draft in front of a human in an editable UI — one finding at a time, thumbs-up / correct / reject — and records every correction with enough provenance that `learn-from-analysis-corrections` can turn the fixes into flagged improvement opportunities for the analyzer that drafted them.
 
-It is the **review checkpoint for tier 3**, the tier-3 counterpart to `review-transcript-segments` (tier 2) and `review-external-context` (tier 1). It is optional — `analyze-agent-transcript` consumes `findings.<kind>.json` fine on its own — but every correction captured here makes the next analysis better.
+It is the **review checkpoint for phase 3**, the phase-3 counterpart to `review-transcript-segments` (phase 2) and `review-external-context` (phase 1). It is optional — `analyze-agent-transcript` consumes `findings.<kind>.json` fine on its own — but every correction captured here makes the next analysis better.
 
 ## Inputs
 
@@ -89,13 +89,13 @@ The correction-provenance contract lives in the bundled `review.py`, the same co
 
 ## Out of scope
 
-- Producing the draft — that's the tier-3 analyzers, driven by `analyze-agent-transcript` (or `analyze-cross-transcript-patterns`).
+- Producing the draft — that's the phase-3 analyzers, driven by `analyze-agent-transcript` (or `analyze-cross-transcript-patterns`).
 - Turning the corrections into improvement opportunities for the analyzers — that's the sibling skill `learn-from-analysis-corrections`.
-- Reviewing the Segment tree (tier 2) or the external-context bundle (tier 1) — those are `review-transcript-segments` and `review-external-context`.
-- Synthesizing findings into a final recommendation slate — that's tier 4's job.
+- Reviewing the Segment tree (phase 2) or the external-context bundle (phase 1) — those are `review-transcript-segments` and `review-external-context`.
+- Synthesizing findings into a final recommendation slate — that's phase 4's job.
 
 ## Privacy
 
-- Secret-redaction runs once, at acquire time (tier 1). The `findings.<kind>.json` drafts this skill reviews were built from already-redacted Segments, so `findings.<kind>.reviewed.json` is written as-is — no second redaction pass here.
+- Secret-redaction runs once, at acquire time (phase 1). The `findings.<kind>.json` drafts this skill reviews were built from already-redacted Segments, so `findings.<kind>.reviewed.json` is written as-is — no second redaction pass here.
 - The localhost server has no public binding and no upload endpoint.
 - `findings.<kind>.json` is never modified.

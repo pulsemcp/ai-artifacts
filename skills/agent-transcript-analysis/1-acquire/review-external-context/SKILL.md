@@ -20,7 +20,7 @@ user-invocable: true
 
 This skill puts the draft in front of a human in an editable UI, and records every correction with enough provenance to see exactly where the gatherer went wrong.
 
-This is the **review checkpoint** for the context bundle — the tier-1 counterpart to `review-transcript-segments`. It is optional — downstream tiers read `external-context.json` fine on its own — but a corrected bundle makes every later judgment better, and the corrections show where `gather-external-context` could be improved.
+This is the **review checkpoint** for the context bundle — the phase-1 counterpart to `review-transcript-segments`. It is optional — downstream phases read `external-context.json` fine on its own — but a corrected bundle makes every later judgment better, and the corrections show where `gather-external-context` could be improved.
 
 ## Inputs
 
@@ -51,7 +51,7 @@ python main.py --tmp-dir /path/to/transcript-tmp-dir [--port 9851] [--no-browser
 - [ ] The user audits each block against its `how_found` evidence: is this the right ticket? the right PR? is the role / team correct?
 - [ ] The user fixes what's wrong — correct a field, attach a ticket or PR the gatherer missed, clear a wrong block, resolve an `unresolved` entry — and adds a "why / context" note explaining each correction
 - [ ] The user clicks **Save**, which writes `external-context.reviewed.json`
-- [ ] Downstream skills (tiers 2-5) prefer `external-context.reviewed.json` when it exists and fall back to `external-context.json`
+- [ ] Downstream skills (phases 2-5) prefer `external-context.reviewed.json` when it exists and fall back to `external-context.json`
 
 ## What the user can edit
 

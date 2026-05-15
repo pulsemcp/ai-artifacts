@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-"""Localhost review UI for the AI-synthesized tier-4 report.
+"""Localhost review UI for the AI-synthesized phase-4 report.
 
 Thin wrapper over the review engine bundled alongside this skill. `synthesize-report`
 emits `findings.report.json` — the consolidated recommendation slate, in the same
-`{kind, items}` envelope every tier-3 findings file uses, with `kind: "report"`.
+`{kind, items}` envelope every phase-3 findings file uses, with `kind: "report"`.
 This skill puts that draft in front of a human in a browser: thumbs-up each
 recommendation, correct the fields the synthesis got wrong, or reject the ones
 whose leap from the findings doesn't hold. Saving writes

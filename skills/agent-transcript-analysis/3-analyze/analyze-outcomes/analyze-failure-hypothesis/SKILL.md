@@ -20,34 +20,42 @@ Per-Segment analyzer for Failure Outcomes and retro-Failures.
 
 ## Inputs
 
-- `segment`: a Segment from `segments.json` whose Outcome is Failure, or whose immediately-following sibling Segment starts with a Correction trigger (either source).
+- `segment`: a Segment from `segments.json` whose Outcome is Failure, or whose immediately-following sibling Segment starts with a Correction trigger (either source). The orchestrator hands you the Segment directly — you do not walk raw JSONL.
 - `surrounding_segments`: the parent Segment, the prior sibling, and the next sibling — needed to reason about retro-Failures and recovery.
+- `transcript.json`: the OpenTranscripts `Transcript` document, available to dereference event ids from `segment.meta.event_range` when you need turn-level evidence.
+- `external_context` (optional): `external-context.json` if present — grounds the hypothesis in *why* the session happened.
 - `philosophy_skills`, `philosophy_mcp`: reference docs, so the hypothesis stays in line with team stance.
 
 ## Output
 
+This is the item **body**. The orchestrator wraps it with `id` / `segment_id` / `analyzer` (see the orchestrator's "Findings-item shape" section) — emit only the fields below.
+
 ```json
 {
-  "segment_id": "...",
   "failure_kind": "outright_failure"
                 | "retro_failure_via_user_correction"
-                | "retro_failure_via_agent_correction",
+                | "retro_failure_via_agent_correction"
+                | "failure_confirmed_by_correction",
   "root_cause_class": "missing_skill" | "non_triggering_skill"
                      | "missing_mcp_tool" | "wrong_mcp_response_shape"
                      | "prompting_issue" | "user_mistake" | "agent_reasoning_error",
-  "evidence": "<turn-level evidence: which assistant turn went wrong, which correction confirmed it (user-source or agent-source)>",
+  "evidence": "<event-id-level evidence: which assistant event went wrong, which correction confirmed it (user-source or agent-source)>",
   "hypothesis": "<one-paragraph improvement hypothesis>",
   "recommendation_route": "prompting" | "skills" | "mcp" | "multi" | "none",
   "recommendation_seed": "<short draft of the concrete change — promoted to a full proposal by the matching analyze-{skills,mcp}-gaps skill>"
 }
 ```
 
+Evidence cites **OpenTranscripts event ids** (the `id` strings in `transcript.json` / `segments.json`), never integer turn numbers.
+
 ## Sequencing checklist
 
 - [ ] Confirm `failure_kind`:
-  - **outright_failure**: Segment's Outcome is Failure in `segments.json`.
+  - **outright_failure**: Segment's Outcome is Failure in `segments.json`, *and* its next sibling does **not** open with a Correction trigger.
   - **retro_failure_via_user_correction**: Segment's Outcome is Success but the next sibling Segment opens with a Correction trigger whose `source == "user"`. Strongest retro-Failure signal — the user had to intervene.
   - **retro_failure_via_agent_correction**: Segment's Outcome is Success but the next sibling Segment opens with a Correction trigger whose `source == "agent"`. Softer signal but still actionable — the agent self-corrected, which usually means it pursued a wrong path far enough to notice.
+  - **failure_confirmed_by_correction**: Segment's Outcome is Failure in `segments.json` **and** its next sibling opens with a Correction trigger — i.e. the outright-Failure and retro-Failure conditions both fire on the same Segment. Use this single value; **emit one item, not two.** Note in `evidence` which Correction source confirmed it (user-source raises urgency).
+  - The orchestrator runs this analyzer when *either* condition holds; when both hold for one Segment, that is exactly the `failure_confirmed_by_correction` case — do not emit a separate item per condition.
   - Trust the segmenter's classification — don't second-guess by re-reading raw JSONL.
 - [ ] Classify the `root_cause_class`. Decision order:
   1. Was there a Skill or MCP tool that *should have triggered*? → `non_triggering_skill` or `missing_skill` / `missing_mcp_tool`.
@@ -63,5 +71,5 @@ Per-Segment analyzer for Failure Outcomes and retro-Failures.
 - **The default cause of a Correction is a Skill issue, not a user mistake.** Per the `transcript-segment` reference, this is the team's prior — only override it with explicit evidence. Applies whether the Correction came from the user or from the agent self-correcting.
 - **Weight retro-Failure recommendations by Correction source.** A `retro_failure_via_user_correction` deserves a more forceful hypothesis (user-visible failure mode) than `retro_failure_via_agent_correction` (agent recovered on its own — still worth fixing, but lower urgency).
 - **Don't propagate failure up the tree.** A leaf Failure does not automatically make its parent a Failure; the segmenter already made that call. Analyze the Segment you were handed.
-- **Stay short.** One hypothesis per Segment. If you find yourself listing three independent causes, the Segment was probably under-decomposed — flag it back to tier 2 instead of papering over it here.
+- **Stay short.** One hypothesis per Segment. If you find yourself listing three independent causes, the Segment was probably under-decomposed — flag it back to phase 2 instead of papering over it here.
 - **The recommendation_seed is a seed, not a finished proposal.** The corresponding `analyze-skill-gaps` / `analyze-mcp-gaps` run is responsible for fleshing it out against the philosophy docs.

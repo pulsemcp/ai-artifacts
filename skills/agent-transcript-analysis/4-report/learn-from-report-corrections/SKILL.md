@@ -5,7 +5,7 @@ description: >
   findings.report.reviewed.json files (produced by review-report), cluster them
   into recurring patterns, and surface them as flagged improvement
   opportunities for synthesize-report — the skill that makes the leap from
-  tier-3 findings to recommendations. Consumes the append-only correction log
+  phase-3 findings to recommendations. Consumes the append-only correction log
   (approvals, field edits, rejections, notes), diagnoses where the synthesis
   over-reaches, mis-routes, or mis-prioritizes, and writes that up for a human
   to act on. It flags opportunities — it does not edit any skill. Use after a
@@ -39,7 +39,7 @@ This skill **flags; it does not apply.** Whoever picks up the write-up decides w
 - [ ] Find every `findings.report.reviewed.json` across the given `batch_dir`s and load each one's `review.log` (the append-only correction log) plus the per-item `review` verdicts
 - [ ] Bucket each log entry by recommendation `bucket` (`prompting` / `skills` / `mcp`) and by type (`approve` / `field` / `reject` / `note`)
 - [ ] **Cluster the corrections.** A `reject` reason that repeats, or a `field` edit with a `before → after` direction that repeats, is a pattern. Read the `note` entries — they are the reviewer's own explanation of *why* the recommendation was wrong, and are the highest-signal input
-- [ ] **Trace each cluster to a synthesis behavior.** Unlike the tier-3 learner, every correction here points back at one skill — `synthesize-report` — so the question is not *which* skill but *which behavior*:
+- [ ] **Trace each cluster to a synthesis behavior.** Unlike the phase-3 learner, every correction here points back at one skill — `synthesize-report` — so the question is not *which* skill but *which behavior*:
   - rejections citing "the `sources` don't support this" → the synthesis is **over-reaching** the findings
   - corrections to `bucket` → the synthesis is **mis-routing** findings into the wrong output bucket
   - corrections to `priority` / `effort` → the synthesis is **mis-calibrating** how much each recommendation matters
@@ -70,10 +70,10 @@ Each `findings.report.reviewed.json` carries `review.log` — a flat, time-order
 
 - Capturing corrections — that's `review-report`.
 - Editing `synthesize-report` or any other skill — this skill **flags opportunities for a human**; it never patches a skill. The deployed skill files are a copy; changes belong at the source of truth, behind the normal PR gate.
-- Analyzer corrections (tier 3) and decomposer corrections (tier 2) — those are `learn-from-analysis-corrections` and `learn-from-segment-corrections`. This skill is narrowly about what the tier-4 *synthesis* review history reveals: a tier-3 finding being wrong is the analyzer's problem; a correct finding being turned into a bad recommendation is `synthesize-report`'s.
+- Analyzer corrections (phase 3) and decomposer corrections (phase 2) — those are `learn-from-analysis-corrections` and `learn-from-segment-corrections`. This skill is narrowly about what the phase-4 *synthesis* review history reveals: a phase-3 finding being wrong is the analyzer's problem; a correct finding being turned into a bad recommendation is `synthesize-report`'s.
 
 ## Notes
 
 - This skill is **only as good as the review volume**. Run it after several reports have been through `review-report`, not after one.
 - Conflicting corrections are signal too: if one reviewer rejects a recommendation another approves, the synthesis may be making a genuinely ambiguous call — that belongs in "Open questions", and is worth flagging as a possible gap in `synthesize-report`'s own contract rather than a tuning issue.
-- This skill is the tier-4 twin of `learn-from-analysis-corrections` (tier 3) and `learn-from-segment-corrections` (tier 2). Same shape — read a structured correction log, cluster it, flag opportunities, never apply — pointed at the synthesis step instead of the analyzers or the decomposer.
+- This skill is the phase-4 twin of `learn-from-analysis-corrections` (phase 3) and `learn-from-segment-corrections` (phase 2). Same shape — read a structured correction log, cluster it, flag opportunities, never apply — pointed at the synthesis step instead of the analyzers or the decomposer.

@@ -58,8 +58,8 @@ Each `segments.reviewed.json` carries `review.log` — a flat, time-ordered list
 
 - **Direction matters.** Ten `outcome.kind` edits split 9 `Success → Failure` and 1 the other way is a clear "the decomposer is too optimistic about Outcomes" pattern — don't dilute it by counting the lone reverse edit.
 - **Splits and merges are about the leaf-stop rule and boundary triggers.** A pile of merges → the leaf-stop rule is too aggressive, or a boundary trigger is firing on noise. A pile of splits → a boundary trigger is too conservative.
-- **`trigger.kind` corrections are the highest-value pattern.** Correction-vs-New drives the entire retro-Failure signal downstream; a systematic misclassification there poisons every tier-3 analyzer.
-- **Notes that say "the agent should have…" are usually really Skill/MCP gaps**, not decomposer bugs — route those as Open questions toward tier 3, don't try to fix them in the decomposer.
+- **`trigger.kind` corrections are the highest-value pattern.** Correction-vs-New drives the entire retro-Failure signal downstream; a systematic misclassification there poisons every phase-3 analyzer.
+- **Notes that say "the agent should have…" are usually really Skill/MCP gaps**, not decomposer bugs — route those as Open questions toward phase 3, don't try to fix them in the decomposer.
 
 ## Out of scope
 

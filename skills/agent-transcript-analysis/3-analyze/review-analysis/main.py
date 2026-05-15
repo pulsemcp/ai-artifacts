@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""Localhost review UI for AI-drafted tier-3 analyzer findings.
+"""Localhost review UI for AI-drafted phase-3 analyzer findings.
 
-Thin wrapper over the review engine bundled alongside this skill. The tier-3
+Thin wrapper over the review engine bundled alongside this skill. The phase-3
 analyzers emit `findings.<kind>.json` — flat lists of conclusions, one file per
 bucket (outcomes, prompts, skills, mcp, cross-transcript). This skill puts one
 of those drafts in front of a human in a browser: thumbs-up each finding,

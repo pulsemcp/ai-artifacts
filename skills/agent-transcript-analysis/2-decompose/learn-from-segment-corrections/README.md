@@ -1,6 +1,6 @@
 # `learn-from-segment-corrections`
 
-The feedback half of the tier-2 review loop. Reads the human corrections captured by `review-transcript-segments` and **flags concrete improvement opportunities** for `decompose-agent-transcript-into-transcript-segments` — it does not edit any skill.
+The feedback half of the phase-2 review loop. Reads the human corrections captured by `review-transcript-segments` and **flags concrete improvement opportunities** for `decompose-agent-transcript-into-transcript-segments` — it does not edit any skill.
 
 ## Why this exists
 
@@ -42,4 +42,4 @@ learn-from-segment-corrections       →  flagged opportunities for decompose-ag
 - **Flag, don't apply.** The same human-in-the-loop principle that makes `segments.json` a draft makes this skill's output a flag, not a fix. A skill that rewrote another skill from a handful of corrections would be unreviewable — and the skill files it sees at runtime are a deployed copy anyway, not the source of truth.
 - **Patterns, not anecdotes.** A single correction is noise; the same `before → after` across several transcripts is a heuristic. The skill is explicitly told to run on review *volume*, and to park one-offs and contradictions in "Open questions".
 - **The `note` is the highest-signal field.** A `before`/`after` says *what* the human changed; the context note says *why*. The skill leans on notes to trace a correction back to the specific heuristic that misfired.
-- **Stays in its lane.** Corrections that are really about agent behavior (missing Skills, missing MCP tools) get routed toward tier 3, not attributed to the decomposer. This skill only flags opportunities in the *decomposition* logic.
+- **Stays in its lane.** Corrections that are really about agent behavior (missing Skills, missing MCP tools) get routed toward phase 3, not attributed to the decomposer. This skill only flags opportunities in the *decomposition* logic.

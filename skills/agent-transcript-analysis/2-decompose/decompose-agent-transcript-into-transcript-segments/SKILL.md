@@ -9,7 +9,7 @@ description: >
   subagent), a Goal (Plan | Action), an Outcome (Success | Failure), child
   sub-segments, and a meta block (event range, wall-clock, tokens, model).
   Emits segments.json (structured) and flamegraph.html (annotated). All
-  tier-3 analyzers read segments.json — they never walk transcript.json
+  phase-3 analyzers read segments.json — they never walk transcript.json
   events directly. Use this skill immediately after acquisition and before
   any analyze-* skill.
 user-invocable: false
@@ -59,7 +59,7 @@ Both must agree. Downstream skills read `segments.json`; humans look at `flamegr
 
 ## Out of scope
 
-- Acquiring the transcript or transforming CC JSONL — that's tier 1.
+- Acquiring the transcript or transforming CC JSONL — that's phase 1.
 - Any analysis or recommendation — every `analyze-*` skill is downstream of this.
 - Cross-transcript work — that's `analyze-cross-transcript-patterns`.
 

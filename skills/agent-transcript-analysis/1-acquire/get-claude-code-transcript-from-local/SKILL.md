@@ -15,7 +15,7 @@ user-invocable: true
 
 # Get Claude Code transcript
 
-The acquisition step of the analysis pipeline: take a CC session id, gather the main JSONL plus every linked subagent JSONL, run the deterministic CC→OpenTranscripts transformation, and emit a single `transcript.json` ready for tier 2. This skill owns the canonical CC→OT mapping end to end — locating the session and transforming it are one job, not two.
+The acquisition step of the analysis pipeline: take a CC session id, gather the main JSONL plus every linked subagent JSONL, run the deterministic CC→OpenTranscripts transformation, and emit a single `transcript.json` ready for phase 2. This skill owns the canonical CC→OT mapping end to end — locating the session and transforming it are one job, not two.
 
 ## Invocation
 
@@ -64,7 +64,7 @@ Per the line-by-line mapping in the `open-transcripts-claude-code-mapping` refer
 - `assistant` + text/thinking/tool_use blocks → emit one `AssistantMessage` for the text content, plus separate `Thinking` and `ToolCall` events for each thinking/tool_use block in the same line.
 - `assistant` + `tool_use` with `name == "Task"` → emit both a `ToolCall` *and* a `SubagentSpawn` event. The `SubagentSpawn`'s `spawned_transcript_id` is resolved in pass 3.
 - `system` lines with error payloads → `Error` event.
-- Compaction markers (`isCompactSummary: true` or equivalent) → `Compaction` event.
+- The CC `system` line with `subtype == "compact_boundary"` → `Compaction` event. This line is the reliable compaction signal — it carries a `compactMetadata` object; map `compactMetadata.preTokens` → `tokens_before`, `compactMetadata.postTokens` → `tokens_after`, and `compactMetadata.trigger` → `trigger` on the `Compaction` event. (An `isCompactSummary: true` flag may also appear on the summary `user` line, but the `compact_boundary` system line is the authoritative marker and the one carrying the metadata.)
 - All other CC line types (`attachment`, `ai-title`, `last-prompt`, `queue-operation`, `permission-mode`, `pr-link`, `file-history-snapshot`, etc.) → `SystemEvent` with `subtype = <CC type>`.
 - Anything wholly unrecognized → `SystemEvent` with `subtype = "unmapped"` *and* the original line appended to `provider.raw.unmapped_lines[]`.
 
@@ -122,7 +122,7 @@ Subagents may themselves spawn subagents; the same recursion applies. No depth l
 ## Out of scope
 
 - Picking which session to pull — that's `find-all-claude-code-transcripts-on-local`.
-- Decomposing the Transcript into Segments — that's tier 2 (`decompose-agent-transcript-into-transcript-segments`).
+- Decomposing the Transcript into Segments — that's phase 2 (`decompose-agent-transcript-into-transcript-segments`).
 - Any analysis or scoring — that's the `analyze-*` skills.
 
 ## When the Claude Code format drifts

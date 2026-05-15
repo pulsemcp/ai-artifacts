@@ -64,6 +64,8 @@ The two dimensions are independent. The four cases that matter most:
 
 The presence of a Correction trigger — from either source — retroactively marks the prior sibling segment as Failure even if the agent didn't itself recognize the failure. User-source Corrections are the stronger signal (the user had to intervene); agent-source Corrections are softer but still inform the failure analysis.
 
+**Carve-out — retro-Failure only when the prior segment's *own Goal* wasn't delivered.** Retro-Failure and "Outcome is judged against the Goal" can collide: a Correction can target something the prior segment never claimed to do. Resolve it by the prior segment's *own* stated Goal. If the Correction indicates that Goal was not actually delivered (the work the segment set out to do was wrong or incomplete), the prior segment is retro-marked Failure. But if the prior segment met its literal Goal and the Correction opens a genuinely new or adjacent Goal, the prior segment **stays Success** — the Correction trigger is then just a New-vs-Correction judgment call on the *new* segment, not a retro-Failure signal on the old one. User-source Correction stays the strong signal that *a* Correction happened; this carve-out only governs whether it propagates backward as Failure.
+
 ### Children
 
 One or more sub-segments. A segment's children must collectively account for everything between the segment's start and end events. Leaf segments may have a single trivially-atomic action as their sole "child" or, by convention, an empty list.
@@ -94,8 +96,10 @@ Three signals that should prompt the decomposer to draw a new Segment:
    - **Multi-Goal message** (one message asking for two unrelated things — "fix the auth bug, and bump lodash"): draw *one Segment per Goal* as siblings. All siblings share `trigger.event_id` pointing at the same `UserMessage`; their `meta.event_range`s partition the agent's response events by which Goal each addressed.
    - **Continuation-only messages** ("continue", "go on", "yes") do *not* start a new Segment — the Goal is unchanged.
    - **Re-statement with extra context** (the user adds a fact but the Goal is the same) does *not* start a new Segment either; the agent's Goal didn't change, the user just helped.
+   - **Skill-injected / harness-synthesized messages.** A `UserMessage` that carries an injected skill body or a tool/harness-synthesized prompt (e.g. a `wait-for-ci` skill body delivered as a `UserMessage`, not human-typed) does *not* by itself start a new Segment. Judge it the same way as a continuation message — by whether the *Goal* actually changed — not by the fact that a `UserMessage` event appeared.
 
 2. **`SubagentSpawn` event.** A `SubagentSpawn` always starts a child Segment with `trigger.source = subagent`, `trigger.event_id` pointing at the `SubagentSpawn` in the parent's `events[]`, and `trigger.text` set to `SubagentSpawn.prompt`. `meta.source_transcript_id` is the subagent's `Transcript.transcript_id`. The child's `trigger.kind` is almost always `New` (the parent is delegating fresh work); use `Correction` only if the parent explicitly framed the spawn as fixing a prior subagent run. The child's lifetime is the subagent transcript's full `events[]` range; control returns to the parent at the next main-thread event.
+   - **Interleaved spawns and the coverage rule.** When a parent spawns several subagents with main-thread work between them, a strict reading of Coverage ("children tile the parent with no gaps") would force a tiny sub-threshold filler Segment around each spawn — fighting the leaf-stop rule and the "bias toward fewer Segments" guidance. The intended resolution: a subagent child Segment's `event_range` may **absorb the adjacent main-thread events that set up and consume that spawn** (the parent reading inputs for the delegation, then folding the subagent's result back in). Those setup/teardown events belong to the spawn's child Segment, not to a separate filler sibling. The parent's children still tile cleanly, with no sub-threshold filler — that absorption is how the tension resolves.
 
 3. **Topic / file shift within a single agent turn-run.** Between two `UserMessage` events, the agent can pivot to a new Goal on its own ("now let me run the tests" after the edits land). New Segment's `trigger.source = agent`; no `event_id`/`text`. Draw a child Segment only when *all three* hold:
    - The agent verbalizes the shift, **or** the tool-call mode changes (read-only ↔ state-mutating).
@@ -114,7 +118,7 @@ Stop subdividing when **any** of:
 - The Segment serves a single narrowly-scoped Goal that can't be meaningfully split ("write this one function").
 - Further decomposition would produce mechanical sub-steps ("call the function", "check the return value") rather than Goals an analyzer would attach a recommendation to.
 
-Bias toward fewer, more meaningful Segments. Every Segment costs an analyzer pass per tier-4 bucket; a Segment that produces zero findings across all buckets is a sign it shouldn't have been split out.
+Bias toward fewer, more meaningful Segments. Every Segment costs an analyzer pass per phase-4 bucket; a Segment that produces zero findings across all buckets is a sign it shouldn't have been split out.
 
 ### What a Segment is *not*
 
@@ -136,13 +140,13 @@ When analyzing a Segment, look for these in order. Anything that fires becomes a
    - non-triggering Skill (a Skill existed but its description didn't fire)
 3. **Unambitious user-source New trigger** — Success Outcome but short wall-clock and followed by another user-source New trigger soon after. Likely the user split work that could have been one ambitious prompt.
 4. **Wasteful branches** — the Segment spent time on detours that, in hindsight, weren't on the critical path. Where did the time go? Was there a different framing that would have skipped the detour?
-5. **Model-tier mismatch** — could a smaller model have served this Segment without quality loss? Or was the model too small and the Segment thrashed?
+5. **Model-size mismatch** — could a smaller model have served this Segment without quality loss? Or was the model too small and the Segment thrashed?
 
 ## Output contract
 
 `decompose-agent-transcript-into-transcript-segments` consumes a `Transcript` (the JSON document defined by [`transcript.md`](./transcript.md)) and emits **both**:
 
-1. **`segments.json`** — the structured tree. Every analyzer in tier 4 reads this and dereferences event ids into the Transcript as needed. Schema and example below.
+1. **`segments.json`** — the structured tree. Every analyzer in phase 4 reads this and dereferences event ids into the Transcript as needed. Schema and example below.
 2. **`flamegraph.html`** — annotated visualization. The X axis is wall-clock time; the Y axis is Segment depth. Each block is color-coded by Outcome (green = Success, red = Failure) with a badge for any Correction trigger at the Segment's head (badge variant indicates `source: user` vs `source: agent`). Hover/click reveals the Goal text and meta.
 
 Both must agree. Downstream analyzers read `segments.json`; the flamegraph is for humans reviewing the report.
@@ -172,7 +176,7 @@ The file is a single JSON document whose top-level value is the root Segment of 
   "meta": {
     "event_range":          ["evt_01HABC...", "evt_01HXYZ..."], // first/last event ids in this segment (inclusive)
     "wall_clock_s":         1820,
-    "tokens_in":            18200,
+    "tokens_in":            18200,                              // sum of AssistantMessage.usage.input_tokens — uncached input only; see note below
     "tokens_out":            6400,
     "model":                "claude-sonnet-4-6",
     "source_transcript_id": "01HXYZ..."                         // which Transcript this Segment's events live in
@@ -186,8 +190,9 @@ Rules a Segment tree must satisfy:
 - **Trigger consistency**: when `trigger.source` is `user` or `subagent`, both `trigger.event_id` and `trigger.text` are populated. For `source = user`, `trigger.event_id` refers to a `UserMessage` event in the segment's `source_transcript_id`. For `source = subagent`, `trigger.event_id` refers to a `SubagentSpawn` event in the **parent's** Transcript. When `trigger.source = agent`, both `event_id` and `text` are `null`.
 - **Root rule**: the root Segment's `trigger.source` is `user` (or `subagent` if this whole transcript is itself a delegated run); `trigger.kind` is `New`.
 - **Coverage**: a Segment's `children` must collectively cover its `meta.event_range` with no gaps and no overlaps. Leaves have `children: []`.
-- **`id` stability**: ids are deterministic for a given input (e.g. depth-first numbering: `S0`, `S0.0`, `S0.1`, `S0.1.0`). Analyzers reference Segments by `id`; the orchestrator round-trips ids in its report.
+- **`id` stability**: ids MUST follow **depth-first positional numbering** — the root is `S0`; every other Segment is `S{parent_id}.{childIndex}` where `childIndex` is its 0-based position in the parent's `children` array (`S0.0`, `S0.1`, `S0.1.0`, …). This positional scheme is what makes ids deterministic for a given input and stable across re-runs — it is normative, not an example. Analyzers reference Segments by `id`; the orchestrator round-trips ids in its report.
 - **Outcome is local to the Goal**: a Success Segment can sit under a Failure parent and vice versa. Do not propagate up.
+- **`tokens_in` is uncached input, not prompt size**: `tokens_in` sums `AssistantMessage.usage.input_tokens`, but Claude Code logs only the *uncached* input tokens there — the bulk of a turn's real prompt is in `cache_read_tokens`. On a cache-heavy session this sum can be near-zero and is **not** a faithful "prompt size." The definition stands as-is; downstream analyzers should read `tokens_in` as "uncached input tokens" and consult `cache_read_tokens` when they need true context size.
 
 ### Example
 

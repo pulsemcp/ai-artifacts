@@ -17,8 +17,8 @@ Raw vendor logs   →   Transcript        →   TranscriptSegment tree
 (CC JSONL today)      (OpenTranscripts)     (analysis primitive)
 ```
 
-- **Transcript** is the *carrier* — a normalized, vendor-neutral log of what happened. Nine event types, a wrapper with subagent links, redactable. Tier 1 of `agent-transcript-analysis` produces this.
-- **TranscriptSegment** is the *interpretation* — a tree of Trigger → Goal → Outcome over those events. Tier 2 produces this. Tiers 3+ consume only Segments.
+- **Transcript** is the *carrier* — a normalized, vendor-neutral log of what happened. Nine event types, a wrapper with subagent links, redactable. Phase 1 of `agent-transcript-analysis` produces this.
+- **TranscriptSegment** is the *interpretation* — a tree of Trigger → Goal → Outcome over those events. Phase 2 produces this. Phases 3+ consume only Segments.
 
 Keeping them separate means: a new vendor (Codex, Pi, Cursor, etc.) only needs a mapping doc to the Transcript layer; the Segment tree and every analyzer work unchanged.
 

@@ -1,6 +1,6 @@
 # `learn-from-report-corrections`
 
-The feedback half of the tier-4 review loop. Reads the human corrections captured by `review-report` and **flags concrete improvement opportunities** for `synthesize-report` — it does not edit any skill.
+The feedback half of the phase-4 review loop. Reads the human corrections captured by `review-report` and **flags concrete improvement opportunities** for `synthesize-report` — it does not edit any skill.
 
 ## Why this exists
 
@@ -45,8 +45,8 @@ learn-from-report-corrections →  flagged opportunities for synthesize-report
 - **Flag, don't apply.** The same human-in-the-loop principle that makes `findings.report.json` a draft makes this skill's output a flag, not a fix. A skill that rewrote `synthesize-report` from a handful of corrections would be unreviewable — and the skill files it sees at runtime are a deployed copy anyway, not the source of truth.
 - **Patterns, not anecdotes.** A single rejection is noise; the same rejection reason across several reports is a heuristic. The skill is explicitly told to run on review *volume*, and to park one-offs and contradictions in "Open questions".
 - **The `note` is the highest-signal field.** A `before`/`after` or a bare `reject` says *what* the human changed; the context note says *why*. The skill leans on notes to name which synthesis behavior drifted.
-- **One skill, many behaviors.** Every tier-4 correction traces back to one skill — `synthesize-report` — so the diagnostic question is not *which skill* (as it is for the tier-3 learner) but *which behavior*: over-reaching the findings, mis-routing into the wrong bucket, mis-calibrating priority, or a weak philosophy check.
+- **One skill, many behaviors.** Every phase-4 correction traces back to one skill — `synthesize-report` — so the diagnostic question is not *which skill* (as it is for the phase-3 learner) but *which behavior*: over-reaching the findings, mis-routing into the wrong bucket, mis-calibrating priority, or a weak philosophy check.
 
-## Mirrors the tier-2 and tier-3 loops
+## Mirrors the phase-2 and phase-3 loops
 
-This skill is the tier-4 member of the `learn-from-*-corrections` family — `learn-from-segment-corrections` (tier 2), `learn-from-analysis-corrections` (tier 3), `learn-from-report-corrections` (tier 4). Same shape — read a structured correction log, cluster it, flag opportunities, never apply — each pointed at a different interpretive step. The three never overlap: a wrong Segment tree is tier 2's, a wrong finding drawn from a correct tree is tier 3's, and a wrong recommendation synthesized from correct findings is tier 4's.
+This skill is the phase-4 member of the `learn-from-*-corrections` family — `learn-from-segment-corrections` (phase 2), `learn-from-analysis-corrections` (phase 3), `learn-from-report-corrections` (phase 4). Same shape — read a structured correction log, cluster it, flag opportunities, never apply — each pointed at a different interpretive step. The three never overlap: a wrong Segment tree is phase 2's, a wrong finding drawn from a correct tree is phase 3's, and a wrong recommendation synthesized from correct findings is phase 4's.

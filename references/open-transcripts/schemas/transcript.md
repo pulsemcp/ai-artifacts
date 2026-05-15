@@ -1,6 +1,6 @@
 # Transcript (OpenTranscripts v0.1)
 
-A `Transcript` is a single self-contained JSON document representing one agent session — its events, its subagents (recursively), and a small envelope of metadata. This is what tier 1 of `agent-transcript-analysis` emits; everything downstream consumes it.
+A `Transcript` is a single self-contained JSON document representing one agent session — its events, its subagents (recursively), and a small envelope of metadata. This is what phase 1 of `agent-transcript-analysis` emits; everything downstream consumes it.
 
 This page covers the top-level wrapper. The event shapes inside `events[]` are in [`events.md`](./events.md).
 
@@ -70,7 +70,7 @@ Every entry below is in the form: **what**, **tag**, **citation quote**, and, wh
 - parent's `tool_use` for the Agent call: `{"type":"tool_use","id":"toolu_xyz","name":"Task",...}`
 - parent's `tool_result`: `{"type":"tool_result","tool_use_id":"toolu_xyz","toolUseResult":{"agentId":"<agentId>"}}`
 
-Tier 1 walks parent → finds Task tool_uses → matches `toolu_xyz` → emits a `SubagentSpawn` event with `spawned_transcript_id = <agentId>` and recurses into that file. The child's `parent.spawn_event_id` is the id of that `SubagentSpawn` event.
+Phase 1 walks parent → finds Task tool_uses → matches `toolu_xyz` → emits a `SubagentSpawn` event with `spawned_transcript_id = <agentId>` and recurses into that file. The child's `parent.spawn_event_id` is the id of that `SubagentSpawn` event.
 
 **Cross-reference:** Pi has a one-way version of this:
 > "For sessions with a parent (created via `/fork`, `/clone`, or `newSession({ parentSession })`): `{...,"parentSession":"/path/to/original/session.jsonl"}`"
@@ -183,7 +183,7 @@ Pi attaches `Usage` to every assistant message. We do the same at the per-event 
 
 **Why it's ours and not lifted:** No precedent has a single "vendor passthrough" field — each format is shipped *by* a single vendor and doesn't anticipate cross-vendor use. OT does, so we need a place to keep CC-specific quirks (e.g., the `attachment` / `ai-title` / `last-prompt` / `queue-operation` / `permission-mode` / `pr-link` / `file-history-snapshot` line types that don't map cleanly into the 9 OT events) without losing them. The convention is: anything `provider.raw[*]` is preserved on round-trip but never read by analyzers.
 
-**Generated from CC how:** Tier 1 sets `vendor = "claude-code"`, `vendor_version` from the `claudeVersion` field if present, and stuffs anything it couldn't map into `raw.unmapped_lines[]` (an array of original JSONL lines, post-redaction).
+**Generated from CC how:** Phase 1 sets `vendor = "claude-code"`, `vendor_version` from the `claudeVersion` field if present, and stuffs anything it couldn't map into `raw.unmapped_lines[]` (an array of original JSONL lines, post-redaction).
 
 **Cross-reference:** OpenCode's `metadata` field on tool parts is the closest analogue — "extension state persistence" — but it's per-part, not per-transcript.
 

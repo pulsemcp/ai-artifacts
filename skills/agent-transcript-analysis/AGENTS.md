@@ -9,7 +9,7 @@ plugin, as a node, with the data that flows between them on the edges. It is the
 canonical at-a-glance map of the pipeline, and people read it to understand how
 the pieces fit.
 
-**Whenever you add, remove, rename, or re-tier a skill, update that mermaid
+**Whenever you add, remove, rename, or re-phase a skill, update that mermaid
 diagram in the same change.** A skill present in `skills/skills.json` but absent
 from the diagram (or the reverse) is a bug — treat it like a failing test.
 
@@ -21,8 +21,8 @@ them in sync:
 - `skills/skills.json` — the flat catalog AIR resolves; source of truth for each
   skill's `name` and `description`
 - `plugins/plugins.json` — the `agent-transcript-analysis` plugin's `skills` array
-- the tier `README.md` files (`1-acquire/`, `2-decompose/`, …) — each lists the
-  skills in its own tier
+- the phase `README.md` files (`1-acquire/`, `2-decompose/`, …) — each lists the
+  skills in its own phase
 
 ## Documentation conventions
 

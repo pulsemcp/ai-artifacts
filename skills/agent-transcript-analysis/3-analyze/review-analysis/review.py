@@ -1,9 +1,9 @@
-"""Human-in-the-loop review contract for tier-3 *findings*.
+"""Human-in-the-loop review contract for phase-3 *findings*.
 
 `segment_review.py` (bundled with the `review-transcript-segments` skill) is the
 review contract for the recursive Segment tree.
 This module is its sibling for everything *downstream* of decomposition: the
-flat lists of conclusions the tier-3 analyzers produce. A Segment tree is
+flat lists of conclusions the phase-3 analyzers produce. A Segment tree is
 recursive and structural — you split and merge it. A findings list is flat and
 independent — you thumbs-up each conclusion or correct it. So this module is
 deliberately the *simpler* of the two: no split, no merge, no tree walk — just
@@ -13,9 +13,9 @@ It owns the correction-provenance contract shared by the review UI
 (`review_server.py` + `review_ui.html`, bundled here and driven by
 `review-analysis`) and the learning skill (`learn-from-analysis-corrections`).
 The contract is
-deliberately `kind`-parametrised, so a future tier-4 report reviewer can reuse
+deliberately `kind`-parametrised, so a future phase-4 report reviewer can reuse
 it unchanged — see `REPORT_KIND` below — but today the only consumers are the
-tier-3 review skills:
+phase-3 review skills:
 
 - **The AI draft stays pristine.** `findings.<kind>.json` is never overwritten.
 - **`findings.<kind>.reviewed.json` is the human-blessed sibling.** Same schema
@@ -45,10 +45,10 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Iterator
 
-# --- the findings buckets a tier-3 analyzer set can produce ---------------
+# --- the findings buckets a phase-3 analyzer set can produce ---------------
 # Each maps to one `findings.<kind>.json` draft in a transcript tmp_dir.
 FINDINGS_KINDS = {"outcomes", "prompts", "skills", "mcp", "cross-transcript"}
-# `report` is reserved: the contract is kind-agnostic, so a future tier-4
+# `report` is reserved: the contract is kind-agnostic, so a future phase-4
 # report reviewer can adopt it without a schema change. No skill emits it yet.
 REPORT_KIND = "report"
 ALL_KINDS = FINDINGS_KINDS | {REPORT_KIND}

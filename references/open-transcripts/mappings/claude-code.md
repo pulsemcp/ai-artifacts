@@ -26,7 +26,7 @@ The `tool-results/` directory contains text files for tool_result bodies that ex
 ### Legacy layouts
 
 - **CC ≤ ~2.0.x:** subagent JSONLs were written as siblings of the parent file (`~/.claude/projects/<project>/<agentId>.jsonl`) with no `<session-uuid>/` sidecar dir. The transformer should fall back to sibling lookup if `<session-uuid>/subagents/agent-<agentId>.jsonl` doesn't exist.
-- **Orphan sessions:** some projects contain only the sidecar dir (no parent `.jsonl`). These are unrecoverable; tier 1 skips them with a warning.
+- **Orphan sessions:** some projects contain only the sidecar dir (no parent `.jsonl`). These are unrecoverable; phase 1 skips them with a warning.
 
 Each JSONL line is a JSON object with at minimum a `type` field. Empirical line types observed in production CC transcripts:
 
@@ -42,7 +42,7 @@ Common fields on every line: `uuid`, `parentUuid`, `timestamp`, `sessionId`, `cw
 |---|---|
 | `schema_version` | Hard-coded `"0.1"` by the transformer. |
 | `transcript_id` | The session UUID from the JSONL filename. |
-| `parent` | `null` for the main transcript. For a subagent: `{ transcript_id: <parent session uuid>, spawn_event_id: <id of the SubagentSpawn event in the parent> }`. Computed by tier 1, not present in CC. |
+| `parent` | `null` for the main transcript. For a subagent: `{ transcript_id: <parent session uuid>, spawn_event_id: <id of the SubagentSpawn event in the parent> }`. Computed by phase 1, not present in CC. |
 | `agent.name` | Hard-coded `"claude-code"`. |
 | `agent.version` | From the `version` field on the first line. |
 | `agent.model_default` | The `model` field on the first `assistant` line; later overrides go on per-event `AssistantMessage.model`. |
@@ -123,7 +123,7 @@ Subagent linkage is fully recoverable from CC's JSONL with no heuristics. The ca
 3. **Subagent file name**: `<session-uuid>/subagents/agent-<agentId>.jsonl` next to the parent transcript. Companion `agent-<agentId>.meta.json` carries `{ "agentType", "description" }`.
 4. **Every line of the subagent file** carries `"agentId": "<agentId>"` and `"isSidechain": true`.
 
-Tier 1 walks the parent linearly, building a map `toolu_xxx → agentId` as it sees each Task spawn + tool_result pair. For each entry, it loads `<session-uuid>/subagents/agent-<agentId>.jsonl` (falling back to the legacy sibling layout if not found) and emits a child `Transcript`. The child's `parent.spawn_event_id` is the id of the OT `SubagentSpawn` event emitted from step 1.
+Phase 1 walks the parent linearly, building a map `toolu_xxx → agentId` as it sees each Task spawn + tool_result pair. For each entry, it loads `<session-uuid>/subagents/agent-<agentId>.jsonl` (falling back to the legacy sibling layout if not found) and emits a child `Transcript`. The child's `parent.spawn_event_id` is the id of the OT `SubagentSpawn` event emitted from step 1.
 
 Subagents can themselves spawn subagents; the recursion uses the same chain unchanged.
 
@@ -131,7 +131,7 @@ Subagents can themselves spawn subagents; the recursion uses the same chain unch
 
 Apply the redaction patterns from `pulsemcp/agentic-engineering-infra`'s `transcript-export/transcript-export.py` (the patterns we shipped there for `API_KEY`, `STRIPE_KEY`, `AWS_*`, `BEARER_TOKEN`, `PRIVATE_KEY`, etc.) to all string fields *before* any line is written to OT. The OT `Transcript` should never contain raw secrets.
 
-Tier 1 includes `redaction_summary` info in its own run log (counts by pattern) but does **not** carry that into `Transcript` — readers don't need it.
+Phase 1 includes `redaction_summary` info in its own run log (counts by pattern) but does **not** carry that into `Transcript` — readers don't need it.
 
 ## What we do not preserve
 

@@ -4,7 +4,7 @@ description: >
   Read the human corrections captured in one or more
   findings.<kind>.reviewed.json files (produced by review-analysis), cluster
   them into recurring patterns, and surface them as flagged improvement
-  opportunities for the tier-3 analyzers that drafted the findings. Consumes
+  opportunities for the phase-3 analyzers that drafted the findings. Consumes
   the append-only correction log (approvals, field edits, rejections, notes),
   diagnoses which analyzer misfired and in which direction, and writes that up
   for a human to act on. It flags opportunities — it does not edit any skill.
@@ -16,9 +16,9 @@ user-invocable: true
 
 # Learn from analysis corrections
 
-`review-analysis` captures, in structured form, every place a human disagreed with a tier-3 analyzer's findings. This skill is the **other half of that loop**: it reads those corrections, finds the patterns in them, and **flags concrete improvement opportunities** for the analyzer that drafted them — so a human knows exactly where an analyzer is drifting from what they'd have concluded.
+`review-analysis` captures, in structured form, every place a human disagreed with a phase-3 analyzer's findings. This skill is the **other half of that loop**: it reads those corrections, finds the patterns in them, and **flags concrete improvement opportunities** for the analyzer that drafted them — so a human knows exactly where an analyzer is drifting from what they'd have concluded.
 
-It **flags opportunities; it does not apply them.** This skill never edits the tier-3 analyzers (or any other skill). The skill files visible at runtime are a deployed copy — their source of truth lives elsewhere — so the right move is always to *surface* the opportunity for a human, not to patch the copy in place.
+It **flags opportunities; it does not apply them.** This skill never edits the phase-3 analyzers (or any other skill). The skill files visible at runtime are a deployed copy — their source of truth lives elsewhere — so the right move is always to *surface* the opportunity for a human, not to patch the copy in place.
 
 Without this skill, review is a one-shot cleanup. With it, every review tells you something actionable about the analyzers.
 
@@ -30,7 +30,7 @@ Without this skill, review is a one-shot cleanup. With it, every review tells yo
 
 - **`analysis-correction-learnings.md`** — written to the first `tmp_dir` (or a path the caller specifies). A write-up of flagged opportunities for a human, not an applied change. It contains:
   - **Correction patterns** — corrections clustered by what they have in common, grouped by the bucket and analyzer they trace back to (e.g. "across N transcripts the reviewer keeps rejecting `analyze-skill-gaps` findings that propose a Skill for a one-off task").
-  - **Flagged opportunities** — for each pattern, which tier-3 analyzer appears to be misfiring and **in which direction** (too aggressive / too conservative / wrong rationale), with the corrections that motivate it cited as evidence. Describe the opportunity precisely enough that a human can act on it — but stop there: don't write a ready-to-paste edit, and don't point at skill files by path.
+  - **Flagged opportunities** — for each pattern, which phase-3 analyzer appears to be misfiring and **in which direction** (too aggressive / too conservative / wrong rationale), with the corrections that motivate it cited as evidence. Describe the opportunity precisely enough that a human can act on it — but stop there: don't write a ready-to-paste edit, and don't point at skill files by path.
   - **Open questions** — corrections that don't generalize yet, or that conflict with each other, flagged for a human to weigh in.
 
 This skill **flags; it does not apply.** Whoever picks up the write-up decides whether and how to change an analyzer, and makes that change at its source of truth through the normal PR gate.
@@ -70,8 +70,8 @@ Each `findings.<kind>.reviewed.json` carries `review.log` — a flat, time-order
 ## Out of scope
 
 - Capturing corrections — that's `review-analysis`.
-- Editing the tier-3 analyzers or any other skill — this skill **flags opportunities for a human**; it never patches a skill. The deployed skill files are a copy; changes belong at the source of truth, behind the normal PR gate.
-- Decomposer corrections — that's `learn-from-segment-corrections`, the tier-2 counterpart. This skill is narrowly about what the tier-3 analyzers' review history reveals.
+- Editing the phase-3 analyzers or any other skill — this skill **flags opportunities for a human**; it never patches a skill. The deployed skill files are a copy; changes belong at the source of truth, behind the normal PR gate.
+- Decomposer corrections — that's `learn-from-segment-corrections`, the phase-2 counterpart. This skill is narrowly about what the phase-3 analyzers' review history reveals.
 
 ## Notes
 

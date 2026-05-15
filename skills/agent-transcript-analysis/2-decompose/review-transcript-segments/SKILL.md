@@ -18,7 +18,7 @@ user-invocable: true
 
 `decompose-agent-transcript-into-transcript-segments` emits `segments.json` — an **AI draft**. Decomposition is the most interpretive step in the whole pipeline: deciding where a Goal changes, whether a Segment was a Failure, and what its Trigger was are all judgment calls. This skill puts that draft in front of a human in an editable UI so they can correct it, and records every correction with enough provenance that `learn-from-segment-corrections` can turn the fixes into flagged improvement opportunities for the decompose skill.
 
-This is the **review checkpoint** for tier 2. It is optional — analyzers read `segments.json` fine on their own — but every correction captured here makes the next decomposition better.
+This is the **review checkpoint** for phase 2. It is optional — analyzers read `segments.json` fine on their own — but every correction captured here makes the next decomposition better.
 
 ## Inputs
 
@@ -49,7 +49,7 @@ python main.py --tmp-dir /path/to/transcript-tmp-dir [--port 9850] [--no-browser
 - [ ] The user audits the tree: every Trigger / Goal / Outcome field is editable; the event-preview index next to each Segment lets them sanity-check boundaries and evidence
 - [ ] The user fixes what's wrong — edit fields, **Split** a leaf into sub-segments, **Merge ↓** a Segment into its next sibling, and add a **Why / context** note explaining each correction
 - [ ] The user clicks **Save**, which writes `segments.reviewed.json` and surfaces any validation warnings (warnings never block a save — the reviewer's judgment wins)
-- [ ] Downstream skills (tier 3) should now prefer `segments.reviewed.json` when it exists (the bundled `segment_review.py` `load_bundle` helper does this automatically)
+- [ ] Downstream skills (phase 3) should now prefer `segments.reviewed.json` when it exists (the bundled `segment_review.py` `load_bundle` helper does this automatically)
 
 ## What the user can edit
 
@@ -77,6 +77,6 @@ The correction-provenance contract lives in the bundled `segment_review.py`, the
 
 ## Privacy
 
-- Secret-redaction runs once, at acquire time (tier 1). The event index and `segments.reviewed.json` are built from the already-redacted `transcript.json` and `segments.json`, so this skill writes them as-is — no second redaction pass.
+- Secret-redaction runs once, at acquire time (phase 1). The event index and `segments.reviewed.json` are built from the already-redacted `transcript.json` and `segments.json`, so this skill writes them as-is — no second redaction pass.
 - The localhost server has no public binding and no upload endpoint.
 - `segments.json` and `transcript.json` are never modified.

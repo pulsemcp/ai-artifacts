@@ -18,15 +18,17 @@ Per-Segment ambition check. Runs only on Segments with `trigger.kind == "New" &&
 
 ## Inputs
 
-- `segment`: a Segment with `trigger.kind == "New"` and `trigger.source == "user"`.
-- `next_user_new_segments`: the next 1-3 Segments in the same Transcript with the same Trigger shape (`kind: New, source: user`) — needed to detect the "user split work" pattern.
-- `manifest`: project / branch context, useful for spotting recurring user-triggers that should be deterministic.
+- `segment`: a Segment with `trigger.kind == "New"` and `trigger.source == "user"`, carrying its `meta` block (`event_range`, `wall_clock_s`, model). The orchestrator hands you the Segment directly — you do not walk raw JSONL.
+- `next_user_new_segments`: the next 1-3 Segments in the same Transcript with the same Trigger shape (`kind: New, source: user`) — needed to detect the "user split work" pattern. May be empty when this is a root Segment with no following user-source New sibling.
+- `transcript.json`: the OpenTranscripts `Transcript` document, available to dereference event ids when needed.
+- `external_context` (optional): `external-context.json` if present — useful for spotting recurring user-triggers that should be deterministic.
 
 ## Output
 
+This is the item **body**. The orchestrator wraps it with `id` / `segment_id` / `analyzer` (see the orchestrator's "Findings-item shape" section) — emit only the fields below.
+
 ```json
 {
-  "segment_id": "...",
   "ambition_finding": "unambitious" | "appropriately_scoped" | "ambitious",
   "evidence": {
     "wall_clock_s": 0,
@@ -39,10 +41,13 @@ Per-Segment ambition check. Runs only on Segments with `trigger.kind == "New" &&
 }
 ```
 
+Evidence cites **OpenTranscripts event ids** (the `id` strings in `transcript.json` / `segments.json`), never integer turn numbers. On a **root Segment** — one with no following user-source New sibling — `evidence.next_user_new_within_s` is `null` and `evidence.next_user_new_goal_overlap` is `"none"`; the analyzer notes "root — no following prompt to compare" and cannot flag `unambitious` (there is no split-work pattern to detect).
+
 ## Sequencing checklist
 
 - [ ] Confirm `segment.trigger.kind == "New" && segment.trigger.source == "user"`. If not, return early — this skill only applies to user-typed New Triggers.
 - [ ] Pull the Segment's wall-clock from `meta`. If short (< a few minutes by default) **and** the next user-source New Trigger fires soon after **and** that next prompt's Goal overlaps this one's, flag as `unambitious`.
+- [ ] If this is a **root Segment** with no following user-source New sibling (`next_user_new_segments` is empty), there is no split-work pattern to detect: set `evidence.next_user_new_within_s = null`, `evidence.next_user_new_goal_overlap = "none"`, note "root — no following prompt to compare", and judge `ambition_finding` on the prompt's own scope alone (it cannot be `unambitious` on the split-work basis). The deterministic-trigger check below still applies.
 - [ ] If `unambitious`, draft a `prompting_recommendation`: what one combined prompt would have set both Goals up front?
 - [ ] Independently, ask: **does this user-typed New Trigger look like an ad-hoc reaction to an external event** (alert, ticket, schedule, PR opening, build break)? If yes, set `deterministic_trigger_candidate = true` and draft a `trigger_proposal` naming the system that should have fired the prompt instead. This is the north-star case per the `transcript-segment` reference.
 - [ ] For `appropriately_scoped` and `ambitious`, set the recommendation fields to null. Producing no finding is a real outcome.

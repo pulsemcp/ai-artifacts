@@ -2,13 +2,13 @@
 name: analyze-cross-transcript-patterns
 description: >
   Cross-cutting analyzer. Given the per-transcript findings.*.json sets of
-  several already-analyzed transcripts (the tier-3 outputs of
+  several already-analyzed transcripts (the phase-3 outputs of
   analyze-agent-transcript — findings.outcomes/prompts/skills/mcp.json),
   surface patterns that no single transcript reveals: Segments that could
   have been shorter with hindsight, user prompts that repeat the same nudges
   or context, recurring missing Skills / MCP tools across sessions, time-spend
   patterns where the agent consistently takes 5x what a human would. Still
-  tier-3 labeling, but runs once over the whole batch — last in tier 3, after
+  phase-3 labeling, but runs once over the whole batch — last in phase 3, after
   every transcript has been analyzed — as an optional pre-report augmentation,
   not interleaved per transcript and not fanned out by the orchestrator. Runs
   on the raw per-transcript findings; there is no per-transcript report, and
@@ -23,19 +23,23 @@ user-invocable: true
 
 The "step back and look at many sessions at once" analyzer. Per-transcript analysis catches per-session issues; this catches habits.
 
-It runs **once, last in tier 3** — after every transcript in the batch has been analyzed — as an optional pre-report augmentation. It is not interleaved per transcript and not fanned out by `analyze-agent-transcript`; it is run on its own over the whole batch, then `synthesize-report` runs after it.
+It runs **once, last in phase 3** — after every transcript in the batch has been analyzed — as an optional pre-report augmentation. It is not interleaved per transcript and not fanned out by `analyze-agent-transcript`; it is run on its own over the whole batch, then `synthesize-report` runs after it.
 
 It reads the **per-transcript analysis outputs** of many transcripts — the `findings.*.json` sets. There is no per-transcript report to read. The unit of input is each transcript's raw findings set, and that is the point: reading raw findings is what catches the long tail this skill exists to find — individually-minor findings that only become significant once they recur across many sessions.
 
 ## Inputs
 
-- `transcripts` (required): the list of per-transcript `tmp_dir`s that make up the batch — one per already-analyzed transcript. Each contributes its tier-3 findings set: `findings.outcomes.json`, `findings.prompts.json`, `findings.skills.json`, `findings.mcp.json` (preferring any `findings.<kind>.reviewed.json` sibling a human has produced). These are the outputs of `analyze-agent-transcript`'s per-Segment analyzers — not the `report.md` / `findings.report.json` that `synthesize-report` produces. The per-transcript `segments.json` (or `segments.reviewed.json`) sits in the same `tmp_dir` and may be read alongside the findings for Segment/Trigger detail.
+- `transcripts` (required): the list of per-transcript `tmp_dir`s that make up the batch — one per already-analyzed transcript. Each contributes its phase-3 findings set: `findings.outcomes.json`, `findings.prompts.json`, `findings.skills.json`, `findings.mcp.json` (preferring any `findings.<kind>.reviewed.json` sibling a human has produced). These are the outputs of `analyze-agent-transcript`'s per-Segment analyzers — not the `report.md` / `findings.report.json` that `synthesize-report` produces. The per-transcript `segments.json` (or `segments.reviewed.json`) sits in the same `tmp_dir` and may be read alongside the findings for Segment/Trigger detail. Every findings item carries `id` (unique within its file), `segment_id`, `analyzer`, plus analyzer-specific fields; evidence references are OpenTranscripts event ids, never integer turn indices.
+- Per-transcript findings files may diverge in id scheme across orchestrator runs — different runs may number their items differently. Treat finding ids as unique batch-wide and cite them as-is; don't assume a uniform scheme across transcripts.
 - `batch_dir` (optional): the batch-level working directory `findings.cross-transcript.json` is written into — distinct from any single transcript's `tmp_dir`. Defaults to a new tmp dir created for the batch. `synthesize-report` reads this same `batch_dir`.
 - `philosophy_skills`, `philosophy_mcp`: the same references the per-transcript analyzers used.
 
 ## Output
 
-A Markdown + JSON report with these sections:
+Two artifacts, both written into `batch_dir`: the human-readable Markdown report
+`cross-transcript-analysis.md`, and the reviewable-intermediate
+`findings.cross-transcript.json` (described below). The Markdown report has these
+sections:
 
 ```
 # Cross-transcript analysis
@@ -66,19 +70,50 @@ A Markdown + JSON report with these sections:
   would close the gap.
 ```
 
+### Thresholds unreachable at small batch sizes
+
+Some sections have thresholds that **structurally cannot fire** on a small
+batch: "Hindsight-as-foresight" needs a Goal cluster of size ≥ 3, and
+"Time-spend patterns" needs a median over a cluster — neither can be reached on a
+2- or 3-transcript batch. When a section's threshold is unreachable at the
+current batch size, **say so explicitly in that section** ("threshold not
+reachable at N=2") rather than rendering an empty section. This is a distinct
+case from "examined the batch, genuinely clean" — keep the two honest and
+separate. Don't lower the thresholds to compensate; just label which case the
+empty section is.
+
 ### Reviewable intermediate: `findings.cross-transcript.json`
 
 Alongside the report, write the flat list of cross-cutting conclusions to the
-`batch_dir` as `findings.cross-transcript.json`, in the envelope
-`{kind: "cross-transcript", items: [{id, …}]}` — one item per finding across
-all five sections. This is the **reviewable intermediate**: it is the
+`batch_dir` as `findings.cross-transcript.json`, in the same
+`{kind, items: [{id, …}]}` envelope every phase-3 findings file uses, with
+`kind: "cross-transcript"` — one item per finding across all five sections. Each
+item carries:
+
+```jsonc
+{
+  "id":                 "ct-001",          // unique within this file
+  "section":            "Hindsight-as-foresight", // which of the 5 sections
+  "title":              "<short actionable headline>",
+  "summary":            "<the cross-cutting conclusion, in prose>",
+  "evidence":           "<the recurring text / Goal pattern / counts that ground it>",
+  "source_finding_ids": ["<per-transcript finding id>", "..."], // the findings this aggregates
+  "transcripts":        ["<source_transcript_id>", "..."],      // sessions it spans
+  "proposed_change":    "<the Skill / CLAUDE.md / MCP / framing change it implies>"
+}
+```
+
+`source_finding_ids` points back at the per-transcript finding ids this item
+aggregates (cited as-is — see the Inputs note on heterogeneous id schemes), the
+same way `synthesize-report`'s `sources` makes its leap auditable. This is the
+**reviewable intermediate**: it is the
 `cross-transcript` bucket `review-analysis` opens in a human-correction UI, and
 `learn-from-analysis-corrections` turns those corrections into flagged
 improvement opportunities for this analyzer. It is also the optional input
 `synthesize-report` reads from `batch_dir` to fold these cross-cutting findings
 into the batch's recommendation slate. Emitting it is best-effort — the report
 stands on its own — but it is what plugs cross-transcript analysis into the
-tier-3 review loop and the tier-4 report.
+phase-3 review loop and the phase-4 report.
 
 ## Sequencing checklist
 

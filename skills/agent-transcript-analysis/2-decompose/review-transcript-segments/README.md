@@ -1,10 +1,10 @@
 # `review-transcript-segments`
 
-The human review checkpoint for tier 2. Opens a localhost UI to audit and correct the AI-drafted Segment tree, and writes a `segments.reviewed.json` sibling with full correction provenance.
+The human review checkpoint for phase 2. Opens a localhost UI to audit and correct the AI-drafted Segment tree, and writes a `segments.reviewed.json` sibling with full correction provenance.
 
 ## Why this exists
 
-Tier 1 (acquisition, CC → OpenTranscripts) is **deterministic** — a field mapping with no judgment calls, so it needs no review UI. Decomposition is the opposite: where does a Goal change? was this Segment a Failure? was the Trigger a Correction or just the next step? Every one of those is interpretive, and the decomposer will get some of them wrong.
+Phase 1 (acquisition, CC → OpenTranscripts) is **deterministic** — a field mapping with no judgment calls, so it needs no review UI. Decomposition is the opposite: where does a Goal change? was this Segment a Failure? was the Trigger a Correction or just the next step? Every one of those is interpretive, and the decomposer will get some of them wrong.
 
 So `segments.json` is treated as a **draft**, not an answer. This skill is where a human turns the draft into something they'd actually stand behind — and, just as importantly, where their corrections get captured in a structured, replayable form so the decompose skill can be improved from them.
 
@@ -23,7 +23,7 @@ So `segments.json` is treated as a **draft**, not an answer. This skill is where
 
 ```
 tmp_dir/
-  transcript.json            # tier 1 output — never touched
+  transcript.json            # phase 1 output — never touched
   segments.json              # decompose draft — never touched
   segments.reviewed.json     # written here; same schema + a `review` block
 ```
@@ -50,5 +50,5 @@ Every edit appends one replayable entry to the log:
 - **Same schema, so analyzers don't care.** Downstream code calls `load_bundle`, which prefers `segments.reviewed.json` when present and falls back to `segments.json`. No analyzer needs to know whether a tree was reviewed.
 - **The log is the source of truth for provenance.** `write_reviewed` strips stale `review` stamps and re-derives them from the log on every save — so the stamps can never drift from the log, and the log alone is enough for `learn-from-segment-corrections` to work.
 - **Warnings never block a save.** The validator surfaces structural problems (bad enums, dangling event ids, duplicate ids), but the reviewer can save anyway. A human who knows the tree is right beats a validator that thinks it isn't.
-- **Trust upstream redaction.** Secret-redaction runs once, at acquire time (tier 1): `transcript.json` and the `segments.json` decomposed from it are already redacted. The event index shipped to the browser and `segments.reviewed.json` are built from those, so this skill writes them as-is — no second redaction pass.
+- **Trust upstream redaction.** Secret-redaction runs once, at acquire time (phase 1): `transcript.json` and the `segments.json` decomposed from it are already redacted. The event index shipped to the browser and `segments.reviewed.json` are built from those, so this skill writes them as-is — no second redaction pass.
 - **Self-contained, not DRY.** `segment_review.py` is a bundled copy, not a shared library import. A skill that runs from a deployed `.claude/skills/` copy can't reach a sibling's files, so each skill carries its own — portability beats deduplication here.

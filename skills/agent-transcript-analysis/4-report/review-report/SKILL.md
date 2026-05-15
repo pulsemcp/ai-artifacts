@@ -1,26 +1,26 @@
 ---
 name: review-report
 description: >
-  Open a local browser UI to audit and correct the AI-synthesized tier-4
+  Open a local browser UI to audit and correct the AI-synthesized phase-4
   report — findings.report.json in the batch_dir, the single batch-final
   recommendation slate synthesize-report produces from the whole batch's
-  tier-3 findings. The report is a draft: thumbs-up the recommendations you'd
+  phase-3 findings. The report is a draft: thumbs-up the recommendations you'd
   act on, correct the ones whose framing or priority is off, reject the ones
   whose leap from the findings doesn't hold. Saving writes
   findings.report.reviewed.json next to the draft (the draft is never
   overwritten) with full correction provenance. Use after synthesize-report
   and before learn-from-report-corrections. Optional but recommended human
-  checkpoint for tier 4.
+  checkpoint for phase 4.
 user-invocable: true
 ---
 
 # Review report
 
-`synthesize-report` makes the pipeline's one **leap from analysis to recommendations** — it reads the whole batch's tier-3 findings and synthesizes them into `findings.report.json`, a flat slate of actionable next steps. That leap is interpretive: a recommendation can over-reach what its findings actually support, mis-prioritize, mis-route a finding into the wrong bucket, or contradict team philosophy. The synthesis will get some of them wrong.
+`synthesize-report` makes the pipeline's one **leap from analysis to recommendations** — it reads the whole batch's phase-3 findings and synthesizes them into `findings.report.json`, a flat slate of actionable next steps. That leap is interpretive: a recommendation can over-reach what its findings actually support, mis-prioritize, mis-route a finding into the wrong bucket, or contradict team philosophy. The synthesis will get some of them wrong.
 
 This skill puts the report in front of a human in an editable UI — one recommendation at a time, thumbs-up / correct / reject — and records every correction with enough provenance that `learn-from-report-corrections` can turn the fixes into flagged improvement opportunities for `synthesize-report`.
 
-It is the **review checkpoint for tier 4**, the tier-4 counterpart to `review-transcript-segments` (tier 2) and `review-analysis` (tier 3). It is optional — `findings.report.json` stands on its own — but every correction captured here makes the next synthesis better. Crucially, this is where a human reviews **the leap itself**: does each recommendation actually follow from the findings in its `sources` list?
+It is the **review checkpoint for phase 4**, the phase-4 counterpart to `review-transcript-segments` (phase 2) and `review-analysis` (phase 3). It is optional — `findings.report.json` stands on its own — but every correction captured here makes the next synthesis better. Crucially, this is where a human reviews **the leap itself**: does each recommendation actually follow from the findings in its `sources` list?
 
 ## Inputs
 
@@ -28,7 +28,7 @@ It is the **review checkpoint for tier 4**, the tier-4 counterpart to `review-tr
 
 ## The report document
 
-`findings.report.json` is the **same envelope as every tier-3 findings file** — the review subsystem is deliberately schema-agnostic about it:
+`findings.report.json` is the **same envelope as every phase-3 findings file** — the review subsystem is deliberately schema-agnostic about it:
 
 ```
 {
@@ -64,7 +64,7 @@ python main.py --tmp-dir /path/to/batch-dir [--port 9853] [--no-browser]
 
 - [ ] Confirm `batch_dir` contains `findings.report.json` (or `findings.report.reviewed.json`); if not, run `synthesize-report` first
 - [ ] Start the local UI (`python main.py --tmp-dir <batch_dir>`, default `localhost:9853`)
-- [ ] The user audits each recommendation against its `sources`: does this recommendation actually follow from the tier-3 findings it cites? Is the `bucket` right? the `priority`? does `philosophy_check` hold up?
+- [ ] The user audits each recommendation against its `sources`: does this recommendation actually follow from the phase-3 findings it cites? Is the `bucket` right? the `priority`? does `philosophy_check` hold up?
 - [ ] For each recommendation the user **Approves** it (thumbs-up), **corrects** the fields that are wrong, or **Rejects** the whole recommendation — and can attach a "why / context" note explaining a rejection or a correction
 - [ ] The user clicks **Save**, which writes `findings.report.reviewed.json` and surfaces any envelope warnings (warnings never block a save — the reviewer's judgment wins)
 - [ ] Downstream skills prefer `findings.report.reviewed.json` when it exists (the bundled `review.py` loader does this automatically)
@@ -84,17 +84,17 @@ python main.py --tmp-dir /path/to/batch-dir [--port 9853] [--no-browser]
 3. Every action appends an entry to an in-memory **correction log** — `approve` / `field` / `reject` / `note`. The log is append-only and replayable.
 4. On Save, `POST /api/save` hands the edited document + full log to `review.py`'s `write_reviewed`, which strips any stale `review` stamps, re-derives them from the log, validates the envelope, attaches file-level provenance, and atomically writes `findings.report.reviewed.json`.
 
-The correction-provenance contract lives in the bundled `review.py`, the same contract `learn-from-report-corrections` reads. The engine is `kind`-parametrised: `review-analysis` runs it with a tier-3 `kind`, this skill runs it with `report`. No new server, no new UI — only the `kind` differs.
+The correction-provenance contract lives in the bundled `review.py`, the same contract `learn-from-report-corrections` reads. The engine is `kind`-parametrised: `review-analysis` runs it with a phase-3 `kind`, this skill runs it with `report`. No new server, no new UI — only the `kind` differs.
 
 ## Out of scope
 
 - Producing the draft — that's `synthesize-report`.
 - Turning the corrections into improvement opportunities for `synthesize-report` — that's the sibling skill `learn-from-report-corrections`.
-- Reviewing the tier-3 findings, the Segment tree, or the external-context bundle — those are `review-analysis`, `review-transcript-segments`, and `review-external-context`.
+- Reviewing the phase-3 findings, the Segment tree, or the external-context bundle — those are `review-analysis`, `review-transcript-segments`, and `review-external-context`.
 - Re-running the synthesis — a rejected recommendation is left in place and stamped, not regenerated. Re-run `synthesize-report` for a fresh draft.
 
 ## Privacy
 
-- Secret-redaction runs once, at acquire time (tier 1). `findings.report.json` was synthesized from already-redacted findings, so `findings.report.reviewed.json` is written as-is — no second redaction pass here.
+- Secret-redaction runs once, at acquire time (phase 1). `findings.report.json` was synthesized from already-redacted findings, so `findings.report.reviewed.json` is written as-is — no second redaction pass here.
 - The localhost server has no public binding and no upload endpoint.
 - `findings.report.json` is never modified.

@@ -340,7 +340,7 @@ Pi attaches error info to the failing assistant message. OT promotes it to a fir
 
 **Why it's ours and not lifted:** No precedent has a generic catchall. Pi has 11 distinct entry types (some of which — `LabelEntry`, `CustomEntry`, `SessionInfoEntry`, `ThinkingLevelChangeEntry`, `ModelChangeEntry` — would each warrant promotion to first-class OT events if we had multi-vendor evidence they matter for analysis). Until we do, we collapse them all into `SystemEvent` with a `subtype` discriminator. The convention: analyzers may skip `SystemEvent`s; consumers that care can dispatch on `subtype`.
 
-**Generated from CC how:** Claude Code's JSONL has ~13 non-conversation line types beyond `user` / `assistant`: `system`, `attachment`, `ai-title`, `last-prompt`, `queue-operation`, `permission-mode`, `pr-link`, `file-history-snapshot`, etc. Tier 1 maps each to a `SystemEvent` with `subtype` = the CC line type and `payload` = the redacted line minus the fields hoisted to base.
+**Generated from CC how:** Claude Code's JSONL has ~13 non-conversation line types beyond `user` / `assistant`: `system`, `attachment`, `ai-title`, `last-prompt`, `queue-operation`, `permission-mode`, `pr-link`, `file-history-snapshot`, etc. Phase 1 maps each to a `SystemEvent` with `subtype` = the CC line type and `payload` = the redacted line minus the fields hoisted to base.
 
 **Cross-reference (the precedent shape that closest):** Pi's `CustomEntry`:
 > `{"type":"custom","id":"...","parentId":"...","timestamp":"...","customType":"my-extension","data":{...}}` — "Extension state persistence. Does NOT participate in LLM context."
