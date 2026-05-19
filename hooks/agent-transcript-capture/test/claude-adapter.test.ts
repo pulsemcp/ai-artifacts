@@ -89,6 +89,11 @@ describe("ClaudeAdapter", () => {
       process.env.CLAUDE_CODE_VERSION = "";
       expect(adapter.agentVersion(input())).toBeNull();
     });
+
+    it("treats empty-string payload version as missing (falls through)", () => {
+      process.env.CLAUDE_CODE_VERSION = "from-env";
+      expect(adapter.agentVersion(input({ version: "" }))).toBe("from-env");
+    });
   });
 
   it("collects the parent transcript", async () => {

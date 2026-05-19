@@ -34,7 +34,7 @@ On S3 the `{namespace_key}/` prefix is load-bearing — the bucket policy's Reso
 ### What it captures
 
 ```
-manifest.json                  # Session metadata (id, timestamp, agent, privacy mode, file list)
+manifest.json                  # Session metadata — see fields below
 transcript.jsonl               # Parent session transcript
 subagents/
   agent-{id}.jsonl             # Subagent transcripts (all of them)
@@ -43,7 +43,35 @@ tool-results/
   toolu_{id}.txt               # Externalized large tool outputs
 ```
 
+`manifest.json` fields:
+
+| Field           | Type                | Notes                                                                                                                              |
+| --------------- | ------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+| `version`       | `number`            | Manifest schema version (currently `1`).                                                                                           |
+| `created`       | `string` (ISO 8601) | When the archive was built.                                                                                                        |
+| `session_id`    | `string`            | The agent's session UUID.                                                                                                          |
+| `agent`         | `string`            | MCP-client-specific identifier — `"claude_code"` today; future adapters would set e.g. `"claude_cowork"`.                          |
+| `agent_version` | `string \| null`    | Best-effort CLI version (Claude Code: payload `version` → `CLAUDE_CODE_VERSION` env var → `null`). Always present for shape stability. |
+| `privacy_mode`  | `"full" \| "redacted"` | Mirrors the configured privacy mode.                                                                                            |
+| `user_id`       | `string`            | Sanitized local username.                                                                                                          |
+| `files`         | `string[]`          | All file paths inside the archive (excluding the manifest itself).                                                                 |
+| `extra`         | any (optional)      | Opaque user-supplied metadata; **omitted entirely when `AGENT_TRANSCRIPT_CAPTURE_EXTRA_METADATA` is unset** (see below).           |
+
 A single interactive session may produce multiple Stops (one per completed task). Each Stop overwrites the previous archive for that session, so the stored version always reflects the latest state.
+
+### Optional extra metadata
+
+Set `AGENT_TRANSCRIPT_CAPTURE_EXTRA_METADATA` to attach arbitrary user-supplied metadata to every uploaded manifest under the top-level `extra` key. Useful for recording, for example, the CLI flags enabled on the current Claude Code invocation.
+
+- **JSON wins.** If the value parses as JSON, the parsed structure is embedded.
+- **Falls back to raw string** when the value is not valid JSON — no error, no upload failure.
+- **Omitted when unset** (or empty) so the common-case manifest stays clean.
+
+```bash
+export AGENT_TRANSCRIPT_CAPTURE_EXTRA_METADATA='{"cli_flags":["--no-color","-v"],"machine":"laptop-7"}'
+# or
+export AGENT_TRANSCRIPT_CAPTURE_EXTRA_METADATA='--dangerously-skip-permissions enabled'
+```
 
 ## Setup
 
