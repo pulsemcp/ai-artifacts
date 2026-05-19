@@ -356,16 +356,18 @@ describe("loadConfig", () => {
       expect(config!.agent_name).toBe("claude_cowork");
     });
 
-    it("throws when agent_name is an empty string", () => {
+    it("treats empty-string agent_name as unset (falls through to next signal)", () => {
+      // Mirrors the AGENT_TRANSCRIPT_CAPTURE_AGENT_NAME env var's empty-string
+      // handling. `resolveAgentName` also has a defensive `length > 0` guard,
+      // but normalizing here keeps the contract simple.
       writeHookJson({
         mode: "no-auth",
         no_auth: { provider: "gcs", bucket: GOOD_GCS_BUCKET },
         privacy: { mode: "full" },
         agent_name: "",
       });
-      expect(() => loadConfig()).toThrow(
-        "'agent_name' must be a non-empty string when set"
-      );
+      const config = loadConfig();
+      expect(config!.agent_name).toBeUndefined();
     });
 
     it("throws when agent_name is not a string", () => {
@@ -376,7 +378,7 @@ describe("loadConfig", () => {
         agent_name: 42,
       });
       expect(() => loadConfig()).toThrow(
-        "'agent_name' must be a non-empty string when set"
+        "'agent_name' must be a string when set"
       );
     });
   });

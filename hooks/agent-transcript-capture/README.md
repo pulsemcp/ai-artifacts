@@ -65,7 +65,7 @@ The `agent` field in `manifest.json` tells downstream consumers which MCP client
 
 1. `AGENT_TRANSCRIPT_CAPTURE_AGENT_NAME` env var — runtime escape hatch for one-off overrides.
 2. `x-config.agent_name` in `HOOK.json` — set-once-per-install override.
-3. Path heuristic — transcripts under macOS Application Support's `local-agent-mode-sessions/` are tagged `"claude_cowork"` (the Claude Code binary running inside the desktop app's VM sandbox); transcripts under `~/.claude/projects/` are tagged `"claude_code"`.
+3. Path heuristic — transcripts under macOS Application Support's `local-agent-mode-sessions/` are tagged `"claude_cowork"` (the Claude Code binary running inside the desktop app's VM sandbox); transcripts under `~/.claude/projects/` (or when the `CLAUDE_PROJECT_DIR` env var is set) are tagged `"claude_code"`.
 4. Default: `"claude_code"`.
 
 Empty-string values for the env var or config field are treated as not set and fall through to the next signal.
