@@ -13,7 +13,7 @@ describe("detectAgent", () => {
       cwd: "/tmp",
     };
     const adapter = detectAgent(input);
-    expect(adapter.name).toBe("claude");
+    expect(adapter.name).toBe("claude_code");
   });
 
   it("detects Claude Code from CLAUDE_PROJECT_DIR env var", () => {
@@ -24,7 +24,7 @@ describe("detectAgent", () => {
       cwd: "/tmp",
     };
     const adapter = detectAgent(input);
-    expect(adapter.name).toBe("claude");
+    expect(adapter.name).toBe("claude_code");
   });
 
   it("defaults to Claude Code when no heuristic matches", () => {
@@ -34,6 +34,6 @@ describe("detectAgent", () => {
       cwd: "/tmp",
     };
     const adapter = detectAgent(input);
-    expect(adapter.name).toBe("claude");
+    expect(adapter.name).toBe("claude_code");
   });
 });

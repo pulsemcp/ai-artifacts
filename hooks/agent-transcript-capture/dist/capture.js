@@ -30,6 +30,8 @@ var __importStar = (this && this.__importStar) || function (mod) {
     return result;
 };
 Object.defineProperty(exports, "__esModule", { value: true });
+exports.EXTRA_METADATA_ENV_VAR = void 0;
+exports.resolveExtraMetadata = resolveExtraMetadata;
 const path = __importStar(require("path"));
 const interface_1 = require("./adapters/interface");
 const interface_2 = require("./backends/interface");
@@ -39,6 +41,33 @@ const identity_1 = require("./identity");
 const archive_1 = require("./archive");
 const error_page_1 = require("./error-page");
 const manifest_1 = require("./manifest");
+// ---------------------------------------------------------------------------
+// Extra metadata env var
+// ---------------------------------------------------------------------------
+exports.EXTRA_METADATA_ENV_VAR = "AGENT_TRANSCRIPT_CAPTURE_EXTRA_METADATA";
+/**
+ * Resolve the optional `extra` manifest field from
+ * `AGENT_TRANSCRIPT_CAPTURE_EXTRA_METADATA`. The value is opaque to the hook:
+ * users stuff anything they want into it (e.g., the flags currently enabled
+ * on the Claude Code CLI) and it lands in the manifest verbatim.
+ *
+ * Returns `undefined` when the env var is unset or empty (caller omits the
+ * field), the parsed JSON when the value is valid JSON, otherwise the raw
+ * string. A bad JSON value is never an error — manifest-writer issues must
+ * not fail the hook.
+ */
+function resolveExtraMetadata(raw) {
+    if (raw === undefined)
+        return undefined;
+    if (raw.length === 0)
+        return undefined;
+    try {
+        return JSON.parse(raw);
+    }
+    catch {
+        return raw;
+    }
+}
 // ---------------------------------------------------------------------------
 // Stdin reader
 // ---------------------------------------------------------------------------
@@ -96,10 +125,15 @@ async function main() {
         created: now.toISOString(),
         session_id: bundle.sessionId,
         agent: adapter.name,
+        agent_version: adapter.agentVersion(hookInput),
         privacy_mode: config.privacy.mode,
         user_id: userId,
         files: archiveEntries.map((e) => e.path),
     };
+    const extra = resolveExtraMetadata(process.env[exports.EXTRA_METADATA_ENV_VAR]);
+    if (extra !== undefined) {
+        manifest.extra = extra;
+    }
     archiveEntries.unshift({
         path: "manifest.json",
         content: Buffer.from(JSON.stringify(manifest, null, 2), "utf-8"),
@@ -165,9 +199,14 @@ async function main() {
     process.stderr.write(`agent-transcript-capture: upload failed (${errorMsg}): ${details}\n`);
     process.exit(2);
 }
-main().catch((err) => {
-    const message = err instanceof Error ? err.message : String(err);
-    (0, error_page_1.showError)("unexpected_error", message, "unknown");
-    process.stderr.write(`agent-transcript-capture: unexpected error: ${message}\n`);
-    process.exit(2);
-});
+// Only run main() when invoked as the entry script, so other modules (and
+// tests) can import the helpers above without triggering an stdin read +
+// process.exit.
+if (require.main === module) {
+    main().catch((err) => {
+        const message = err instanceof Error ? err.message : String(err);
+        (0, error_page_1.showError)("unexpected_error", message, "unknown");
+        process.stderr.write(`agent-transcript-capture: unexpected error: ${message}\n`);
+        process.exit(2);
+    });
+}

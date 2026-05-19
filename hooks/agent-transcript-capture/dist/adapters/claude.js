@@ -60,7 +60,23 @@ function listFiles(dir, test) {
     }
 }
 class ClaudeAdapter {
-    name = "claude";
+    name = "claude_code";
+    /**
+     * Resolve the Claude Code CLI version, in order:
+     *   1. Stop-hook payload `version` field (most accurate when present)
+     *   2. `CLAUDE_CODE_VERSION` env var (set by some Claude Code releases)
+     *   3. `null` (don't shell out — hooks must be fast and side-effect-free)
+     */
+    agentVersion(hookInput) {
+        if (typeof hookInput.version === "string" && hookInput.version.length > 0) {
+            return hookInput.version;
+        }
+        const envVersion = process.env.CLAUDE_CODE_VERSION;
+        if (typeof envVersion === "string" && envVersion.length > 0) {
+            return envVersion;
+        }
+        return null;
+    }
     async collectSession(hookInput) {
         const transcriptPath = hookInput.transcript_path;
         const sessionId = hookInput.session_id;

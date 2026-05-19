@@ -40,8 +40,55 @@ afterEach(() => {
 describe("ClaudeAdapter", () => {
   const adapter = new ClaudeAdapter();
 
-  it("has name 'claude'", () => {
-    expect(adapter.name).toBe("claude");
+  it("has name 'claude_code'", () => {
+    expect(adapter.name).toBe("claude_code");
+  });
+
+  describe("agentVersion", () => {
+    const origVersion = process.env.CLAUDE_CODE_VERSION;
+    afterEach(() => {
+      if (origVersion !== undefined) {
+        process.env.CLAUDE_CODE_VERSION = origVersion;
+      } else {
+        delete process.env.CLAUDE_CODE_VERSION;
+      }
+    });
+
+    function input(overrides: Partial<HookInput> = {}): HookInput {
+      return {
+        session_id: "s",
+        transcript_path: "/tmp/x.jsonl",
+        cwd: "/tmp",
+        ...overrides,
+      };
+    }
+
+    it("prefers the hook-payload version when present", () => {
+      delete process.env.CLAUDE_CODE_VERSION;
+      expect(adapter.agentVersion(input({ version: "1.2.3" }))).toBe("1.2.3");
+    });
+
+    it("falls back to CLAUDE_CODE_VERSION env var", () => {
+      process.env.CLAUDE_CODE_VERSION = "4.5.6";
+      expect(adapter.agentVersion(input())).toBe("4.5.6");
+    });
+
+    it("payload version wins over env var", () => {
+      process.env.CLAUDE_CODE_VERSION = "from-env";
+      expect(adapter.agentVersion(input({ version: "from-payload" }))).toBe(
+        "from-payload"
+      );
+    });
+
+    it("returns null when no source is available", () => {
+      delete process.env.CLAUDE_CODE_VERSION;
+      expect(adapter.agentVersion(input())).toBeNull();
+    });
+
+    it("returns null when env var is empty string", () => {
+      process.env.CLAUDE_CODE_VERSION = "";
+      expect(adapter.agentVersion(input())).toBeNull();
+    });
   });
 
   it("collects the parent transcript", async () => {

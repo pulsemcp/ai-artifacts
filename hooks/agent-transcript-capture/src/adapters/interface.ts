@@ -13,6 +13,12 @@ export interface HookInput {
   cwd: string;
   permission_mode?: string;
   hook_event_name?: string;
+  /**
+   * Claude Code began including the CLI version in Stop-hook payloads in
+   * recent releases. Field is optional — older versions don't send it, and
+   * other agents that one day grow hook support won't have it either.
+   */
+  version?: string;
 }
 
 /** A single file to include in the session archive. */
@@ -42,7 +48,11 @@ export interface UploadSuccessNotice {
 
 /** Adapter for a specific coding agent's transcript format. */
 export interface AgentAdapter {
-  /** Human-readable name for manifests and logs. */
+  /**
+   * MCP-client-specific identifier emitted in `manifest.agent` (e.g.,
+   * `"claude_code"`, `"claude_cowork"`). Don't use the model family — this
+   * field tells downstream consumers which client produced the transcript.
+   */
   readonly name: string;
 
   /**
@@ -50,6 +60,14 @@ export interface AgentAdapter {
    * Returns a bundle ready for redaction and archiving.
    */
   collectSession(hookInput: HookInput): Promise<SessionBundle>;
+
+  /**
+   * Best-effort agent CLI version emitted in `manifest.agent_version`.
+   * Returns `null` when no reliable source is available — the manifest field
+   * is present-but-null rather than omitted, so consumers can rely on its
+   * shape across uploads.
+   */
+  agentVersion(hookInput: HookInput): string | null;
 
   /**
    * Format a successful-upload notice for this harness in whatever shape will

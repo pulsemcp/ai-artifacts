@@ -9,6 +9,7 @@ import {
   readRecords,
   findBySessionId,
 } from "../src/manifest";
+import { resolveExtraMetadata } from "../src/capture";
 
 let tmpDir: string;
 const origEnv = process.env.AGENT_TRANSCRIPT_CAPTURE_HOME;
@@ -37,7 +38,7 @@ function makeRecord(overrides: Partial<UploadRecord> = {}): UploadRecord {
       "secret-do-not-share-deadbeef/alice/2026/04/10/aaaa-bbbb-cccc.tar.gz",
     object_uri:
       "gs://bucket/secret-do-not-share-deadbeef/alice/2026/04/10/aaaa-bbbb-cccc.tar.gz",
-    agent: "claude",
+    agent: "claude_code",
     status: "uploaded",
     ...overrides,
   };
@@ -112,6 +113,45 @@ describe("readRecords", () => {
     const records = readRecords();
     expect(records).toHaveLength(1);
     expect(records[0].session_id).toBe("ok");
+  });
+});
+
+describe("UploadRecord shape", () => {
+  it("defaults the agent identifier to the MCP-client-specific value", () => {
+    // Sanity check: the ledger record carries the per-client identifier the
+    // Claude Code adapter now emits, not the old "claude" family name.
+    appendRecord(makeRecord({ session_id: "agent-id-check" }));
+    const found = findBySessionId("agent-id-check");
+    expect(found!.agent).toBe("claude_code");
+  });
+});
+
+describe("resolveExtraMetadata", () => {
+  it("returns undefined when env var is unset", () => {
+    expect(resolveExtraMetadata(undefined)).toBeUndefined();
+  });
+
+  it("returns undefined when env var is the empty string", () => {
+    expect(resolveExtraMetadata("")).toBeUndefined();
+  });
+
+  it("parses valid JSON objects", () => {
+    expect(resolveExtraMetadata('{"flags":["--no-color","-v"]}')).toEqual({
+      flags: ["--no-color", "-v"],
+    });
+  });
+
+  it("parses valid JSON scalars and arrays", () => {
+    expect(resolveExtraMetadata("[1,2,3]")).toEqual([1, 2, 3]);
+    expect(resolveExtraMetadata("42")).toBe(42);
+    expect(resolveExtraMetadata("true")).toBe(true);
+  });
+
+  it("falls back to the raw string for invalid JSON", () => {
+    expect(resolveExtraMetadata("--flags --enabled")).toBe(
+      "--flags --enabled"
+    );
+    expect(resolveExtraMetadata("{not json")).toBe("{not json");
   });
 });
 
