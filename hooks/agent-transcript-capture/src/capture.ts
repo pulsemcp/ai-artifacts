@@ -89,7 +89,7 @@ async function main(): Promise<void> {
   }
 
   // 3. Auto-detect agent and collect session files.
-  const adapter = detectAgent(hookInput);
+  const adapter = detectAgent(hookInput, config);
   const bundle = await adapter.collectSession(hookInput);
 
   // 4. Redact if configured.

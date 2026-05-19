@@ -104,7 +104,7 @@ async function main() {
         process.exit(0);
     }
     // 3. Auto-detect agent and collect session files.
-    const adapter = (0, interface_1.detectAgent)(hookInput);
+    const adapter = (0, interface_1.detectAgent)(hookInput, config);
     const bundle = await adapter.collectSession(hookInput);
     // 4. Redact if configured.
     const isRedacted = config.privacy.mode === "redacted";

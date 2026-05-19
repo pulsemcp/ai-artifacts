@@ -176,6 +176,14 @@ function loadConfig() {
             }
         }
     }
+    // --- agent_name (optional override) ---
+    let agentName;
+    if (parsed.agent_name !== undefined) {
+        if (typeof parsed.agent_name !== "string" || parsed.agent_name.length === 0) {
+            throw new Error("agent-transcript-capture config: 'agent_name' must be a non-empty string when set");
+        }
+        agentName = parsed.agent_name;
+    }
     return {
         mode: "no-auth",
         no_auth: noAuthConfig,
@@ -183,6 +191,7 @@ function loadConfig() {
             mode: privacy.mode,
             extra_patterns: extraPatterns,
         },
+        agent_name: agentName,
     };
 }
 /**

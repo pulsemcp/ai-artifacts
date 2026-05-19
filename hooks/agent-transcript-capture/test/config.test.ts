@@ -333,4 +333,51 @@ describe("loadConfig", () => {
     });
     expect(() => loadConfig()).toThrow("'no_auth.max_archive_bytes' must be a positive number");
   });
+
+  describe("agent_name", () => {
+    it("is undefined when not set in HOOK.json", () => {
+      writeHookJson({
+        mode: "no-auth",
+        no_auth: { provider: "gcs", bucket: GOOD_GCS_BUCKET },
+        privacy: { mode: "full" },
+      });
+      const config = loadConfig();
+      expect(config!.agent_name).toBeUndefined();
+    });
+
+    it("parses a non-empty string agent_name", () => {
+      writeHookJson({
+        mode: "no-auth",
+        no_auth: { provider: "gcs", bucket: GOOD_GCS_BUCKET },
+        privacy: { mode: "full" },
+        agent_name: "claude_cowork",
+      });
+      const config = loadConfig();
+      expect(config!.agent_name).toBe("claude_cowork");
+    });
+
+    it("throws when agent_name is an empty string", () => {
+      writeHookJson({
+        mode: "no-auth",
+        no_auth: { provider: "gcs", bucket: GOOD_GCS_BUCKET },
+        privacy: { mode: "full" },
+        agent_name: "",
+      });
+      expect(() => loadConfig()).toThrow(
+        "'agent_name' must be a non-empty string when set"
+      );
+    });
+
+    it("throws when agent_name is not a string", () => {
+      writeHookJson({
+        mode: "no-auth",
+        no_auth: { provider: "gcs", bucket: GOOD_GCS_BUCKET },
+        privacy: { mode: "full" },
+        agent_name: 42,
+      });
+      expect(() => loadConfig()).toThrow(
+        "'agent_name' must be a non-empty string when set"
+      );
+    });
+  });
 });

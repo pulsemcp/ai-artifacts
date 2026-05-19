@@ -44,6 +44,11 @@ describe("ClaudeAdapter", () => {
     expect(adapter.name).toBe("claude_code");
   });
 
+  it("accepts a custom name via constructor (used by detectAgent for Cowork)", () => {
+    expect(new ClaudeAdapter("claude_cowork").name).toBe("claude_cowork");
+    expect(new ClaudeAdapter("custom-thing").name).toBe("custom-thing");
+  });
+
   describe("agentVersion", () => {
     const origVersion = process.env.CLAUDE_CODE_VERSION;
     afterEach(() => {

@@ -46,13 +46,28 @@ function listFiles(
 }
 
 export class ClaudeAdapter implements AgentAdapter {
-  readonly name = "claude_code";
+  readonly name: string;
+
+  /**
+   * Both Claude Code (CLI on the host) and Claude Cowork (the same CLI binary
+   * inside the desktop app's VM sandbox) write transcripts in the same JSONL
+   * layout under a `~/.claude/projects/` tree. So we use a single adapter for
+   * both surfaces and just vary the `name` field that lands in the manifest.
+   * See `detectAgent` in `./interface.ts` for how the value is chosen.
+   */
+  constructor(name: string = "claude_code") {
+    this.name = name;
+  }
 
   /**
    * Resolve the Claude Code CLI version, in order:
    *   1. Stop-hook payload `version` field (most accurate when present)
    *   2. `CLAUDE_CODE_VERSION` env var (set by some Claude Code releases)
    *   3. `null` (don't shell out — hooks must be fast and side-effect-free)
+   *
+   * Same source for Cowork: it runs the same Claude Code binary, and the
+   * sample transcript events in a Cowork session carry the same `version`
+   * field (e.g., "2.1.138") that Claude Code emits in 2.1+.
    */
   agentVersion(hookInput: HookInput): string | null {
     if (typeof hookInput.version === "string" && hookInput.version.length > 0) {

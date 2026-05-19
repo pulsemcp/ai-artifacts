@@ -7,28 +7,60 @@
  * and collecting all files that belong to a session.
  */
 Object.defineProperty(exports, "__esModule", { value: true });
+exports.AGENT_NAME_ENV_VAR = void 0;
+exports.resolveAgentName = resolveAgentName;
 exports.detectAgent = detectAgent;
 // ---------------------------------------------------------------------------
 // Auto-detection + factory
 // ---------------------------------------------------------------------------
 const claude_1 = require("./claude");
+exports.AGENT_NAME_ENV_VAR = "AGENT_TRANSCRIPT_CAPTURE_AGENT_NAME";
 /**
- * Detect the agent type from the hook input and environment.
+ * Resolve the manifest `agent` identifier from the available signals, in
+ * priority order. Exposed for testing; production callers should use
+ * `detectAgent` below.
  *
- * Current heuristics:
- * - transcript_path contains "/.claude/" → Claude Code
- * - CLAUDE_PROJECT_DIR env var is set   → Claude Code
- *
- * Falls back to Claude Code as the default (it's the only agent with a
- * hook system today).  When Cursor or other agents gain hook support,
- * add detection heuristics here.
+ * Resolution order:
+ *   1. `AGENT_TRANSCRIPT_CAPTURE_AGENT_NAME` env var — runtime escape hatch
+ *      for one-off overrides without touching HOOK.json
+ *   2. `config.agent_name` — set-once-per-install override in HOOK.json
+ *   3. Path heuristic: transcripts under macOS Application Support's
+ *      `local-agent-mode-sessions/` are Cowork (Claude Code running inside
+ *      the desktop app's VM sandbox — same JSONL format, different home dir)
+ *   4. Path heuristic: transcripts under `~/.claude/projects/` are Claude
+ *      Code (the CLI on the host)
+ *   5. Default to `claude_code`
  */
-function detectAgent(hookInput) {
-    // Claude Code: transcripts live under ~/.claude/projects/
+function resolveAgentName(hookInput, config) {
+    const envName = process.env[exports.AGENT_NAME_ENV_VAR];
+    if (typeof envName === "string" && envName.length > 0) {
+        return envName;
+    }
+    if (config?.agent_name && config.agent_name.length > 0) {
+        return config.agent_name;
+    }
+    // The Cowork giveaway: macOS path
+    // `~/Library/Application Support/Claude/local-agent-mode-sessions/...`.
+    // Both Cowork and Claude Code paths contain `/.claude/projects/`, so we
+    // have to check the Cowork-specific segment FIRST.
+    if (hookInput.transcript_path.includes("/local-agent-mode-sessions/")) {
+        return "claude_cowork";
+    }
     if (hookInput.transcript_path.includes("/.claude/") ||
         process.env.CLAUDE_PROJECT_DIR) {
-        return new claude_1.ClaudeAdapter();
+        return "claude_code";
     }
-    // Default: assume Claude Code for now.
-    return new claude_1.ClaudeAdapter();
+    return "claude_code";
+}
+/**
+ * Detect the agent adapter from the hook input + (optional) config.
+ *
+ * Today both Claude Code (host CLI) and Claude Cowork (same CLI inside the
+ * desktop app's VM) write the same JSONL layout, so they share `ClaudeAdapter`
+ * — the only difference is the `name` it reports. When a genuinely different
+ * agent surface (Cursor, etc.) grows hook support, branch here on a new
+ * adapter class.
+ */
+function detectAgent(hookInput, config) {
+    return new claude_1.ClaudeAdapter(resolveAgentName(hookInput, config));
 }
