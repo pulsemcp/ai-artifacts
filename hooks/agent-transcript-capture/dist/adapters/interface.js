@@ -22,12 +22,12 @@ exports.AGENT_NAME_ENV_VAR = "AGENT_TRANSCRIPT_CAPTURE_AGENT_NAME";
  *
  * Resolution order:
  *   1. `AGENT_TRANSCRIPT_CAPTURE_AGENT_NAME` env var — runtime escape hatch
- *   2. Path heuristic: transcripts under macOS Application Support's
+ *   2. Cowork path heuristic: transcripts under macOS Application Support's
  *      `local-agent-mode-sessions/` are Cowork (Claude Code running inside
  *      the desktop app's VM sandbox — same JSONL format, different home dir)
- *   3. Path heuristic: transcripts under `~/.claude/projects/` are Claude
- *      Code (the CLI on the host)
- *   4. Default to `claude_code`
+ *   3. Default to `claude_code` (covers the `~/.claude/projects/` host CLI
+ *      case and anything else we don't recognize — Claude Code is the only
+ *      surface we ship for today)
  */
 function resolveAgentName(hookInput) {
     const envName = process.env[exports.AGENT_NAME_ENV_VAR];
@@ -37,13 +37,9 @@ function resolveAgentName(hookInput) {
     // The Cowork giveaway: macOS path
     // `~/Library/Application Support/Claude/local-agent-mode-sessions/...`.
     // Both Cowork and Claude Code paths contain `/.claude/projects/`, so we
-    // have to check the Cowork-specific segment FIRST.
+    // only need to special-case the Cowork-specific segment.
     if (hookInput.transcript_path.includes("/local-agent-mode-sessions/")) {
         return "claude_cowork";
-    }
-    if (hookInput.transcript_path.includes("/.claude/") ||
-        process.env.CLAUDE_PROJECT_DIR) {
-        return "claude_code";
     }
     return "claude_code";
 }

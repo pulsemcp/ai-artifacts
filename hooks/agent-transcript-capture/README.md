@@ -64,8 +64,8 @@ A single interactive session may produce multiple Stops (one per completed task)
 The `agent` field in `manifest.json` tells downstream consumers which MCP client produced the transcript. It is resolved in this order:
 
 1. `AGENT_TRANSCRIPT_CAPTURE_AGENT_NAME` env var — runtime escape hatch (e.g., for users running a fork of Claude Code or a future MCP client).
-2. Path heuristic — transcripts under macOS Application Support's `local-agent-mode-sessions/` are tagged `"claude_cowork"` (the Claude Code binary running inside the desktop app's VM sandbox); transcripts under `~/.claude/projects/` (or when the `CLAUDE_PROJECT_DIR` env var is set) are tagged `"claude_code"`.
-3. Default: `"claude_code"`.
+2. Path heuristic — transcripts under macOS Application Support's `local-agent-mode-sessions/` are tagged `"claude_cowork"` (the Claude Code binary running inside the desktop app's VM sandbox).
+3. Default: `"claude_code"` — covers the standard `~/.claude/projects/` host CLI install and anything else we don't recognize.
 
 An empty `AGENT_TRANSCRIPT_CAPTURE_AGENT_NAME` is treated as unset and falls through to the path heuristic.
 

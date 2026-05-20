@@ -8,11 +8,10 @@ import {
 
 describe("detectAgent", () => {
   afterEach(() => {
-    delete process.env.CLAUDE_PROJECT_DIR;
     delete process.env[AGENT_NAME_ENV_VAR];
   });
 
-  it("detects Claude Code from transcript path containing /.claude/", () => {
+  it("tags Claude Code's typical ~/.claude/projects/ path as claude_code", () => {
     const input: HookInput = {
       session_id: "abc",
       transcript_path: "/home/user/.claude/projects/test/abc.jsonl",
@@ -22,18 +21,9 @@ describe("detectAgent", () => {
     expect(adapter.name).toBe("claude_code");
   });
 
-  it("detects Claude Code from CLAUDE_PROJECT_DIR env var", () => {
-    process.env.CLAUDE_PROJECT_DIR = "/some/path";
-    const input: HookInput = {
-      session_id: "abc",
-      transcript_path: "/some/other/path/abc.jsonl",
-      cwd: "/tmp",
-    };
-    const adapter = detectAgent(input);
-    expect(adapter.name).toBe("claude_code");
-  });
-
-  it("defaults to Claude Code when no heuristic matches", () => {
+  it("defaults to claude_code when no Cowork signal is present", () => {
+    // Anything that's not a Cowork path lands on the default — including
+    // arbitrary paths and the explicit `~/.claude/projects/` case above.
     const input: HookInput = {
       session_id: "abc",
       transcript_path: "/random/path/abc.jsonl",
