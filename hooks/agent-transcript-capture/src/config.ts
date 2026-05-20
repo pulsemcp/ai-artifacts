@@ -39,12 +39,6 @@ export interface CaptureConfig {
   mode: "no-auth";
   no_auth: NoAuthModeConfig;
   privacy: PrivacyConfig;
-  /**
-   * Set-once-per-install override for the manifest `agent` identifier. When
-   * omitted, `detectAgent` falls back to the env-var escape hatch and a path
-   * heuristic. See `resolveAgentName` in src/adapters/interface.ts.
-   */
-  agent_name?: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -240,20 +234,6 @@ export function loadConfig(): CaptureConfig | null {
     }
   }
 
-  // --- agent_name (optional override) ---
-  // Empty-string is treated as "not set" and falls through to the next signal
-  // in resolveAgentName — matches the AGENT_TRANSCRIPT_CAPTURE_AGENT_NAME env
-  // var's empty-string handling. Non-string values are rejected loudly.
-  let agentName: string | undefined;
-  if (parsed.agent_name !== undefined && parsed.agent_name !== "") {
-    if (typeof parsed.agent_name !== "string") {
-      throw new Error(
-        "agent-transcript-capture config: 'agent_name' must be a string when set"
-      );
-    }
-    agentName = parsed.agent_name;
-  }
-
   return {
     mode: "no-auth",
     no_auth: noAuthConfig,
@@ -261,7 +241,6 @@ export function loadConfig(): CaptureConfig | null {
       mode: privacy.mode as "full" | "redacted",
       extra_patterns: extraPatterns,
     },
-    agent_name: agentName,
   };
 }
 

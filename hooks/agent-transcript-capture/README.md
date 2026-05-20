@@ -50,7 +50,7 @@ tool-results/
 | `version`       | `number`            | Manifest schema version (currently `1`).                                                                                           |
 | `created`       | `string` (ISO 8601) | When the archive was built.                                                                                                        |
 | `session_id`    | `string`            | The agent's session UUID.                                                                                                          |
-| `agent`         | `string`            | MCP-client-specific identifier. Auto-detected from the transcript path (`/local-agent-mode-sessions/` → `"claude_cowork"`, otherwise `"claude_code"`). Override with `x-config.agent_name` or `AGENT_TRANSCRIPT_CAPTURE_AGENT_NAME`. |
+| `agent`         | `string`            | MCP-client-specific identifier. Auto-detected from the transcript path (`/local-agent-mode-sessions/` → `"claude_cowork"`, otherwise `"claude_code"`). Override with `AGENT_TRANSCRIPT_CAPTURE_AGENT_NAME`. |
 | `agent_version` | `string \| null`    | Best-effort CLI version (Claude Code: payload `version` → `CLAUDE_CODE_VERSION` env var → `null`). Always present for shape stability. |
 | `privacy_mode`  | `"full" \| "redacted"` | Mirrors the configured privacy mode.                                                                                            |
 | `user_id`       | `string`            | Sanitized local username.                                                                                                          |
@@ -63,12 +63,11 @@ A single interactive session may produce multiple Stops (one per completed task)
 
 The `agent` field in `manifest.json` tells downstream consumers which MCP client produced the transcript. It is resolved in this order:
 
-1. `AGENT_TRANSCRIPT_CAPTURE_AGENT_NAME` env var — runtime escape hatch for one-off overrides.
-2. `x-config.agent_name` in `HOOK.json` — set-once-per-install override.
-3. Path heuristic — transcripts under macOS Application Support's `local-agent-mode-sessions/` are tagged `"claude_cowork"` (the Claude Code binary running inside the desktop app's VM sandbox); transcripts under `~/.claude/projects/` (or when the `CLAUDE_PROJECT_DIR` env var is set) are tagged `"claude_code"`.
-4. Default: `"claude_code"`.
+1. `AGENT_TRANSCRIPT_CAPTURE_AGENT_NAME` env var — runtime escape hatch (e.g., for users running a fork of Claude Code or a future MCP client).
+2. Path heuristic — transcripts under macOS Application Support's `local-agent-mode-sessions/` are tagged `"claude_cowork"` (the Claude Code binary running inside the desktop app's VM sandbox); transcripts under `~/.claude/projects/` (or when the `CLAUDE_PROJECT_DIR` env var is set) are tagged `"claude_code"`.
+3. Default: `"claude_code"`.
 
-Empty-string values for the env var or config field are treated as not set and fall through to the next signal.
+An empty `AGENT_TRANSCRIPT_CAPTURE_AGENT_NAME` is treated as unset and falls through to the path heuristic.
 
 ### Optional extra metadata
 
@@ -279,8 +278,6 @@ All config lives under the `x-config` key in `HOOK.json`.
 ### `no_auth.namespace_key` — string. **Required when `provider` is `"s3"`** (overridden by env `STORAGE_NAMESPACE_KEY`). **Prohibited when `provider` is `"gcs"`** — the secret lives in the bucket name; setting this field (or `STORAGE_NAMESPACE_KEY`) throws a validation error. Format `^secret-do-not-share-[a-f0-9]{12,}$`.
 ### `no_auth.region` — string, required when provider is `"s3"`. AWS region (e.g., `us-east-1`).
 ### `no_auth.max_archive_bytes` — number, default `52428800` (50 MB). Hard client-side cap. Uploads larger than this fail loudly with `archive_too_large` rather than silently bloating the bucket.
-
-### `agent_name` — string, optional. Overrides the auto-detected `manifest.agent` identifier. Useful when running the hook from a non-Claude-Code agent (or to disambiguate forks). Env var `AGENT_TRANSCRIPT_CAPTURE_AGENT_NAME` takes precedence at runtime. See "Agent identifier" above for resolution order.
 
 ### `privacy.mode` — `"full" | "redacted"`, required
 - `"redacted"` (recommended): scrubs API keys, JWTs, connection strings, email addresses, etc. from transcripts before upload.

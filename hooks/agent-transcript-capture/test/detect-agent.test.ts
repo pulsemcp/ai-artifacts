@@ -78,19 +78,7 @@ describe("detectAgent", () => {
       expect(detectAgent(input).name).toBe("custom-agent");
     });
 
-    it("wins over config.agent_name", () => {
-      process.env[AGENT_NAME_ENV_VAR] = "from-env";
-      const input: HookInput = {
-        session_id: "abc",
-        transcript_path: "/home/user/.claude/projects/test/abc.jsonl",
-        cwd: "/tmp",
-      };
-      expect(detectAgent(input, { agent_name: "from-config" }).name).toBe(
-        "from-env"
-      );
-    });
-
-    it("is ignored when set to empty string (falls through to next signal)", () => {
+    it("is ignored when set to empty string (falls through to path heuristic)", () => {
       process.env[AGENT_NAME_ENV_VAR] = "";
       const input: HookInput = {
         session_id: "abc",
@@ -99,31 +87,6 @@ describe("detectAgent", () => {
         cwd: "/tmp",
       };
       expect(detectAgent(input).name).toBe("claude_cowork");
-    });
-  });
-
-  describe("config.agent_name override", () => {
-    it("wins over the path heuristic", () => {
-      const input: HookInput = {
-        session_id: "abc",
-        transcript_path:
-          "/Users/alice/Library/Application Support/Claude/local-agent-mode-sessions/x/.claude/projects/y/abc.jsonl",
-        cwd: "/tmp",
-      };
-      // Path heuristic would say claude_cowork — config wins.
-      expect(detectAgent(input, { agent_name: "claude_code" }).name).toBe(
-        "claude_code"
-      );
-    });
-
-    it("empty string is treated as not set (falls through)", () => {
-      const input: HookInput = {
-        session_id: "abc",
-        transcript_path:
-          "/Users/alice/Library/Application Support/Claude/local-agent-mode-sessions/x/.claude/projects/y/abc.jsonl",
-        cwd: "/tmp",
-      };
-      expect(detectAgent(input, { agent_name: "" }).name).toBe("claude_cowork");
     });
   });
 });

@@ -176,17 +176,6 @@ function loadConfig() {
             }
         }
     }
-    // --- agent_name (optional override) ---
-    // Empty-string is treated as "not set" and falls through to the next signal
-    // in resolveAgentName — matches the AGENT_TRANSCRIPT_CAPTURE_AGENT_NAME env
-    // var's empty-string handling. Non-string values are rejected loudly.
-    let agentName;
-    if (parsed.agent_name !== undefined && parsed.agent_name !== "") {
-        if (typeof parsed.agent_name !== "string") {
-            throw new Error("agent-transcript-capture config: 'agent_name' must be a string when set");
-        }
-        agentName = parsed.agent_name;
-    }
     return {
         mode: "no-auth",
         no_auth: noAuthConfig,
@@ -194,7 +183,6 @@ function loadConfig() {
             mode: privacy.mode,
             extra_patterns: extraPatterns,
         },
-        agent_name: agentName,
     };
 }
 /**
