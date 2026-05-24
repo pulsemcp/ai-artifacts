@@ -32,7 +32,7 @@ function makeRecord(overrides: Partial<UploadRecord> = {}): UploadRecord {
       "secret-do-not-share-deadbeef/alice/2026/04/10/aaaa-bbbb-cccc-dddd.tar.gz",
     object_uri:
       "gs://bucket/secret-do-not-share-deadbeef/alice/2026/04/10/aaaa-bbbb-cccc-dddd.tar.gz",
-    agent: "claude",
+    agent: "claude_code",
     status: "uploaded",
     ...overrides,
   };

@@ -333,4 +333,5 @@ describe("loadConfig", () => {
     });
     expect(() => loadConfig()).toThrow("'no_auth.max_archive_bytes' must be a positive number");
   });
+
 });

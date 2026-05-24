@@ -17,6 +17,35 @@ import { showError } from "./error-page";
 import { appendRecord } from "./manifest";
 
 // ---------------------------------------------------------------------------
+// Extra metadata env var
+// ---------------------------------------------------------------------------
+
+export const EXTRA_METADATA_ENV_VAR = "AGENT_TRANSCRIPT_CAPTURE_EXTRA_METADATA";
+
+/**
+ * Resolve the optional `extra` manifest field from
+ * `AGENT_TRANSCRIPT_CAPTURE_EXTRA_METADATA`. The value is opaque to the hook:
+ * users stuff anything they want into it (e.g., the flags currently enabled
+ * on the Claude Code CLI) and it lands in the manifest verbatim.
+ *
+ * Returns `undefined` when the env var is unset or empty (caller omits the
+ * field), the parsed JSON when the value is valid JSON, otherwise the raw
+ * string. A bad JSON value is never an error — manifest-writer issues must
+ * not fail the hook.
+ */
+export function resolveExtraMetadata(
+  raw: string | undefined
+): unknown | undefined {
+  if (raw === undefined) return undefined;
+  if (raw.length === 0) return undefined;
+  try {
+    return JSON.parse(raw);
+  } catch {
+    return raw;
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Stdin reader
 // ---------------------------------------------------------------------------
 
@@ -81,15 +110,20 @@ async function main(): Promise<void> {
 
   // 5. Build manifest and tar.gz archive.
   const now = new Date();
-  const manifest = {
+  const manifest: Record<string, unknown> = {
     version: 1,
     created: now.toISOString(),
     session_id: bundle.sessionId,
     agent: adapter.name,
+    agent_version: adapter.agentVersion(hookInput),
     privacy_mode: config.privacy.mode,
     user_id: userId,
     files: archiveEntries.map((e) => e.path),
   };
+  const extra = resolveExtraMetadata(process.env[EXTRA_METADATA_ENV_VAR]);
+  if (extra !== undefined) {
+    manifest.extra = extra;
+  }
   archiveEntries.unshift({
     path: "manifest.json",
     content: Buffer.from(JSON.stringify(manifest, null, 2), "utf-8"),
@@ -171,9 +205,16 @@ async function main(): Promise<void> {
   process.exit(2);
 }
 
-main().catch((err) => {
-  const message = err instanceof Error ? err.message : String(err);
-  showError("unexpected_error", message, "unknown");
-  process.stderr.write(`agent-transcript-capture: unexpected error: ${message}\n`);
-  process.exit(2);
-});
+// Only run main() when invoked as the entry script, so other modules (and
+// tests) can import the helpers above without triggering an stdin read +
+// process.exit.
+if (require.main === module) {
+  main().catch((err) => {
+    const message = err instanceof Error ? err.message : String(err);
+    showError("unexpected_error", message, "unknown");
+    process.stderr.write(
+      `agent-transcript-capture: unexpected error: ${message}\n`
+    );
+    process.exit(2);
+  });
+}

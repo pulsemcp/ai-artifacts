@@ -13,6 +13,12 @@
  *       tool-results/
  *         toolu_{id}.txt                      # Externalized large tool outputs (>~20KB)
  *
+ * Claude Cowork (the same binary inside the desktop app's VM) reuses this exact
+ * inner layout, just rooted under the app's Application Support sandbox instead
+ * of `~/.claude/`. Since everything here is derived relative to the incoming
+ * `transcript_path`, this adapter serves both — see the `ClaudeAdapter`
+ * constructor doc for the full path comparison.
+ *
  * All Claude-specific knowledge lives in this file.
  */
 var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
@@ -60,7 +66,45 @@ function listFiles(dir, test) {
     }
 }
 class ClaudeAdapter {
-    name = "claude";
+    name;
+    /**
+     * Both Claude Code (CLI on the host) and Claude Cowork (the same CLI binary
+     * inside the desktop app's VM sandbox) emit the same transcript format and
+     * the same companion layout *within* a project dir (`{session}.jsonl` beside
+     * a `{session}/subagents/` + `tool-results/` tree). The ROOT differs, though:
+     *   - Claude Code:  ~/.claude/projects/{project}/...
+     *   - Claude Cowork: ~/Library/Application Support/Claude/
+     *                      local-agent-mode-sessions/<s1>/<s2>/local_<s3>/
+     *                      .claude/projects/{project}/...
+     * `collectSession` derives everything relative to the incoming
+     * `transcript_path`, so the differing root doesn't matter — one adapter
+     * handles both surfaces and we just vary the `name` that lands in the
+     * manifest. The `local-agent-mode-sessions/` segment is exactly what
+     * `detectAgent` keys off to tell the two apart; see `./interface.ts`.
+     */
+    constructor(name = "claude_code") {
+        this.name = name;
+    }
+    /**
+     * Resolve the Claude Code CLI version, in order:
+     *   1. Stop-hook payload `version` field (most accurate when present)
+     *   2. `CLAUDE_CODE_VERSION` env var (set by some Claude Code releases)
+     *   3. `null` (don't shell out — hooks must be fast and side-effect-free)
+     *
+     * Same source for Cowork: it runs the same Claude Code binary, and the
+     * sample transcript events in a Cowork session carry the same `version`
+     * field (e.g., "2.1.138") that Claude Code emits in 2.1+.
+     */
+    agentVersion(hookInput) {
+        if (typeof hookInput.version === "string" && hookInput.version.length > 0) {
+            return hookInput.version;
+        }
+        const envVersion = process.env.CLAUDE_CODE_VERSION;
+        if (typeof envVersion === "string" && envVersion.length > 0) {
+            return envVersion;
+        }
+        return null;
+    }
     async collectSession(hookInput) {
         const transcriptPath = hookInput.transcript_path;
         const sessionId = hookInput.session_id;

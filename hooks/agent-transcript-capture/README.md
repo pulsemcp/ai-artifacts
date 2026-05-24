@@ -34,7 +34,7 @@ On S3 the `{namespace_key}/` prefix is load-bearing — the bucket policy's Reso
 ### What it captures
 
 ```
-manifest.json                  # Session metadata (id, timestamp, agent, privacy mode, file list)
+manifest.json                  # Session metadata — see fields below
 transcript.jsonl               # Parent session transcript
 subagents/
   agent-{id}.jsonl             # Subagent transcripts (all of them)
@@ -43,7 +43,45 @@ tool-results/
   toolu_{id}.txt               # Externalized large tool outputs
 ```
 
+`manifest.json` fields:
+
+| Field           | Type                | Notes                                                                                                                              |
+| --------------- | ------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+| `version`       | `number`            | Manifest schema version (currently `1`).                                                                                           |
+| `created`       | `string` (ISO 8601) | When the archive was built.                                                                                                        |
+| `session_id`    | `string`            | The agent's session UUID.                                                                                                          |
+| `agent`         | `string`            | MCP-client-specific identifier. Auto-detected from the transcript path (`/local-agent-mode-sessions/` → `"claude_cowork"`, otherwise `"claude_code"`). Override with `AGENT_TRANSCRIPT_CAPTURE_AGENT_NAME`. |
+| `agent_version` | `string \| null`    | Best-effort CLI version (Claude Code: payload `version` → `CLAUDE_CODE_VERSION` env var → `null`). Always present for shape stability. |
+| `privacy_mode`  | `"full" \| "redacted"` | Mirrors the configured privacy mode.                                                                                            |
+| `user_id`       | `string`            | Sanitized local username.                                                                                                          |
+| `files`         | `string[]`          | All file paths inside the archive (excluding the manifest itself).                                                                 |
+| `extra`         | any (optional)      | Opaque user-supplied metadata; **omitted entirely when `AGENT_TRANSCRIPT_CAPTURE_EXTRA_METADATA` is unset** (see below).           |
+
 A single interactive session may produce multiple Stops (one per completed task). Each Stop overwrites the previous archive for that session, so the stored version always reflects the latest state.
+
+### Agent identifier (`manifest.agent`)
+
+The `agent` field in `manifest.json` tells downstream consumers which MCP client produced the transcript. It is resolved in this order:
+
+1. `AGENT_TRANSCRIPT_CAPTURE_AGENT_NAME` env var — runtime escape hatch (e.g., for users running a fork of Claude Code or a future MCP client).
+2. Path heuristic — transcripts under macOS Application Support's `local-agent-mode-sessions/` are tagged `"claude_cowork"` (the Claude Code binary running inside the desktop app's VM sandbox).
+3. Default: `"claude_code"` — covers the standard `~/.claude/projects/` host CLI install and anything else we don't recognize.
+
+An empty `AGENT_TRANSCRIPT_CAPTURE_AGENT_NAME` is treated as unset and falls through to the path heuristic.
+
+### Optional extra metadata
+
+Set `AGENT_TRANSCRIPT_CAPTURE_EXTRA_METADATA` to attach arbitrary user-supplied metadata to every uploaded manifest under the top-level `extra` key. Useful for recording, for example, the CLI flags enabled on the current Claude Code invocation.
+
+- **JSON wins.** If the value parses as JSON, the parsed structure is embedded.
+- **Falls back to raw string** when the value is not valid JSON — no error, no upload failure.
+- **Omitted when unset** (or empty) so the common-case manifest stays clean.
+
+```bash
+export AGENT_TRANSCRIPT_CAPTURE_EXTRA_METADATA='{"cli_flags":["--no-color","-v"],"machine":"laptop-7"}'
+# or
+export AGENT_TRANSCRIPT_CAPTURE_EXTRA_METADATA='--dangerously-skip-permissions enabled'
+```
 
 ## Setup
 
