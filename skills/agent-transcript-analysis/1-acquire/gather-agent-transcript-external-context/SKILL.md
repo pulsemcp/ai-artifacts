@@ -80,6 +80,6 @@ One file written into `tmp_dir`:
 ## Notes
 
 - **Best-effort, never blocking.** The pipeline runs without `external-context.json`; this skill only ever *adds* signal.
-- **Confidence and provenance are mandatory.** A wrong-but-confident ticket is worse than an honest `unresolved` entry — both the review UI and downstream analyzers lean on `confidence` and `how_found`.
+- **Confidence and provenance are mandatory.** A wrong-but-confident ticket is worse than an honest `unresolved` entry — downstream analyzers lean on `confidence` and `how_found`, and a reader should weigh a low-confidence inference before trusting it.
 - **The source set is meant to grow.** Today: ticket + PR + light user context. As new systems become reachable (design docs, incident records, org chart), add a step here and a block to the schema. Treat "we don't know how to get X yet" as a tracked gap, not a reason to drop X silently.
 - **Consolidate, don't analyze.** This skill structures context; it draws no conclusions about the session. That's phases 3-4.
