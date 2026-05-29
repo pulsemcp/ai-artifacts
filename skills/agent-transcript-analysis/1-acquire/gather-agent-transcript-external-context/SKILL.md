@@ -59,7 +59,7 @@ One file written into `tmp_dir`:
   }
   ```
 
-  Every block is optional — a session with no ticket omits `ticket` and may add an `unresolved` entry. Every populated block carries `confidence` and `how_found` so a human (and `review-agent-transcript-external-context`) can audit the inference.
+  Every block is optional — a session with no ticket omits `ticket` and may add an `unresolved` entry. Every populated block carries `confidence` and `how_found` so a human can audit the inference.
 
 ## Sequencing checklist
 
@@ -70,12 +70,10 @@ One file written into `tmp_dir`:
 - [ ] **User context** — gather what's reasonably available about the user's role / team / project. This source set is intentionally thin today; extend this step (and the schema) as new resolvers appear rather than forcing a guess
 - [ ] Consolidate into `external-context.json`. Anything expected-but-missing goes in `unresolved` with a reason — never fabricate a ticket or PR to fill a slot
 - [ ] Redact every fetched string through the bundled `redaction.py` before writing — ticket bodies and PR descriptions routinely carry secrets. This is a genuine ingress point, so redaction runs here; downstream phases trust the redacted artifacts and never re-redact
-- [ ] Point the user at `review-agent-transcript-external-context` so low-confidence inferences get a human check before phase 2
 
 ## Out of scope
 
 - Acquiring the transcript itself — that's `get-claude-code-transcript-from-local`.
-- Correcting the gathered context — that's `review-agent-transcript-external-context`.
 - Per-Segment context lookups during analysis — that's `pull-together-agent-transcript-goal-context` in phase 3, which does narrow, on-demand pulls once a specific Segment's Goal is unclear. This skill does the one-time, transcript-wide gather up front.
 - Any judgment about whether the session went well — that's phases 3-4.
 

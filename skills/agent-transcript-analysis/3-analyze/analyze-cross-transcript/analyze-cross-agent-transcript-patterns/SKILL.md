@@ -29,7 +29,7 @@ It reads the **per-transcript analysis outputs** of many transcripts — the `fi
 
 ## Inputs
 
-- `transcripts` (required): the list of per-transcript `tmp_dir`s that make up the batch — one per already-analyzed transcript. Each contributes its phase-3 findings set: `findings.outcomes.json`, `findings.prompts.json`, `findings.skills.json`, `findings.mcp.json` (preferring any `findings.<kind>.reviewed.json` sibling a human has produced). These are the outputs of `analyze-agent-transcript`'s per-Segment analyzers — not the `report.md` / `findings.report.json` that `synthesize-agent-transcript-analysis-report` produces. The per-transcript `segments.json` (or `segments.reviewed.json`) sits in the same `tmp_dir` and may be read alongside the findings for Segment/Trigger detail. Every findings item carries `id` (unique within its file), `segment_id`, `analyzer`, plus analyzer-specific fields; evidence references are OpenTranscripts event ids, never integer turn indices.
+- `transcripts` (required): the list of per-transcript `tmp_dir`s that make up the batch — one per already-analyzed transcript. Each contributes its phase-3 findings set: `findings.outcomes.json`, `findings.prompts.json`, `findings.skills.json`, `findings.mcp.json`. These are the outputs of `analyze-agent-transcript`'s per-Segment analyzers — not the `report.md` / `findings.report.json` that `synthesize-agent-transcript-analysis-report` produces. The per-transcript `segments.json` sits in the same `tmp_dir` and may be read alongside the findings for Segment/Trigger detail. Every findings item carries `id` (unique within its file), `segment_id`, `analyzer`, plus analyzer-specific fields; evidence references are OpenTranscripts event ids, never integer turn indices.
 - Per-transcript findings files may diverge in id scheme across orchestrator runs — different runs may number their items differently. Treat finding ids as unique batch-wide and cite them as-is; don't assume a uniform scheme across transcripts.
 - `batch_dir` (optional): the batch-level working directory `findings.cross-transcript.json` is written into — distinct from any single transcript's `tmp_dir`. Defaults to a new tmp dir created for the batch. `synthesize-agent-transcript-analysis-report` reads this same `batch_dir`.
 - `philosophy_skills`, `philosophy_mcp`: the same references the per-transcript analyzers used.
@@ -105,19 +105,15 @@ item carries:
 
 `source_finding_ids` points back at the per-transcript finding ids this item
 aggregates (cited as-is — see the Inputs note on heterogeneous id schemes), the
-same way `synthesize-agent-transcript-analysis-report`'s `sources` makes its leap auditable. This is the
-**reviewable intermediate**: it is the
-`cross-transcript` bucket `review-agent-transcript-analysis` opens in a human-correction UI, and
-`learn-from-agent-transcript-analysis-corrections` turns those corrections into flagged
-improvement opportunities for this analyzer. It is also the optional input
-`synthesize-agent-transcript-analysis-report` reads from `batch_dir` to fold these cross-cutting findings
-into the batch's recommendation slate. Emitting it is best-effort — the report
-stands on its own — but it is what plugs cross-transcript analysis into the
-phase-3 review loop and the phase-4 report.
+same way `synthesize-agent-transcript-analysis-report`'s `sources` makes its leap auditable. It is the
+optional input `synthesize-agent-transcript-analysis-report` reads from `batch_dir` to fold these
+cross-cutting findings into the batch's recommendation slate. Emitting it is
+best-effort — the report stands on its own — but it is what plugs
+cross-transcript analysis into the phase-4 report.
 
 ## Sequencing checklist
 
-- [ ] Resolve `batch_dir` (use the one given, or create a new tmp dir for the batch). Load every transcript's `findings.*.json` set from the `transcripts` `tmp_dir`s (`findings.outcomes.json`, `findings.prompts.json`, `findings.skills.json`, `findings.mcp.json` — preferring any `.reviewed.json` sibling). The per-transcript `findings.*.json` items carry the Segment context they were derived from; read each transcript's `segments.json` (or `segments.reviewed.json`) alongside the findings where a step needs fuller Segment/Trigger detail
+- [ ] Resolve `batch_dir` (use the one given, or create a new tmp dir for the batch). Load every transcript's `findings.*.json` set from the `transcripts` `tmp_dir`s (`findings.outcomes.json`, `findings.prompts.json`, `findings.skills.json`, `findings.mcp.json`). The per-transcript `findings.*.json` items carry the Segment context they were derived from; read each transcript's `segments.json` alongside the findings where a step needs fuller Segment/Trigger detail
 - [ ] Build a flat list of every Segment-derived finding across all transcripts, each tagged with its Trigger (kind + source), Goal, Outcome, wall-clock, source transcript id, and originating finding id
 - [ ] **Hindsight-as-foresight**: cluster the `findings.outcomes.json` items (efficiency + failure-hypothesis findings) by the Goal of the Segment they were derived from; for each cluster of size ≥ 3, look at the *shortest* successful instance and ask why the longer ones didn't take that path. Propose what change would have made the short path discoverable up front
 - [ ] **Recurring user-message patterns**: collect every user-source Trigger behind the `findings.prompts.json` items across transcripts (both `kind: New` and `kind: Correction`); cluster by phrasing similarity (n-gram overlap, embedding distance, or simple substring); flag any cluster that appears in ≥ 2 sessions. Each becomes a candidate for a Skill / CLAUDE.md / MCP change
@@ -125,7 +121,7 @@ phase-3 review loop and the phase-4 report.
 - [ ] **Cross-session gaps**: deduplicate the gap proposals in `findings.skills.json` and `findings.mcp.json` across transcripts; a proposal that surfaces in ≥ 2 transcripts gets promoted with a stronger rationale
 - [ ] **Time-spend patterns**: estimate a human counterfactual for each Segment cluster (the efficiency findings in `findings.outcomes.json` carry the agent wall-clock); flag those where the median agent time is ≥ 5× the estimate
 - [ ] Cross-check every recommendation against the philosophy docs before emitting
-- [ ] Write the flat list of findings to the `batch_dir` as `findings.cross-transcript.json` — the reviewable intermediate `review-agent-transcript-analysis` consumes, and the optional pre-report input `synthesize-agent-transcript-analysis-report` picks up from the same `batch_dir`
+- [ ] Write the flat list of findings to the `batch_dir` as `findings.cross-transcript.json` — the optional pre-report input `synthesize-agent-transcript-analysis-report` picks up from the same `batch_dir`
 
 ## Notes
 

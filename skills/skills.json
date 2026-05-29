@@ -23,11 +23,6 @@
       "open-transcripts-transcript"
     ]
   },
-  "review-agent-transcript-external-context": {
-    "title": "Review External Context",
-    "description": "Open a localhost UI to audit and correct the AI-gathered external-context.json \u2014 fix a wrong ticket, attach the right PR, adjust user context, flag low-confidence inferences. Saves external-context.reviewed.json next to the draft with full correction provenance. Optional human review checkpoint for tier 1, before decomposition runs.",
-    "path": "agent-transcript-analysis/1-acquire/review-agent-transcript-external-context"
-  },
   "decompose-agent-transcript-into-transcript-segments": {
     "title": "Decompose Agent Transcript Into Transcript Segments",
     "description": "Walk an OpenTranscripts transcript.json once and produce the recursive Transcript Segment tree (segments.json) plus an annotated flamegraph. Sole producer of the Segment primitive consumed by every downstream analyzer.",
@@ -36,24 +31,6 @@
       "transcript-segment",
       "open-transcripts-transcript",
       "open-transcripts-events"
-    ]
-  },
-  "review-agent-transcript-segments": {
-    "title": "Review Transcript Segments",
-    "description": "Open a localhost UI to audit and correct the AI-drafted Segment tree. Every Trigger/Goal/Outcome field is editable; split leaves, merge siblings, attach context notes. Saves segments.reviewed.json next to the draft with full correction provenance. Optional human review checkpoint for tier 2.",
-    "path": "agent-transcript-analysis/2-decompose/review-agent-transcript-segments",
-    "references": [
-      "transcript-segment",
-      "open-transcripts-transcript",
-      "open-transcripts-events"
-    ]
-  },
-  "learn-from-agent-transcript-segment-corrections": {
-    "title": "Learn From Segment Corrections",
-    "description": "Read the human corrections captured in segments.reviewed.json files, cluster them into recurring patterns, and propose concrete heuristic changes to decompose-agent-transcript-into-transcript-segments. Closes the loop between human review and the draft generator.",
-    "path": "agent-transcript-analysis/2-decompose/learn-from-agent-transcript-segment-corrections",
-    "references": [
-      "transcript-segment"
     ]
   },
   "analyze-agent-transcript": {
@@ -169,34 +146,14 @@
       "transcript-segment"
     ]
   },
-  "review-agent-transcript-analysis": {
-    "title": "Review Analysis",
-    "description": "Open a localhost UI to audit and correct the AI-drafted findings a tier-3 analyzer produced \u2014 findings.<kind>.json, one flat list of conclusions per bucket (outcomes, prompts, skills, mcp, cross-transcript). Thumbs-up, correct, or reject each finding; saving writes findings.<kind>.reviewed.json next to the draft with full correction provenance. Optional human review checkpoint for tier 3.",
-    "path": "agent-transcript-analysis/3-analyze/review-agent-transcript-analysis"
-  },
-  "learn-from-agent-transcript-analysis-corrections": {
-    "title": "Learn From Analysis Corrections",
-    "description": "Read the human corrections captured in findings.<kind>.reviewed.json files, cluster them into recurring patterns, and surface flagged improvement opportunities for the tier-3 analyzers that drafted the findings. Flags opportunities; never edits a skill. The tier-3 twin of learn-from-agent-transcript-segment-corrections.",
-    "path": "agent-transcript-analysis/3-analyze/learn-from-agent-transcript-analysis-corrections"
-  },
   "synthesize-agent-transcript-analysis-report": {
     "title": "Synthesize Report",
-    "description": "Tier-4 synthesis. Runs once over a whole batch of analyzed transcripts: reads every transcript's tier-3 findings (findings.<kind>.json from each per-transcript tmp_dir, preferring the reviewed siblings), plus findings.cross-transcript.json from the batch_dir when present, and synthesizes them into one consolidated report of actionable next steps across human prompting, Skills, and MCP servers. Writes findings.report.json (the reviewable recommendation slate) and report.md (the human-readable report, with the distance-from-ideal north-star block aggregated across the batch) into the batch_dir. Single-mode \u2014 a batch of one transcript is valid input, but there is no per-transcript mode; never driven by analyze-agent-transcript.",
+    "description": "Tier-4 synthesis. Runs once over a whole batch of analyzed transcripts: reads every transcript's tier-3 findings (findings.<kind>.json from each per-transcript tmp_dir), plus findings.cross-transcript.json from the batch_dir when present, and synthesizes them into one consolidated report of actionable next steps across human prompting, Skills, and MCP servers. Writes findings.report.json (the recommendation slate) and report.md (the human-readable report, with the distance-from-ideal north-star block aggregated across the batch) into the batch_dir. Single-mode \u2014 a batch of one transcript is valid input, but there is no per-transcript mode; never driven by analyze-agent-transcript.",
     "path": "agent-transcript-analysis/4-report/synthesize-agent-transcript-analysis-report",
     "references": [
       "philosophy-on-skills",
       "philosophy-on-mcp",
       "transcript-segment"
     ]
-  },
-  "review-agent-transcript-analysis-report": {
-    "title": "Review Report",
-    "description": "Open a localhost UI to audit and correct the AI-synthesized tier-4 report \u2014 findings.report.json, the consolidated recommendation slate. Thumbs-up, correct, or reject each recommendation; this is where a human reviews the leap from analysis to recommendations against the findings each one cites. Saves findings.report.reviewed.json next to the draft with full correction provenance. Optional human review checkpoint for tier 4.",
-    "path": "agent-transcript-analysis/4-report/review-agent-transcript-analysis-report"
-  },
-  "learn-from-agent-transcript-analysis-report-corrections": {
-    "title": "Learn From Report Corrections",
-    "description": "Read the human corrections captured in findings.report.reviewed.json files, cluster them into recurring patterns, and surface flagged improvement opportunities for synthesize-agent-transcript-analysis-report \u2014 where its leap from findings to recommendations over-reaches, mis-routes, or mis-prioritizes. Flags opportunities; never edits a skill. The tier-4 twin of learn-from-agent-transcript-analysis-corrections.",
-    "path": "agent-transcript-analysis/4-report/learn-from-agent-transcript-analysis-report-corrections"
   }
 }

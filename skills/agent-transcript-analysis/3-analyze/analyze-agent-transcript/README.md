@@ -13,7 +13,7 @@ With `segments.json` in hand, it drives, in order:
    - `analyze-prompts/` — `analyze-agent-transcript-user-prompt`, `analyze-agent-transcript-prompt-ambition`, helper `pull-together-agent-transcript-goal-context`.
    - `analyze-skills/` — trigger / action / gaps.
    - `analyze-mcp/` — trigger / action / gaps.
-2. Writes each bucket's conclusions to `tmp_dir` as `findings.{outcomes,prompts,skills,mcp}.json` — the reviewable intermediate `review-agent-transcript-analysis` consumes. **That is the last step.** The orchestrator stops here.
+2. Writes each bucket's conclusions to `tmp_dir` as `findings.{outcomes,prompts,skills,mcp}.json`. **That is the last step.** The orchestrator stops here.
 
 It does **not** produce a report and does **not** invoke `synthesize-agent-transcript-analysis-report`. The report is a batch-level artifact: once every transcript of interest has been through phases 1–3, `analyze-cross-agent-transcript-patterns` (optional) and then `synthesize-agent-transcript-analysis-report` (phase 4) run once each over the whole batch's findings.
 

@@ -67,4 +67,4 @@ Both must agree. Downstream skills read `segments.json`; humans look at `flamegr
 
 - The flamegraph is a humanizing artifact — the analyzers don't read it. Prioritize correctness of `segments.json` over flamegraph polish.
 - Token cost matters; this skill is the only place we walk every event, so do it once and let downstream skills consume the structured output.
-- **`segments.json` is a draft.** Decomposition is the most interpretive step in the pipeline, so its output is meant to be reviewed: `review-agent-transcript-segments` lets a human audit and correct the tree into `segments.reviewed.json`, and `learn-from-agent-transcript-segment-corrections` reads those corrections to flag improvement opportunities for this skill's heuristics. Emit your best draft, but don't treat it as final.
+- **`segments.json` is a draft.** Decomposition is the most interpretive step in the pipeline, so when the tree looks wrong the fix is to re-run this phase rather than to patch around it downstream. Emit your best draft, but don't treat it as final.

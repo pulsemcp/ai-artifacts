@@ -27,7 +27,7 @@ The Transcript Segment is the analysis primitive. See the `transcript-segment` r
 ## Inputs
 
 - `tmp_dir` (required): output of `get-claude-code-transcript-from-local`. Must contain `transcript.json` (an OpenTranscripts `Transcript` document, subagents embedded recursively).
-- `external_context` (optional): `external-context.json` — or `external-context.reviewed.json` — in the same `tmp_dir`, produced by `gather-agent-transcript-external-context`. The ticket, PR, and user context behind the session. When present, pass it through to phase 2 and the phase-3 analyzers so Goal/Outcome judgments are grounded in *why* the session happened. Best-effort: absent is fine, never fatal.
+- `external_context` (optional): `external-context.json` in the same `tmp_dir`, produced by `gather-agent-transcript-external-context`. The ticket, PR, and user context behind the session. When present, pass it through to phase 2 and the phase-3 analyzers so Goal/Outcome judgments are grounded in *why* the session happened. Best-effort: absent is fine, never fatal.
 - `philosophy_skills` (optional): the `philosophy-on-skills` reference. Defaults to the bundled copy. Available to the phase-3 analyzers.
 - `philosophy_mcp` (optional): the `philosophy-on-mcp` reference. Defaults to the bundled copy. Available to the phase-3 analyzers.
 - `transcript_segment_spec` (optional): the `transcript-segment` reference. Defaults to the bundled copy.
@@ -37,13 +37,13 @@ The Transcript Segment is the analysis primitive. See the `transcript-segment` r
 This skill's outputs are the **four phase-3 findings files** for this one transcript, and nothing else. It also ensures the **Segment tree** exists as its phase-2 prerequisite. All land in `tmp_dir`:
 
 - `segments.json` + `flamegraph.html` — produced by phase 2 (`decompose-agent-transcript-into-transcript-segments`), the prerequisite this skill bootstraps if it is missing.
-- `findings.outcomes.json`, `findings.prompts.json`, `findings.skills.json`, `findings.mcp.json` — the flat lists of conclusions from the four phase-3 buckets, one file per bucket, in the envelope `{kind, items: [{id, …}]}`. These are the **reviewable intermediate**: `review-agent-transcript-analysis` opens any of them in a human-correction UI, and `learn-from-agent-transcript-analysis-corrections` turns those corrections into flagged improvement opportunities for the analyzers. They are also the **durable substrate** of the pipeline — they accumulate across transcripts and are what the batch-level steps (`analyze-cross-agent-transcript-patterns`, `synthesize-agent-transcript-analysis-report`) read.
+- `findings.outcomes.json`, `findings.prompts.json`, `findings.skills.json`, `findings.mcp.json` — the flat lists of conclusions from the four phase-3 buckets, one file per bucket, in the envelope `{kind, items: [{id, …}]}`. These are the **durable substrate** of the pipeline — they accumulate across transcripts and are what the batch-level steps (`analyze-cross-agent-transcript-patterns`, `synthesize-agent-transcript-analysis-report`) read.
 
 This skill does **not** produce a report. There is no per-transcript report, and this skill does not invoke `synthesize-agent-transcript-analysis-report`. Aggregation, dedup, the philosophy cross-check, the north-star block, and the report itself are all phase 4's job, run once over the whole batch after every transcript has been analyzed. The orchestrator's responsibility begins at `segments.json` and ends at well-formed `findings.*.json`.
 
 ## Sequencing checklist
 
-- [ ] **Pick up external context if it exists.** Check `tmp_dir` for `external-context.json` (prefer `external-context.reviewed.json`). If present, hold it as shared context for phase 2 and every phase-3 analyzer. If absent, proceed — it is best-effort, never required.
+- [ ] **Pick up external context if it exists.** Check `tmp_dir` for `external-context.json`. If present, hold it as shared context for phase 2 and every phase-3 analyzer. If absent, proceed — it is best-effort, never required.
 - [ ] **Satisfy the decomposition prerequisite (phase 2's job).** If `tmp_dir` doesn't already hold `segments.json`, invoke `decompose-agent-transcript-into-transcript-segments` with `tmp_dir` to produce it (plus `flamegraph.html`). Either way, decomposition runs to completion before any analysis begins. Do **not** walk raw JSONL from this skill — that's phase 2's job, exclusively.
 - [ ] Load `segments.json`. The Segment tree is now the unit of analysis.
 - [ ] For each Segment, in tree order (parent before children, or vice versa — the analyzers don't care, but findings reference Segment ids), run the per-Segment analyzers in this order:
@@ -61,8 +61,8 @@ This skill does **not** produce a report. There is no per-transcript report, and
     - [ ] `analyze-agent-transcript-mcp-trigger-performance`
     - [ ] `analyze-agent-transcript-mcp-action-performance`
     - [ ] `analyze-agent-transcript-mcp-gaps` — seeded by any `recommendation_seed` from this Segment's failure hypothesis and any deterministic-trigger candidate from `analyze-agent-transcript-prompt-ambition`
-- [ ] Write each bucket's conclusions to `tmp_dir` as `findings.<kind>.json` (`outcomes` / `prompts` / `skills` / `mcp`) — the reviewable intermediate `review-agent-transcript-analysis` consumes. Each is the `{kind, items: [{id, …}]}` envelope. **The orchestrator stamps the wrapper fields on every item it writes** — see "Findings-item shape" below — so an analyzer only ever returns the item *body*. **This is the orchestrator's last step** — it writes the four findings files and stops
-- [ ] Surface the four `findings.*.json` paths to the user, and point them at `review-agent-transcript-analysis` — the optional human-review checkpoint over those drafts. Note that the report is a batch-end step: once the user has analyzed every transcript of interest, `analyze-cross-agent-transcript-patterns` (optional) and then `synthesize-agent-transcript-analysis-report` run once over the whole batch. Do **not** invoke `synthesize-agent-transcript-analysis-report` from here
+- [ ] Write each bucket's conclusions to `tmp_dir` as `findings.<kind>.json` (`outcomes` / `prompts` / `skills` / `mcp`). Each is the `{kind, items: [{id, …}]}` envelope. **The orchestrator stamps the wrapper fields on every item it writes** — see "Findings-item shape" below — so an analyzer only ever returns the item *body*. **This is the orchestrator's last step** — it writes the four findings files and stops
+- [ ] Surface the four `findings.*.json` paths to the user. Note that the report is a batch-end step: once the user has analyzed every transcript of interest, `analyze-cross-agent-transcript-patterns` (optional) and then `synthesize-agent-transcript-analysis-report` run once over the whole batch. Do **not** invoke `synthesize-agent-transcript-analysis-report` from here
 
 ## Findings-item shape
 
@@ -84,5 +84,4 @@ So the on-disk item is `{id, segment_id, analyzer, …body fields…}`. Each ana
 - Producing `segments.json` — that's `decompose-agent-transcript-into-transcript-segments`. This skill requires that output and bootstraps it if absent, but the decomposition work itself is phase 2's, exclusively.
 - The actual per-Segment scoring — that's the phase-3 analyzers this orchestrator drives.
 - **The report — entirely.** There is no per-transcript report. Aggregation, dedup, routing into Prompting/Skills/MCP, the philosophy cross-check, the distance-from-ideal north-star block, `findings.report.json`, and `report.md` are all `synthesize-agent-transcript-analysis-report`'s job (phase 4), run once over the whole batch. This skill never invokes `synthesize-agent-transcript-analysis-report` and produces nothing report-shaped.
-- Human review of the findings — that's `review-agent-transcript-analysis` (phase 3). Review of the report is `review-agent-transcript-analysis-report` (phase 4).
 - Cross-session patterns — that's `analyze-cross-agent-transcript-patterns`, in phase 3's `analyze-cross-transcript` bucket, run as a batch-level step over many transcripts' findings.
