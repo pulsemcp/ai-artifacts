@@ -4,7 +4,7 @@ The batch-final synthesis layer. Phase 3 produces **labels** — flat lists of c
 
 ## Skills in this phase
 
-- `synthesize-agent-transcript-analysis-report/` — runs once over the whole batch: reads every transcript's phase-3 findings (`findings.{outcomes,prompts,skills,mcp}.json` from each per-transcript `tmp_dir`), plus `findings.cross-transcript.json` from `batch_dir` when present, and synthesizes them into `findings.report.json` (the recommendation slate) and `report.md` (the human-readable report, with the distance-from-ideal north-star block aggregated across the batch). Both land in `batch_dir`. LLM-driven; no `main.py`.
+- `synthesize-agent-transcript-analysis-report/` — runs once over the whole batch: reads every transcript's phase-3 findings (`findings.{outcomes,prompts,skills,mcp}.json` from each per-transcript `tmp_dir`), plus `findings.cross-transcript.json` from `batch_dir` when present, and synthesizes them into `findings.report.json` (the recommendation slate) and `report.md` (the human-readable report, with the distance-from-ideal north-star block aggregated across the batch). It also emits a multi-page, **read-only drilldown** HTML site (`report.html` + per-recommendation, per-transcript, per-Segment, external-context, and cross-transcript pages) so a reader can click from a recommendation all the way down to the raw events behind it, and wander every intermediate decision the pipeline made. All artifacts land in `batch_dir`. LLM-driven; no `main.py`.
 
 ## How this phase plugs into the rest
 
@@ -12,7 +12,7 @@ The batch-final synthesis layer. Phase 3 produces **labels** — flat lists of c
 
 Phase 4 runs **once, after the batch is complete** — when the user has no more transcripts to analyze. `synthesize-agent-transcript-analysis-report` is given the list of per-transcript `tmp_dir`s that make up the batch, reads each one's findings (plus `findings.cross-transcript.json` from `analyze-cross-agent-transcript-patterns`, when that optional batch step was run), and produces the single final report in `batch_dir`.
 
-Phase 4 reads only the phase-3 findings (and each transcript's `segments.json` for the north-star counts). It never re-walks `transcript.json` or raw JSONL — if a finding is wrong, fix the phase-3 analyzer that drafted it and re-run.
+Phase 4 reads the phase-3 findings, each transcript's `segments.json` (for the north-star counts and to structure the session / segment drilldown pages), and `external-context.json` (for the context pages and external links). It never re-walks `transcript.json` or raw JSONL — it renders the artifacts the earlier phases already produced. If a finding is wrong, fix the phase-3 analyzer that drafted it and re-run.
 
 ## Design decisions
 
