@@ -13,7 +13,6 @@ A transcript is a record of *what the agent did*. Analysis needs *why it was doi
 ```
 get-claude-code-transcript-from-local  →  transcript.json
 gather-agent-transcript-external-context                →  external-context.json           (this skill)
-review-agent-transcript-external-context                →  external-context.reviewed.json  (optional human check)
         ↓
 decompose-agent-transcript-into-transcript-segments and every later phase read both files from tmp_dir
 ```
@@ -28,6 +27,6 @@ It runs after acquisition and before decomposition. It is **best-effort**: a ses
 
 - **Gather once, transcript-wide.** One up-front pull beats every analyzer re-deriving context per Segment. The narrow, per-Segment counterpart is `pull-together-agent-transcript-goal-context` in phase 3 — it reaches out only when a specific Segment's Goal is still unclear.
 - **Best-effort, with honest gaps.** Missing sources are recorded in `unresolved`, never fabricated. A confident-but-wrong ticket would poison every downstream analyzer.
-- **Provenance over trust.** `confidence` + `how_found` on every block make the bundle reviewable — which is the whole point of the sibling `review-agent-transcript-external-context`.
+- **Provenance over trust.** `confidence` + `how_found` on every block let a reader audit each inference rather than trusting it blindly — a confident-but-wrong ticket would poison every downstream analyzer.
 - **The source set grows.** Ticket + PR + light user context is the starting point, not the ceiling. New resolvers get added here as the systems become reachable.
 - **Redact on the way in.** This is a genuine ingress point — ticket and PR bodies arrive un-redacted — so they go through the bundled `redaction.py` before they touch disk, exactly like the transcript itself. Secret-redaction runs once, here at acquire time; downstream phases trust the redacted artifacts and never re-redact.

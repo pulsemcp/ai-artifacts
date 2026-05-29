@@ -8,10 +8,7 @@
       "find-all-claude-code-transcripts-on-local",
       "get-claude-code-transcript-from-local",
       "gather-agent-transcript-external-context",
-      "review-agent-transcript-external-context",
       "decompose-agent-transcript-into-transcript-segments",
-      "review-agent-transcript-segments",
-      "learn-from-agent-transcript-segment-corrections",
       "analyze-agent-transcript",
       "analyze-agent-transcript-failure-hypothesis",
       "analyze-agent-transcript-segment-efficiency",
@@ -25,11 +22,7 @@
       "analyze-agent-transcript-mcp-action-performance",
       "analyze-agent-transcript-mcp-gaps",
       "analyze-cross-agent-transcript-patterns",
-      "review-agent-transcript-analysis",
-      "learn-from-agent-transcript-analysis-corrections",
-      "synthesize-agent-transcript-analysis-report",
-      "review-agent-transcript-analysis-report",
-      "learn-from-agent-transcript-analysis-report-corrections"
+      "synthesize-agent-transcript-analysis-report"
     ],
     "mcp_servers": [],
     "hooks": [],
