@@ -25,11 +25,66 @@ import * as fs from "fs";
 import * as path from "path";
 import {
   AgentAdapter,
+  AgentModels,
   HookInput,
   SessionBundle,
   SessionFile,
   UploadSuccessNotice,
 } from "./interface";
+
+/**
+ * Pseudo-model markers Claude Code stamps onto synthetic assistant turns
+ * (e.g. local-only "API error" placeholders and other client-generated
+ * messages). They show up in `message.model` but are not real models, so they
+ * must never pollute the manifest's model list.
+ */
+const NON_MODEL_MARKERS = new Set(["<synthetic>"]);
+
+/**
+ * Parse a Claude Code transcript (JSONL) and return the distinct models used,
+ * in order of first appearance, plus the current (last) model.
+ *
+ * Claude Code records the model on every assistant message at
+ * `message.model`. Because that's emitted per-message, a mid-session model
+ * switch (user changes model, or a fallback kicks in) is captured as a second
+ * entry in the list — the transcript is the source of truth, not a single
+ * hook-time guess.
+ *
+ * Defensive by design: any line that isn't valid JSON, or that carries no
+ * usable `message.model`, is skipped. A transcript that isn't Claude JSONL at
+ * all therefore yields `{ models: [], current: null }` rather than throwing or
+ * inventing model names — which is what keeps a mis-wired non-Claude transcript
+ * from being labeled with fabricated Claude models.
+ */
+export function extractClaudeModels(transcriptText: string): AgentModels {
+  const models: string[] = [];
+  const seen = new Set<string>();
+  let current: string | null = null;
+
+  for (const line of transcriptText.split("\n")) {
+    const trimmed = line.trim();
+    if (!trimmed) continue;
+
+    let obj: unknown;
+    try {
+      obj = JSON.parse(trimmed);
+    } catch {
+      continue;
+    }
+
+    const model = (obj as { message?: { model?: unknown } })?.message?.model;
+    if (typeof model !== "string" || model.length === 0) continue;
+    if (NON_MODEL_MARKERS.has(model)) continue;
+
+    current = model;
+    if (!seen.has(model)) {
+      seen.add(model);
+      models.push(model);
+    }
+  }
+
+  return { models, current };
+}
 
 /** Glob-like helper: list files in a directory matching a test function. */
 function listFiles(
@@ -92,6 +147,21 @@ export class ClaudeAdapter implements AgentAdapter {
       return envVersion;
     }
     return null;
+  }
+
+  /**
+   * Distinct models used over the session, parsed from the already-collected
+   * parent transcript (`transcript.jsonl`). Reads the in-memory bundle rather
+   * than re-reading from disk. Returns `{ models: [], current: null }` when the
+   * parent transcript is absent or carries no recognizable model — see
+   * `extractClaudeModels` for the per-line parsing rules.
+   */
+  agentModels(bundle: SessionBundle): AgentModels {
+    const transcript = bundle.files.find(
+      (f) => f.archivePath === "transcript.jsonl"
+    );
+    if (!transcript) return { models: [], current: null };
+    return extractClaudeModels(transcript.content.toString("utf-8"));
   }
 
   async collectSession(hookInput: HookInput): Promise<SessionBundle> {

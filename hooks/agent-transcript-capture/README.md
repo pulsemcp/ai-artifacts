@@ -47,17 +47,24 @@ tool-results/
 
 | Field           | Type                | Notes                                                                                                                              |
 | --------------- | ------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
-| `version`       | `number`            | Manifest schema version (currently `1`).                                                                                           |
+| `version`       | `number`            | Manifest schema version (currently `2`). See [Schema versions](#schema-versions).                                                  |
 | `created`       | `string` (ISO 8601) | When the archive was built.                                                                                                        |
 | `session_id`    | `string`            | The agent's session UUID.                                                                                                          |
 | `agent`         | `string`            | MCP-client-specific identifier. Auto-detected from the transcript path (`/local-agent-mode-sessions/` → `"claude_cowork"`, otherwise `"claude_code"`). Override with `AGENT_TRANSCRIPT_CAPTURE_AGENT_NAME`. |
 | `agent_version` | `string \| null`    | Best-effort CLI version (Claude Code: payload `version` → `CLAUDE_CODE_VERSION` env var → `null`). Always present for shape stability. |
+| `models`        | `string[]`          | Distinct models used across the session, **in order of first appearance**, parsed from the transcript. Captures mid-session switches (see [Models](#models-manifestmodels--manifestmodel)). Empty `[]` when none could be inferred. |
+| `model`         | `string \| null`    | Convenience: the current/most-recent model (the last assistant message's model). `null` when none could be inferred. |
 | `privacy_mode`  | `"full" \| "redacted"` | Mirrors the configured privacy mode.                                                                                            |
 | `user_id`       | `string`            | Sanitized local username.                                                                                                          |
 | `files`         | `string[]`          | All file paths inside the archive (excluding the manifest itself).                                                                 |
 | `extra`         | any (optional)      | Opaque user-supplied metadata; **omitted entirely when `AGENT_TRANSCRIPT_CAPTURE_EXTRA_METADATA` is unset** (see below).           |
 
 A single interactive session may produce multiple Stops (one per completed task). Each Stop overwrites the previous archive for that session, so the stored version always reflects the latest state.
+
+#### Schema versions
+
+- **v1** — original field set (`version`, `created`, `session_id`, `agent`, `agent_version`, `privacy_mode`, `user_id`, `files`, optional `extra`).
+- **v2** — adds `models` and `model`. The change is **purely additive**: every v1 field keeps the same name, type, and meaning. Consumers that read fields by name keep working against v2 unchanged. Consumers that strictly validate the exact field set should branch on `version` (`>= 2` ⇒ expect `models`/`model`).
 
 ### Agent identifier (`manifest.agent`)
 
@@ -68,6 +75,35 @@ The `agent` field in `manifest.json` tells downstream consumers which MCP client
 3. Default: `"claude_code"` — covers the standard `~/.claude/projects/` host CLI install and anything else we don't recognize.
 
 An empty `AGENT_TRANSCRIPT_CAPTURE_AGENT_NAME` is treated as unset and falls through to the path heuristic.
+
+#### Codex and other non-Claude runtimes
+
+This hook is wired into **Claude Code's `Stop` event**, so in normal operation it only ever fires for Claude Code / Cowork sessions. Codex uses its own, unrelated notification mechanism and a **different transcript format** (where the model and version are recorded differs), so Codex transcripts do not flow through this hook unless someone deliberately wires this binary into a Codex-style runner.
+
+To keep a non-Claude session from being **silently mislabeled** as `claude_code`, set `AGENT_TRANSCRIPT_CAPTURE_AGENT_NAME` (e.g. `codex`) — the manifest `agent` field is then tagged correctly. Note that file collection (`collectSession`) and the model/version extraction still assume Claude's JSONL layout, so a first-class Codex integration needs a dedicated `CodexAdapter` (a documented TODO in `src/adapters/interface.ts`). The model extractor is written defensively: a transcript it can't parse as Claude JSONL yields `models: []` / `model: null` rather than fabricated Claude model names.
+
+### Models (`manifest.models` / `manifest.model`)
+
+The model in use can change partway through a session — the user switches models, or the runtime falls back — and **every switch is recorded in the transcript** (Claude Code stamps `message.model` on each assistant message). So the model fields are derived from the transcript itself, not a single hook-time guess:
+
+- `models` is the **distinct list of models, in order of first appearance** across the whole session. A session that ran entirely on one model has a single-element list; a mid-session switch produces two (or more) entries.
+- `model` is the **current/most-recent** model — the model on the last assistant message — for convenience.
+- Synthetic client-generated turns (Claude Code's `<synthetic>` marker) are filtered out.
+- When no model can be inferred, the fields are present-but-empty (`models: []`, `model: null`), matching the `agent_version: null` convention.
+
+Example manifest from a session that started on Opus, switched to Sonnet, then switched back to Opus:
+
+```json
+{
+  "version": 2,
+  "agent": "claude_code",
+  "agent_version": "2.1.138",
+  "models": ["claude-opus-4-8", "claude-sonnet-4-6"],
+  "model": "claude-opus-4-8"
+}
+```
+
+`models` records both models (first-appearance order, deduped), while `model` reflects the model in use at capture time.
 
 ### Optional extra metadata
 
@@ -345,7 +381,7 @@ Common error categories: `permission_denied`, `not_found`, `payload_too_large`, 
 ```bash
 npm install
 npm run build
-npm test       # 80 tests, all in-process — no real network or buckets
+npm test       # 119 tests, all in-process — no real network or buckets
 ```
 
 ### Adding a storage backend

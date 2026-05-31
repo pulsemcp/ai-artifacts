@@ -2,8 +2,30 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import * as fs from "fs";
 import * as path from "path";
 import * as os from "os";
-import { ClaudeAdapter } from "../src/adapters/claude";
-import { HookInput } from "../src/adapters/interface";
+import { ClaudeAdapter, extractClaudeModels } from "../src/adapters/claude";
+import { HookInput, SessionBundle } from "../src/adapters/interface";
+
+/** Build a one-file bundle whose transcript.jsonl is `text`. */
+function bundleWithTranscript(text: string): SessionBundle {
+  return {
+    sessionId: "s",
+    files: [
+      {
+        archivePath: "transcript.jsonl",
+        content: Buffer.from(text, "utf-8"),
+        redactable: true,
+      },
+    ],
+  };
+}
+
+/** One Claude Code assistant JSONL line carrying `message.model`. */
+function assistantLine(model: string): string {
+  return JSON.stringify({
+    type: "assistant",
+    message: { role: "assistant", model, content: [] },
+  });
+}
 
 const tmpBase = path.join(os.tmpdir(), "trace-capture-test-" + process.pid);
 
@@ -98,6 +120,107 @@ describe("ClaudeAdapter", () => {
     it("treats empty-string payload version as missing (falls through)", () => {
       process.env.CLAUDE_CODE_VERSION = "from-env";
       expect(adapter.agentVersion(input({ version: "" }))).toBe("from-env");
+    });
+  });
+
+  describe("extractClaudeModels", () => {
+    it("returns empty when there are no assistant messages", () => {
+      const text =
+        JSON.stringify({ type: "user", message: { role: "user" } }) + "\n";
+      expect(extractClaudeModels(text)).toEqual({ models: [], current: null });
+    });
+
+    it("returns the single model when the session never switches", () => {
+      const text =
+        assistantLine("claude-opus-4-8") +
+        "\n" +
+        assistantLine("claude-opus-4-8") +
+        "\n";
+      expect(extractClaudeModels(text)).toEqual({
+        models: ["claude-opus-4-8"],
+        current: "claude-opus-4-8",
+      });
+    });
+
+    it("captures a mid-session model change as multiple models in order of first appearance", () => {
+      const text = [
+        assistantLine("claude-opus-4-8"),
+        JSON.stringify({ type: "user", message: { role: "user" } }),
+        assistantLine("claude-sonnet-4-6"),
+        assistantLine("claude-opus-4-8"), // switches back
+      ].join("\n");
+      const result = extractClaudeModels(text);
+      // First-appearance order, deduped — the switch-back to opus does NOT
+      // append a second opus entry.
+      expect(result.models).toEqual(["claude-opus-4-8", "claude-sonnet-4-6"]);
+      // `current` reflects the actual last message's model, even though opus
+      // appeared first in the list.
+      expect(result.current).toBe("claude-opus-4-8");
+    });
+
+    it("filters out the <synthetic> pseudo-model", () => {
+      const text = [
+        assistantLine("claude-opus-4-8"),
+        assistantLine("<synthetic>"),
+      ].join("\n");
+      const result = extractClaudeModels(text);
+      expect(result.models).toEqual(["claude-opus-4-8"]);
+      // The synthetic marker is skipped for `current` too — it falls back to
+      // the last real model.
+      expect(result.current).toBe("claude-opus-4-8");
+    });
+
+    it("skips malformed JSON lines and blank lines without throwing", () => {
+      const text = [
+        "",
+        "not json at all",
+        assistantLine("claude-opus-4-8"),
+        "   ",
+        "{ broken",
+      ].join("\n");
+      expect(extractClaudeModels(text)).toEqual({
+        models: ["claude-opus-4-8"],
+        current: "claude-opus-4-8",
+      });
+    });
+
+    it("ignores assistant messages with no model field", () => {
+      const text =
+        JSON.stringify({ type: "assistant", message: { role: "assistant" } }) +
+        "\n";
+      expect(extractClaudeModels(text)).toEqual({ models: [], current: null });
+    });
+
+    it("returns empty for a non-Claude transcript shape (no fabricated models)", () => {
+      // A foreign runtime's JSONL that doesn't put the model under
+      // message.model must yield nothing rather than guessing.
+      const text = [
+        JSON.stringify({ role: "assistant", model: "gpt-something" }),
+        JSON.stringify({ event: "turn", llm: { name: "codex-model" } }),
+      ].join("\n");
+      expect(extractClaudeModels(text)).toEqual({ models: [], current: null });
+    });
+  });
+
+  describe("agentModels", () => {
+    it("parses models from the bundle's parent transcript", () => {
+      const bundle = bundleWithTranscript(
+        [assistantLine("claude-opus-4-8"), assistantLine("claude-sonnet-4-6")].join(
+          "\n"
+        )
+      );
+      expect(adapter.agentModels(bundle)).toEqual({
+        models: ["claude-opus-4-8", "claude-sonnet-4-6"],
+        current: "claude-sonnet-4-6",
+      });
+    });
+
+    it("returns empty when there is no parent transcript in the bundle", () => {
+      const bundle: SessionBundle = { sessionId: "s", files: [] };
+      expect(adapter.agentModels(bundle)).toEqual({
+        models: [],
+        current: null,
+      });
     });
   });
 
