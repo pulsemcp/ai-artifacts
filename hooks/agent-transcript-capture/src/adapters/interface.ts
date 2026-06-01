@@ -37,6 +37,27 @@ export interface SessionBundle {
   files: SessionFile[];
 }
 
+/**
+ * Model(s) used over the course of a session, derived from the transcript.
+ *
+ * The model can change partway through a session (the user switches models, or
+ * the runtime falls back), and every switch is recorded in the transcript — so
+ * the transcript, not a single hook-time guess, is the source of truth.
+ */
+export interface AgentModels {
+  /**
+   * Distinct models used across the whole session, in order of first
+   * appearance. Empty when none could be inferred (present-but-empty for shape
+   * stability, mirroring the `agent_version: null` convention).
+   */
+  models: string[];
+  /**
+   * The most-recent / current model at capture time (the last assistant
+   * message's model), for convenience. `null` when none could be inferred.
+   */
+  current: string | null;
+}
+
 /** Information the upload step hands back to the adapter for user-facing surfacing. */
 export interface UploadSuccessNotice {
   sessionId: string;
@@ -68,6 +89,21 @@ export interface AgentAdapter {
    * shape across uploads.
    */
   agentVersion(hookInput: HookInput): string | null;
+
+  /**
+   * Best-effort list of model(s) used over the session, emitted in
+   * `manifest.models` (and the convenience `manifest.model`). Derived from the
+   * session transcript rather than a single hook-time guess, because the model
+   * can change mid-session and each switch is recorded in the transcript.
+   *
+   * Where the model is recorded is runtime-specific (Claude Code stamps it on
+   * every assistant message as `message.model`; other runtimes differ), which
+   * is why this lives on the adapter alongside `agentVersion`. Takes the
+   * already-collected bundle so it parses the in-memory transcript rather than
+   * re-reading from disk. Returns an empty list / `null` current when nothing
+   * can be inferred, so the manifest fields are present-but-empty.
+   */
+  agentModels(bundle: SessionBundle): AgentModels;
 
   /**
    * Format a successful-upload notice for this harness in whatever shape will
@@ -122,8 +158,25 @@ export function resolveAgentName(hookInput: HookInput): string {
  * Today both Claude Code (host CLI) and Claude Cowork (same CLI inside the
  * desktop app's VM) write the same JSONL layout, so they share `ClaudeAdapter`
  * — the only difference is the `name` it reports. When a genuinely different
- * agent surface (Cursor, etc.) grows hook support, branch here on a new
- * adapter class.
+ * agent surface grows hook support, branch here on a new adapter class.
+ *
+ * Codex (and other non-Claude runtimes) — NOT auto-detected, by design:
+ *   - This hook is wired into *Claude Code's* `Stop` event, so in normal use it
+ *     only ever fires for Claude Code / Cowork sessions. Codex uses its own,
+ *     unrelated notification mechanism and a different on-disk transcript
+ *     format (where the model and version are recorded differs), so its
+ *     transcripts do not flow through here unless someone deliberately wires
+ *     this binary into a Codex-style runner.
+ *   - To avoid *silently mislabeling* such a session as `claude_code`, the
+ *     `AGENT_TRANSCRIPT_CAPTURE_AGENT_NAME` env var (see `resolveAgentName`) is
+ *     the supported escape hatch: set it to e.g. `codex` and the manifest
+ *     `agent` field is tagged correctly. Note that `collectSession` and the
+ *     model/version extraction below still assume Claude's JSONL layout, so a
+ *     real Codex integration needs a dedicated `CodexAdapter` (TODO) that knows
+ *     Codex's transcript shape. The model extractor is written defensively —
+ *     it returns an empty list for any transcript it can't parse as Claude
+ *     JSONL — so a mis-wired Codex transcript yields empty `models` rather than
+ *     fabricated Claude model names.
  */
 export function detectAgent(hookInput: HookInput): AgentAdapter {
   return new ClaudeAdapter(resolveAgentName(hookInput));

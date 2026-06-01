@@ -119,13 +119,23 @@ async function main() {
         return { path: file.archivePath, content };
     });
     // 5. Build manifest and tar.gz archive.
+    //
+    // `models` / `model` are derived from the transcript (not a hook-time guess)
+    // so a mid-session model switch is captured: `models` is every distinct
+    // model in order of first appearance, `model` is the current/last one.
     const now = new Date();
+    const { models, current: model } = adapter.agentModels(bundle);
     const manifest = {
-        version: 1,
+        // Schema v2 added `models` + `model`. v1 consumers that key off fixed
+        // fields keep working — the new fields are additive — but anything that
+        // validates the exact field set should branch on `version`.
+        version: 2,
         created: now.toISOString(),
         session_id: bundle.sessionId,
         agent: adapter.name,
         agent_version: adapter.agentVersion(hookInput),
+        models,
+        model,
         privacy_mode: config.privacy.mode,
         user_id: userId,
         files: archiveEntries.map((e) => e.path),

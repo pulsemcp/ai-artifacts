@@ -49,8 +49,25 @@ function resolveAgentName(hookInput) {
  * Today both Claude Code (host CLI) and Claude Cowork (same CLI inside the
  * desktop app's VM) write the same JSONL layout, so they share `ClaudeAdapter`
  * — the only difference is the `name` it reports. When a genuinely different
- * agent surface (Cursor, etc.) grows hook support, branch here on a new
- * adapter class.
+ * agent surface grows hook support, branch here on a new adapter class.
+ *
+ * Codex (and other non-Claude runtimes) — NOT auto-detected, by design:
+ *   - This hook is wired into *Claude Code's* `Stop` event, so in normal use it
+ *     only ever fires for Claude Code / Cowork sessions. Codex uses its own,
+ *     unrelated notification mechanism and a different on-disk transcript
+ *     format (where the model and version are recorded differs), so its
+ *     transcripts do not flow through here unless someone deliberately wires
+ *     this binary into a Codex-style runner.
+ *   - To avoid *silently mislabeling* such a session as `claude_code`, the
+ *     `AGENT_TRANSCRIPT_CAPTURE_AGENT_NAME` env var (see `resolveAgentName`) is
+ *     the supported escape hatch: set it to e.g. `codex` and the manifest
+ *     `agent` field is tagged correctly. Note that `collectSession` and the
+ *     model/version extraction below still assume Claude's JSONL layout, so a
+ *     real Codex integration needs a dedicated `CodexAdapter` (TODO) that knows
+ *     Codex's transcript shape. The model extractor is written defensively —
+ *     it returns an empty list for any transcript it can't parse as Claude
+ *     JSONL — so a mis-wired Codex transcript yields empty `models` rather than
+ *     fabricated Claude model names.
  */
 function detectAgent(hookInput) {
     return new claude_1.ClaudeAdapter(resolveAgentName(hookInput));
