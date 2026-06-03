@@ -22,6 +22,7 @@ Per-Segment ambition check. Runs only on Segments with `trigger.kind == "New" &&
 - `next_user_new_segments`: the next 1-3 Segments in the same Transcript with the same Trigger shape (`kind: New, source: user`) — needed to detect the "user split work" pattern. May be empty when this is a root Segment with no following user-source New sibling.
 - `transcript.json`: the OpenTranscripts `Transcript` document, available to dereference event ids when needed.
 - `external_context` (optional): `external-context.json` if present — useful for spotting recurring user-triggers that should be deterministic.
+- `philosophy_prompting`: the `philosophy-on-prompting` reference — grounds what "ambitious" means (a single end-to-end definition of done, not a longer hand-hold) and why the deterministic trigger is the north-star case.
 
 ## Output
 
@@ -48,7 +49,7 @@ Evidence cites **OpenTranscripts event ids** (the `id` strings in `transcript.js
 - [ ] Confirm `segment.trigger.kind == "New" && segment.trigger.source == "user"`. If not, return early — this skill only applies to user-typed New Triggers.
 - [ ] Pull the Segment's wall-clock from `meta`. If short (< a few minutes by default) **and** the next user-source New Trigger fires soon after **and** that next prompt's Goal overlaps this one's, flag as `unambitious`.
 - [ ] If this is a **root Segment** with no following user-source New sibling (`next_user_new_segments` is empty), there is no split-work pattern to detect: set `evidence.next_user_new_within_s = null`, `evidence.next_user_new_goal_overlap = "none"`, note "root — no following prompt to compare", and judge `ambition_finding` on the prompt's own scope alone (it cannot be `unambitious` on the split-work basis). The deterministic-trigger check below still applies.
-- [ ] If `unambitious`, draft a `prompting_recommendation`: what one combined prompt would have set both Goals up front?
+- [ ] If `unambitious`, draft a `prompting_recommendation`: what one combined prompt — a single end-to-end definition of done, per `philosophy-on-prompting` — would have set both Goals up front?
 - [ ] Independently, ask: **does this user-typed New Trigger look like an ad-hoc reaction to an external event** (alert, ticket, schedule, PR opening, build break)? If yes, set `deterministic_trigger_candidate = true` and draft a `trigger_proposal` naming the system that should have fired the prompt instead. This is the north-star case per the `transcript-segment` reference.
 - [ ] For `appropriately_scoped` and `ambitious`, set the recommendation fields to null. Producing no finding is a real outcome.
 
