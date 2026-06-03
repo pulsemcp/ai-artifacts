@@ -10,6 +10,11 @@
     "description": "Team stance on when an MCP server is the right answer — and when it isn't. When to create, modify, or delete an MCP server.",
     "path": "philosophy-on-mcp.md"
   },
+  "philosophy-on-prompting": {
+    "title": "Philosophy on Prompting",
+    "description": "Team stance on what makes a good prompt — closing the agentic loop. Turning short hand-held turns into productive closed-loop runs via an end-to-end definition of done, verification, and observability. Grounds the human-prompting analyzers.",
+    "path": "philosophy-on-prompting.md"
+  },
   "open-transcripts": {
     "title": "OpenTranscripts",
     "description": "Vendor-neutral data model for coding-agent transcripts. The Transcript wrapper, the event catalog, and the Transcript Segment analysis layer.",

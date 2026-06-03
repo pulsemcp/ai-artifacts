@@ -30,6 +30,7 @@ The Transcript Segment is the analysis primitive. See the `transcript-segment` r
 - `external_context` (optional): `external-context.json` in the same `tmp_dir`, produced by `gather-agent-transcript-external-context`. The ticket, PR, and user context behind the session. When present, pass it through to phase 2 and the phase-3 analyzers so Goal/Outcome judgments are grounded in *why* the session happened. Best-effort: absent is fine, never fatal.
 - `philosophy_skills` (optional): the `philosophy-on-skills` reference. Defaults to the bundled copy. Available to the phase-3 analyzers.
 - `philosophy_mcp` (optional): the `philosophy-on-mcp` reference. Defaults to the bundled copy. Available to the phase-3 analyzers.
+- `philosophy_prompting` (optional): the `philosophy-on-prompting` reference. Defaults to the bundled copy. Available to the phase-3 prompts-bucket analyzers (`analyze-agent-transcript-user-prompt`, `analyze-agent-transcript-prompt-ambition`).
 - `transcript_segment_spec` (optional): the `transcript-segment` reference. Defaults to the bundled copy.
 
 ## Outputs

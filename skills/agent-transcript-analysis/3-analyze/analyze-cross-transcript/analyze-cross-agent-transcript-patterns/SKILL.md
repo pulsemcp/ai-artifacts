@@ -32,7 +32,7 @@ It reads the **per-transcript analysis outputs** of many transcripts — the `fi
 - `transcripts` (required): the list of per-transcript `tmp_dir`s that make up the batch — one per already-analyzed transcript. Each contributes its phase-3 findings set: `findings.outcomes.json`, `findings.prompts.json`, `findings.skills.json`, `findings.mcp.json`. These are the outputs of `analyze-agent-transcript`'s per-Segment analyzers — not the `report.md` / `findings.report.json` that `synthesize-agent-transcript-analysis-report` produces. The per-transcript `segments.json` sits in the same `tmp_dir` and may be read alongside the findings for Segment/Trigger detail. Every findings item carries `id` (unique within its file), `segment_id`, `analyzer`, plus analyzer-specific fields; evidence references are OpenTranscripts event ids, never integer turn indices.
 - Per-transcript findings files may diverge in id scheme across orchestrator runs — different runs may number their items differently. Treat finding ids as unique batch-wide and cite them as-is; don't assume a uniform scheme across transcripts.
 - `batch_dir` (optional): the batch-level working directory `findings.cross-transcript.json` is written into — distinct from any single transcript's `tmp_dir`. Defaults to a new tmp dir created for the batch. `synthesize-agent-transcript-analysis-report` reads this same `batch_dir`.
-- `philosophy_skills`, `philosophy_mcp`: the same references the per-transcript analyzers used.
+- `philosophy_skills`, `philosophy_mcp`, `philosophy_prompting`: the same references the per-transcript analyzers used — `philosophy-on-prompting` grounds recurring-user-prompt and deterministic-trigger patterns in the closed-loop stance.
 
 ## Output
 

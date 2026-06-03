@@ -21,6 +21,7 @@ Per-user-Trigger analyzer. Invoked once per Segment whose `trigger.source == "us
 - `surrounding_segments`: parent and prior sibling — useful for grounding goal extraction and detecting whether a user-source Correction trigger was the user reacting to a Failure.
 - `transcript.json`: the OpenTranscripts `Transcript` document, available to dereference event ids from `segment.meta.event_range` when surrounding events are needed.
 - `external_context` (optional): `external-context.json` if present — supplies project / branch / repo / ticket context behind the session.
+- `philosophy_prompting`: the `philosophy-on-prompting` reference — the team's stance on closed agentic loops (end-to-end definition of done, verification, observability). Judge `closed_loop` and any `prompting_recommendation` against it.
 
 ## Output
 
@@ -48,7 +49,7 @@ Evidence cites **OpenTranscripts event ids** (the `id` strings in `transcript.js
 - [ ] Read `segment.trigger`. The kind (New | Correction) and source (user) are already set by Phase 2 — trust them
 - [ ] Classify the user message (`segment.trigger.text`): is it a **question** (the user wants information back), a **delegation** (the user wants the agent to do something), or **mixed**?
 - [ ] Confirm `goal_certainty`. If it would be `low`, invoke `pull-together-agent-transcript-goal-context` with the Segment and `external_context` before giving up
-- [ ] Determine whether the Segment **closed the loop** on its Goal:
+- [ ] Determine whether the Segment **closed the loop** on its Goal. Per the `philosophy-on-prompting` reference, a closed-loop Trigger carries an end-to-end *definition of done* and (where the Goal needs it) the verification + observability the agent needs to finish unaided — not a step-by-step hand-hold:
   - The Segment's Outcome from `segments.json` is the source of truth — Success = closed, Failure = not closed
   - If the next sibling Segment opens with a Correction trigger (either source), this Segment is a retro-Failure even if `outcome == Success`; flag it accordingly (user-source Correction is the stronger flag)
   - **`closed_loop` reflects the *prompt's* own merit**, not whether the run happened to finish. If the loop broke for a reason unrelated to the prompt — the session was killed, the harness crashed, an infra/network failure, the user revoked access mid-run — keep `closed_loop` set per whether the prompt was self-contained enough to have closed the loop, and record the external break in `loop_break_reason` explicitly tagged as non-prompt (e.g. `"non-prompt: harness crash at <event_id>"`). Don't penalize a well-formed prompt for an infra failure
@@ -56,7 +57,7 @@ Evidence cites **OpenTranscripts event ids** (the `id` strings in `transcript.js
   - **Incorrect** — the user asked for the wrong thing
   - **Ambiguous** — the message left room for interpretation that hurt the Outcome
   - **Missing context** — the agent could only have succeeded with information the user didn't provide
-- [ ] If a prompting issue is the root cause of a Failure or retro-Failure, write a concrete `prompting_recommendation` showing what a better version of the user message would have looked like. Set `recommendation_route` to where the fix lives (usually `prompting`; `skills` or `mcp` when the message itself was fine but the agent needed a missing tool)
+- [ ] If a prompting issue is the root cause of a Failure or retro-Failure, write a concrete `prompting_recommendation` showing what a better version of the user message would have looked like — per `philosophy-on-prompting`, usually a definition of done plus how the agent should verify it. Set `recommendation_route` to where the fix lives (usually `prompting`; route to `skills` or `mcp` when the message itself was fine but the agent hit a *foreseeable capability gap* the prompt couldn't have closed — no browser, no log access, no MCP server for the system the work lives in)
 
 ## Notes
 

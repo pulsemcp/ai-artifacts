@@ -24,7 +24,7 @@ Per-Segment analyzer for Failure Outcomes and retro-Failures.
 - `surrounding_segments`: the parent Segment, the prior sibling, and the next sibling — needed to reason about retro-Failures and recovery.
 - `transcript.json`: the OpenTranscripts `Transcript` document, available to dereference event ids from `segment.meta.event_range` when you need turn-level evidence.
 - `external_context` (optional): `external-context.json` if present — grounds the hypothesis in *why* the session happened.
-- `philosophy_skills`, `philosophy_mcp`: reference docs, so the hypothesis stays in line with team stance.
+- `philosophy_skills`, `philosophy_mcp`, `philosophy_prompting`: reference docs, so the hypothesis stays in line with team stance. `philosophy-on-prompting` grounds the `prompting_issue` root-cause class — judge whether the prompt failed to close its loop (no definition of done / verification) vs. hit a foreseeable capability gap that routes to a Skill or MCP server.
 
 ## Output
 

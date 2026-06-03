@@ -56,12 +56,13 @@ If a segment produces no recommendation in any bucket, it didn't need analysis �
 
 The team's "when to create or modify a Skill" heuristics — agent makes a mistake despite a correct prompt; the same long prompt is being written twice; a segment of work is repeated within or across sessions; the agent spins its wheels; the user can't write a closed-loop prompt due to foreseeable gaps — are the *signals* the analyzers look for. The recommendations above are the *output* those signals are translated into.
 
-For the team's evolving stance on what makes a good Skill or MCP server, see:
+For the team's evolving stance on what makes a good prompt, Skill, or MCP server, see:
 
 - [`references/philosophy-on-skills.md`](references/philosophy-on-skills.md)
 - [`references/philosophy-on-mcp.md`](references/philosophy-on-mcp.md)
+- [`references/philosophy-on-prompting.md`](references/philosophy-on-prompting.md) — closing the agentic loop; grounds the human-prompting analyzers
 
-Every analysis skill should consult these before recommending a create/modify/delete.
+The Skills/MCP analyzers consult the matching philosophy before recommending a create/modify/delete; the prompting analyzers consult `philosophy-on-prompting` when judging whether a prompt closed its loop.
 
 #### Workflow
 
