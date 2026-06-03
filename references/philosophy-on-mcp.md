@@ -2,7 +2,7 @@
 
 This document captures the team's stance on **when an MCP server is the right answer** — and when it isn't; when to **create**, **modify**, or **delete** one. Every `analyze-mcp-*` skill in this plugin should consult this document before recommending a `create`, `modify`, or `delete`.
 
-It is grounded in the team's published thinking — [*How to use MCP effectively*](https://www.pulsemcp.com/posts/how-to-use-mcp-effectively) — distilled into the operational rules below. The **Default stance** section remains the load-bearing, fast-path ruleset the analyzers lean on; the sections after it fill in the *why* and the harder calls (selection, sizing, configuration, emerging capabilities). A handful of genuinely open questions remain in **Still open** at the end — findings that turn on those should still carry `tentative: true` in their `philosophy_check`.
+It is grounded in the team's published thinking — [*How to use MCP effectively*](https://www.pulsemcp.com/posts/how-to-use-mcp-effectively) — distilled into the operational rules below. The **Default stance** section remains the load-bearing, fast-path ruleset the analyzers lean on; the sections after it fill in the *why* and the harder calls (selection, sizing, configuration, emerging capabilities). A handful of genuinely open questions remain in **Still open** at the end — findings that turn on those should still be flagged `tentative`.
 
 ## Default stance
 
@@ -15,10 +15,10 @@ These are the load-bearing rules — the fast path for `analyze-mcp-*`. The sect
 
 ### How this maps to the `analyze-mcp-*` recommendation buckets
 
-- **`create`** (new MCP server) — when the capability is an external connection (rule 1) or dependency-heavy (rule 3) and isn't yet behind MCP, and there's a recurring/shared workflow behind it (see *When an MCP server is the right answer*). Carry `tentative` only for the **Still open** cases at the end.
+- **`create`** (new MCP server) — when the capability is an external connection (rule 1) or dependency-heavy (rule 3) and isn't yet behind MCP, and there's a recurring/shared workflow behind it (see *When an MCP server is the right answer*). Flag `tentative` for the rule-4 migrate nudge (below) and for the **Still open** cases at the end.
 - **`modify`** (existing MCP server) — narrow the tool surface, fix response shapes, tighten auth, add idempotency guards. These are bug fixes — don't gate them on the open questions below.
 - **`delete` / `replace`** — only when the underlying capability is gone or the server has been superseded. Don't recommend deletion just to migrate something from "CLI" to "MCP" — that's a `create` finding plus an eventual cleanup, not a `delete`.
-- **Warning-level migrate recommendation** (the rule-4 case) — emit as `create` with `priority: low` (or `medium` if the CLI is causing real pain — error surface, output-size overflow, brittle parsing) and a `tentative: true` flag in `philosophy_check`.
+- **Warning-level migrate recommendation** (the rule-4 case) — emit as `create` with `priority: low` (or `medium` if the CLI is causing real pain — error surface, output-size overflow, brittle parsing) and a `tentative: true` flag.
 
 The `gh` exception is hard-coded: if the only "external connection without MCP" you can name is `gh`, **do not emit a finding**.
 
@@ -76,7 +76,7 @@ The protocol is moving; two additions worth weighing when shaping a `create`/`mo
 
 ## Still open
 
-A few questions the published philosophy doesn't fully settle. Findings that turn primarily on these should carry `tentative: true` in `philosophy_check`:
+A few questions the published philosophy doesn't fully settle. Findings that turn primarily on these should be flagged `tentative`:
 
 - The precise credential-handling and secret-storage conventions for *our* team's self-hosted/built servers.
 - When a Skill that orchestrates several MCP tool calls is better than letting the agent invoke them freely.
