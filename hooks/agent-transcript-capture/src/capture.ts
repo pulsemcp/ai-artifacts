@@ -11,7 +11,7 @@ import { HookInput, detectAgent } from "./adapters/interface";
 import { createBackend } from "./backends/interface";
 import { loadConfig, toBackendConfig } from "./config";
 import { redactContent } from "./redactor";
-import { getUsername, sanitizeUserId } from "./identity";
+import { resolveUploadIdentity, sanitizeUserId } from "./identity";
 import { buildTarGz, ArchiveEntry } from "./archive";
 import { showError } from "./error-page";
 import { appendRecord } from "./manifest";
@@ -82,6 +82,10 @@ async function main(): Promise<void> {
     process.exit(0);
   }
 
+  if (hookInput.stop_hook_active) {
+    process.exit(0);
+  }
+
   // 2. Load config (lives alongside the hook, not in the project).
   const config = loadConfig();
   if (!config) {
@@ -94,7 +98,8 @@ async function main(): Promise<void> {
 
   // 4. Redact if configured.
   const isRedacted = config.privacy.mode === "redacted";
-  const userId = sanitizeUserId(getUsername());
+  const identity = resolveUploadIdentity(hookInput);
+  const userId = sanitizeUserId(identity.rawUserId);
 
   const archiveEntries: ArchiveEntry[] = bundle.files.map((file) => {
     let content = file.content;
@@ -116,10 +121,10 @@ async function main(): Promise<void> {
   const now = new Date();
   const { models, current: model } = adapter.agentModels(bundle);
   const manifest: Record<string, unknown> = {
-    // Schema v2 added `models` + `model`. v1 consumers that key off fixed
-    // fields keep working — the new fields are additive — but anything that
-    // validates the exact field set should branch on `version`.
-    version: 2,
+    // Schema v3 added `identity`. Earlier consumers that key off fixed fields
+    // keep working — the new fields are additive — but anything that validates
+    // the exact field set should branch on `version`.
+    version: 3,
     created: now.toISOString(),
     session_id: bundle.sessionId,
     agent: adapter.name,
@@ -128,6 +133,7 @@ async function main(): Promise<void> {
     model,
     privacy_mode: config.privacy.mode,
     user_id: userId,
+    identity: identity.metadata,
     files: archiveEntries.map((e) => e.path),
   };
   const extra = resolveExtraMetadata(process.env[EXTRA_METADATA_ENV_VAR]);

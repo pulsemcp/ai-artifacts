@@ -98,6 +98,9 @@ async function main() {
     if (!hookInput.session_id || !hookInput.transcript_path) {
         process.exit(0);
     }
+    if (hookInput.stop_hook_active) {
+        process.exit(0);
+    }
     // 2. Load config (lives alongside the hook, not in the project).
     const config = (0, config_1.loadConfig)();
     if (!config) {
@@ -108,7 +111,8 @@ async function main() {
     const bundle = await adapter.collectSession(hookInput);
     // 4. Redact if configured.
     const isRedacted = config.privacy.mode === "redacted";
-    const userId = (0, identity_1.sanitizeUserId)((0, identity_1.getUsername)());
+    const identity = (0, identity_1.resolveUploadIdentity)(hookInput);
+    const userId = (0, identity_1.sanitizeUserId)(identity.rawUserId);
     const archiveEntries = bundle.files.map((file) => {
         let content = file.content;
         if (isRedacted && file.redactable) {
@@ -126,10 +130,10 @@ async function main() {
     const now = new Date();
     const { models, current: model } = adapter.agentModels(bundle);
     const manifest = {
-        // Schema v2 added `models` + `model`. v1 consumers that key off fixed
-        // fields keep working — the new fields are additive — but anything that
-        // validates the exact field set should branch on `version`.
-        version: 2,
+        // Schema v3 added `identity`. Earlier consumers that key off fixed fields
+        // keep working — the new fields are additive — but anything that validates
+        // the exact field set should branch on `version`.
+        version: 3,
         created: now.toISOString(),
         session_id: bundle.sessionId,
         agent: adapter.name,
@@ -138,6 +142,7 @@ async function main() {
         model,
         privacy_mode: config.privacy.mode,
         user_id: userId,
+        identity: identity.metadata,
         files: archiveEntries.map((e) => e.path),
     };
     const extra = resolveExtraMetadata(process.env[exports.EXTRA_METADATA_ENV_VAR]);

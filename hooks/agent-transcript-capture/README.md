@@ -47,7 +47,7 @@ tool-results/
 
 | Field           | Type                | Notes                                                                                                                              |
 | --------------- | ------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
-| `version`       | `number`            | Manifest schema version (currently `2`). See [Schema versions](#schema-versions).                                                  |
+| `version`       | `number`            | Manifest schema version (currently `3`). See [Schema versions](#schema-versions).                                                  |
 | `created`       | `string` (ISO 8601) | When the archive was built.                                                                                                        |
 | `session_id`    | `string`            | The agent's session UUID.                                                                                                          |
 | `agent`         | `string`            | MCP-client-specific identifier. Auto-detected from the transcript path (`/local-agent-mode-sessions/` → `"claude_cowork"`, otherwise `"claude_code"`). Override with `AGENT_TRANSCRIPT_CAPTURE_AGENT_NAME`. |
@@ -55,7 +55,8 @@ tool-results/
 | `models`        | `string[]`          | Distinct models used across the session, **in order of first appearance**, parsed from the transcript. Captures mid-session switches (see [Models](#models-manifestmodels--manifestmodel)). Empty `[]` when none could be inferred. |
 | `model`         | `string \| null`    | Convenience: the current/most-recent model (the last assistant message's model). `null` when none could be inferred. |
 | `privacy_mode`  | `"full" \| "redacted"` | Mirrors the configured privacy mode.                                                                                            |
-| `user_id`       | `string`            | Sanitized local username.                                                                                                          |
+| `user_id`       | `string`            | Sanitized upload identity used in the object key. For Claude Code this is the Claude auth email when available, then the local OS username. For Claude Cowork this is resolved from Cowork sidecars, never from the host Claude Code CLI identity. |
+| `identity`      | `object`            | Best-effort identity source metadata and diagnostics. For Cowork this records sidecar/source status, resolved email/name fields, UUID cross-checks, and non-fatal diagnostics such as CLI session ID mismatches. |
 | `files`         | `string[]`          | All file paths inside the archive (excluding the manifest itself).                                                                 |
 | `extra`         | any (optional)      | Opaque user-supplied metadata; **omitted entirely when `AGENT_TRANSCRIPT_CAPTURE_EXTRA_METADATA` is unset** (see below).           |
 
@@ -64,7 +65,8 @@ A single interactive session may produce multiple Stops (one per completed task)
 #### Schema versions
 
 - **v1** — original field set (`version`, `created`, `session_id`, `agent`, `agent_version`, `privacy_mode`, `user_id`, `files`, optional `extra`).
-- **v2** — adds `models` and `model`. The change is **purely additive**: every v1 field keeps the same name, type, and meaning. Consumers that read fields by name keep working against v2 unchanged. Consumers that strictly validate the exact field set should branch on `version` (`>= 2` ⇒ expect `models`/`model`).
+- **v2** — adds `models` and `model`.
+- **v3** — adds `identity`. The v2 and v3 changes are **purely additive**: every v1 field keeps the same name, type, and meaning. Consumers that read fields by name keep working unchanged. Consumers that strictly validate the exact field set should branch on `version` (`>= 2` ⇒ expect `models`/`model`; `>= 3` ⇒ expect `identity`).
 
 ### Agent identifier (`manifest.agent`)
 
@@ -75,6 +77,24 @@ The `agent` field in `manifest.json` tells downstream consumers which MCP client
 3. Default: `"claude_code"` — covers the standard `~/.claude/projects/` host CLI install and anything else we don't recognize.
 
 An empty `AGENT_TRANSCRIPT_CAPTURE_AGENT_NAME` is treated as unset and falls through to the path heuristic.
+
+### Upload identity (`manifest.user_id` / `manifest.identity`)
+
+`user_id` is the sanitized identity segment used in the upload object key. It is organizational routing metadata, not an authentication boundary.
+
+For standard Claude Code sessions, the hook preserves the existing fallback chain:
+
+1. `claude auth status` email, when available.
+2. Local OS username.
+3. `unknown`.
+
+For Claude Cowork / desktop local-agent-mode sessions, the host Claude Code CLI identity is intentionally ignored. Cowork runs under macOS `~/Library/Application Support/Claude/local-agent-mode-sessions`, but the transcript JSONL does not contain the logged-in Cowork user. The hook resolves Cowork identity from sidecars in this order:
+
+1. Session metadata sidecar beside the session directory: `<organizationUuid>/local_<coworkSessionUuid>.json`. `emailAddress` is primary, with `accountName` recorded when present. `cliSessionId` is used only as a bridge diagnostic against the Stop-hook `session_id`; mismatches are recorded and do not fail capture.
+2. Session `.claude/.claude.json` sidecar: `oauthAccount` fills gaps and records richer metadata when available, including `emailAddress`, `accountUuid`, `organizationUuid`, `displayName`, `organizationName`, `organizationType`, `seatTier`, and `billingType`.
+3. Stable non-PII Cowork fallback: `cowork-<accountUuid-prefix>` from the OAuth account or Cowork path account UUID. If that is unavailable, `unknown`.
+
+Path account and organization UUIDs are recorded as cross-checks only; the hook does not infer an email address from directory names. Missing or malformed sidecars never stop transcript capture. Diagnostics are emitted under `manifest.identity.diagnostics`.
 
 #### Codex and other non-Claude runtimes
 
@@ -95,7 +115,7 @@ Example manifest from a session that started on Opus, switched to Sonnet, then s
 
 ```json
 {
-  "version": 2,
+  "version": 3,
   "agent": "claude_code",
   "agent_version": "2.1.138",
   "models": ["claude-opus-4-8", "claude-sonnet-4-6"],

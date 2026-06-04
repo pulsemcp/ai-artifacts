@@ -11,6 +11,7 @@ export interface HookInput {
   session_id: string;
   transcript_path: string;
   cwd: string;
+  stop_hook_active?: boolean;
   permission_mode?: string;
   hook_event_name?: string;
   /**
