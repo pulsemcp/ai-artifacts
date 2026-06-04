@@ -96,6 +96,8 @@ For Claude Cowork / desktop local-agent-mode sessions, the host Claude Code CLI 
 
 Path account and organization UUIDs are recorded as cross-checks only; the hook does not infer an email address from directory names. Missing or malformed sidecars never stop transcript capture. Diagnostics are emitted under `manifest.identity.diagnostics`.
 
+`identity` is organizational routing/diagnostic metadata and is **not** subject to `redacted` privacy mode — like the rest of `manifest.json` (e.g. `user_id`, `session_id`), it is written verbatim. Privacy redaction only applies to the captured transcript / tool-result file contents, not to the manifest. Treat any resolved email, display name, or organization fields as present in every manifest regardless of `privacy_mode`.
+
 #### Codex and other non-Claude runtimes
 
 This hook is wired into **Claude Code's `Stop` event**, so in normal operation it only ever fires for Claude Code / Cowork sessions. Codex uses its own, unrelated notification mechanism and a **different transcript format** (where the model and version are recorded differs), so Codex transcripts do not flow through this hook unless someone deliberately wires this binary into a Codex-style runner.

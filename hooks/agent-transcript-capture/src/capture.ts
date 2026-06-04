@@ -82,10 +82,6 @@ async function main(): Promise<void> {
     process.exit(0);
   }
 
-  if (hookInput.stop_hook_active) {
-    process.exit(0);
-  }
-
   // 2. Load config (lives alongside the hook, not in the project).
   const config = loadConfig();
   if (!config) {

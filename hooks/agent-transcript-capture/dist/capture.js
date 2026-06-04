@@ -98,9 +98,6 @@ async function main() {
     if (!hookInput.session_id || !hookInput.transcript_path) {
         process.exit(0);
     }
-    if (hookInput.stop_hook_active) {
-        process.exit(0);
-    }
     // 2. Load config (lives alongside the hook, not in the project).
     const config = (0, config_1.loadConfig)();
     if (!config) {

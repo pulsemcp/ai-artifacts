@@ -105,6 +105,11 @@ function readJsonObject(filePath: string): JsonObject | null {
   }
 }
 
+// Deliberately stricter than the loose `/local-agent-mode-sessions/` substring
+// check that `detectAgent` uses to tag the `agent` field. Identity resolution
+// requires the exact `<root=local-agent-mode-sessions>/<account>/<org>/local_*`
+// layout so it can locate the sidecars; a transcript tagged `claude_cowork`
+// that doesn't match this structure safely degrades to the host fallback.
 function isCoworkSessionDir(candidate: string): boolean {
   if (!COWORK_SESSION_RE.test(path.basename(candidate))) return false;
 
